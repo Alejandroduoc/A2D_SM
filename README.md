@@ -12,6 +12,10 @@ Proyecto APT122 — Duoc UC
 - [Problema que resuelve](#problema-que-resuelve)
 - [Usuarios objetivo](#usuarios-objetivo)
 - [Alcance funcional](#alcance-funcional)
+- [Tecnologías utilizadas](#tecnologías-utilizadas)
+- [Arquitectura de la solución](#arquitectura-de-la-solución)
+- [Metodología de trabajo](#metodología-de-trabajo)
+- [Instrucciones para ejecutar el proyecto localmente](#instrucciones-para-ejecutar-el-proyecto-localmente)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Integrantes del equipo](#integrantes-del-equipo)
 
@@ -45,6 +49,33 @@ asegurando la disponibilidad y confiabilidad de la información.
 - Gestión de catálogos.
 - Auditoría de cambios.
 
+## Tecnologías utilizadas
+
+| Capa | Tecnología |
+| --- | --- |
+| Lenguaje (backend) | Python |
+| Framework (backend) | FastAPI |
+| Autenticación | JWT (JSON Web Tokens) |
+| Frontend | React |
+| Base de datos | Microsoft SQL Server |
+| Cloud | Por definir |
+
+## Arquitectura de la solución
+
+> Por definir. Se incluirá una descripción y/o diagrama de la arquitectura
+> (componentes, capas y flujo de datos entre frontend, backend y base de datos).
+
+## Metodología de trabajo
+
+El equipo trabaja con **Scrum**, organizando el desarrollo en sprints con
+ceremonias de planificación, revisión y retrospectiva.
+
+## Instrucciones para ejecutar el proyecto localmente
+
+> Por definir. Se documentarán los pasos para levantar el backend (FastAPI),
+> el frontend (React) y la conexión a Microsoft SQL Server, junto con las
+> variables de entorno necesarias.
+
 ## Estructura del repositorio
 
 ```text
@@ -64,8 +95,8 @@ A2D_SM/
 
 ## Integrantes del equipo
 
-| Integrante | Carpeta de evidencias |
-| --- | --- |
-| Alejandro Rodríguez | [Alejandro_Rodriguez](Fase_1/Evidencias_Individuales/Alejandro_Rodriguez/) |
-| Diego Carrillo | [Diego_Carrillo](Fase_1/Evidencias_Individuales/Diego_Carrillo/) |
-| Angelo Galindo | [Angelo_Galindo](Fase_1/Evidencias_Individuales/Angelo_Galindo/) |
+| Integrante | Rol | Carpeta de evidencias |
+| --- | --- | --- |
+| Alejandro Rodríguez | _Por definir_ | [Alejandro_Rodriguez](Fase_1/Evidencias_Individuales/Alejandro_Rodriguez/) |
+| Diego Carrillo | _Por definir_ | [Diego_Carrillo](Fase_1/Evidencias_Individuales/Diego_Carrillo/) |
+| Angelo Galindo | _Por definir_ | [Angelo_Galindo](Fase_1/Evidencias_Individuales/Angelo_Galindo/) |
