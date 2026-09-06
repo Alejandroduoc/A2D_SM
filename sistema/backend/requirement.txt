@@ -1,0 +1,13 @@
+fastapi==0.115.6 #framenwork 
+uvicorn[standard]==0.34.0 #levanta el servicio en el puerto 8000
+sqlalcghemy==2.0.36 #escritura de sql como clases 
+pydantic==2.10.4 #verifica lso datos de entrada y salida de la API
+pydantic-settings=2.7.1 #leer configuracion de variables de entorno 
+python-jose[cryptography]==3.3.0 #crea y verifica los JWT ,firma criptografica 
+passlib[bcrypt]==1.7.4 #maneja hashing  de contraseñas
+bcrypt==4.0.1 #el algoritmo de hasing que passlib ,esta version es compatible con passlib 
+python-muntipart==0.0.20 #necesario apra fastapi pueda leer formularios 
+pyodbc==5.2.0 #driver para hablar con sqlserver
+alembic=1.14.0 #migraciones , cada cambio de migrado con alembic
+
+#Cada línea tiene ==X.Y.Z en vez de >=. Así, cuando otra persona del equipo (o Docker) instala las dependencias, obtiene exactamente las mismas versiones y el proyecto se comporta igual en todas las máquinas. El caso de bcrypt==4.0.1 de arriba muestra por qué importa.
