@@ -22,3 +22,7 @@ app.add_middleware(
 app.include_router(auth.router,
                    prefix=settings.api_v1_prefix
                    )  # Incluimos el enrutador de autenticación
+
+@app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
+def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz
+    return {"status": "ok"}  # Retornamos un diccionario con el estado de la API
