@@ -62,8 +62,28 @@ asegurando la disponibilidad y confiabilidad de la información.
 
 ## Arquitectura de la solución
 
-> Por definir. Se incluirá una descripción y/o diagrama de la arquitectura
-> (componentes, capas y flujo de datos entre frontend, backend y base de datos).
+## 1. Decisiones de arquitectura
+
+| Decisión | Elección | Motivo |
+|---|---|---|
+| Backend | **Python + FastAPI** | Tipado con Pydantic, docs OpenAPI automáticas. |
+| ORM / Migraciones | SQLAlchemy 2.0 + Alembic | Estándar de facto en el ecosistema FastAPI. |
+| Base de datos | **SQL Server** (se mantiene) | Migración de datos motor-a-mismo-motor es más simple; se reutiliza lógica de ~30 stored procedures existentes del sistema legacy en vez de reescribirla de cero. |
+| Frontend | **React (Vite) + Tailwind** | SPA desacoplada, consistente con el backend REST. |
+| Autenticación | JWT (access + refresh) | Sin sesiones server-side acopladas a un solo servidor. |
+| Infraestructura | Docker + docker-compose | Portable y reproducible entre miembros del equipo. |
+
+**Principio no negociable:** ningún cliente (browser) accede directo a la base de datos. Todo pasa por la API. Esta es la corrección central del problema de seguridad del sistema legacy (VB.NET 2008 WinForms + PHP, con SQL injection y conexión directa cliente-BD verificadas en el código fuente real — `Backup/socradex/Form4.vb`).
+
+---
+
+## 2. Arquitectura en capas
+
+Toda petición sigue el mismo camino, sin excepciones:
+
+```
+Frontend (React)  →  Router (FastAPI)  →  Service (lógica de negocio)  →  Model (SQLAlchemy)  →  Base de datos
+```
 
 ## Metodología de trabajo
 
