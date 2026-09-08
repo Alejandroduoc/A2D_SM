@@ -97,6 +97,6 @@ A2D_SM/
 
 | Integrante | Rol | Carpeta de evidencias |
 | --- | --- | --- |
-| Alejandro Rodríguez | _Por definir_ | [Alejandro_Rodriguez](Fase_1/Evidencias_Individuales/Alejandro_Rodriguez/) |
-| Diego Carrillo | _Por definir_ | [Diego_Carrillo](Fase_1/Evidencias_Individuales/Diego_Carrillo/) |
-| Angelo Galindo | _Por definir_ | [Angelo_Galindo](Fase_1/Evidencias_Individuales/Angelo_Galindo/) |
+| Alejandro Rodríguez | Project manager | [Alejandro_Rodriguez](Fase_1/Evidencias_Individuales/Alejandro_Rodriguez/) |
+| Diego Carrillo | Analista BD | [Diego_Carrillo](Fase_1/Evidencias_Individuales/Diego_Carrillo/) |
+| Angelo Galindo | QA | [Angelo_Galindo](Fase_1/Evidencias_Individuales/Angelo_Galindo/) |
