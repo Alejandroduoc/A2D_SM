@@ -26,3 +26,4 @@ def get_settings() -> Settings:
     return Settings()   
 settings = get_settings() # se llama a la función y se guarda la instancia en la variable settings. Esta variable se puede importar en otros módulos para acceder a la configuración.   
 
+        
