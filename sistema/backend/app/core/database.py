@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 # Clase base para declarar los modelos de la base de datos.
 # Representa una sesión activa para ejecutar consultas y transacciones.
 # Crea una fábrica reutilizable de sesiones de base de datos.
-from sqlalchemy.orm import Declarativebase,Session,sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 # Importa la configuración de conexión definida para la aplicación.
 from app.core.config import settings 
@@ -23,7 +23,10 @@ from app.core.config import settings
 # Usa la URL de conexión configurada en settings.
 # echo=True muestra en la consola las consultas SQL ejecutadas.
 # future=True utiliza el estilo moderno de SQLAlchemy.
-engine = create_engine(settings.database_url, echo=True, future=True)
+engine_kwargs: dict[str, object] = {"echo": False, "future": True}
+if settings.database_url.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+engine = create_engine(settings.database_url, **engine_kwargs)
 
 # Crea una fábrica para generar nuevas sesiones de base de datos.
 # autocommit=False exige confirmar manualmente las operaciones mediante commit().
