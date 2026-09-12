@@ -68,3 +68,7 @@ def decode_token(token: str) -> dict[str, Any] | None:
     except JWTError:
         # Devuelve None si el token es inválido, está vencido o no puede decodificarse.
         return None
+
+
+def is_access_token(payload: dict[str, Any] | None) -> bool:
+    return bool(payload and payload.get("type") == "access" and payload.get("sub"))
