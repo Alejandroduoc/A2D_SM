@@ -22,7 +22,12 @@ class Settings(BaseSettings):
     project_name: str="A2D_SM" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca PROJECT_NAME en el entorno; si no la encuentra, usa ese string.
     api_v1_prefix: str="/api/v1" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca API_V1_PREFIX en el entorno; si no la encuentra, usa ese string.
     #cors
-    cors_origins: list[str]=["http://localhost:5173"] # direcciones permitidas
+    cors_origins: list[str]=[
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8080",
+    ] # direcciones permitidas
 @lru_cache
 def get_settings() -> Settings:
     #función que devuelve una instancia de Settings. Al usar lru_cache, la primera vez que se llama, se crea la instancia y se guarda en memoria; las siguientes veces, se devuelve la misma instancia sin recalcularla.

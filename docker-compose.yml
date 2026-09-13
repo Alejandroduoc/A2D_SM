@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./sistema/backend
+      dockerfile: Dockerfile
+    container_name: a2dsm-backend
+    ports:
+      - "8000:8000"
+    working_dir: /app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./sistema/backend:/app
+    env_file:
+      - ./sistema/backend/.env
+    environment:
+      PYTHONUNBUFFERED: "1"
+
+  frontend:
+    image: nginx:alpine
+    container_name: a2dsm-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./sistema/frontend:/usr/share/nginx/html:ro
