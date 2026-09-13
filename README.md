@@ -92,9 +92,73 @@ ceremonias de planificación, revisión y retrospectiva.
 
 ## Instrucciones para ejecutar el proyecto localmente
 
-> Por definir. Se documentarán los pasos para levantar el backend (FastAPI),
-> el frontend (React) y la conexión a Microsoft SQL Server, junto con las
-> variables de entorno necesarias.
+### Opción 1: Docker (recomendada)
+
+1. Asegúrate de tener Docker Desktop activo.
+2. Desde la raíz del proyecto ejecuta:
+
+```bash
+docker compose up -d --build
+```
+
+3. Abre la aplicación en:
+
+- Frontend: http://localhost:8080
+- Backend: http://localhost:8000
+- Swagger: http://localhost:8000/docs
+
+4. Para detener los servicios:
+
+```bash
+docker compose down
+```
+
+### Opción 2: Ejecución manual
+
+1. Crear o activar el entorno virtual:
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Instalar dependencias del backend:
+
+```bash
+cd sistema/backend
+pip install -r requirement.txt
+```
+
+3. Levantar la API:
+
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+4. En otra terminal, sirve el frontend:
+
+```bash
+cd sistema/frontend
+python -m http.server 8080
+```
+
+5. Abre en el navegador: http://localhost:8080
+
+### Variables de entorno
+
+Crea un archivo `.env` en la carpeta `sistema/backend` con valores de ejemplo:
+
+```env
+DATABASE_URL=sqlite:///./a2d_sm.db
+SECRET_KEY=dev-secret-key-cambiar-en-produccion
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+PROJECT_NAME=A2D_SM
+API_V1_PREFIX=/api/v1
+```
+
+> En desarrollo local estas variables bastan para levantar el proyecto. Para producción debes usar claves fuertes y un valor real para la base de datos.
 
 ## Estructura del repositorio
 
