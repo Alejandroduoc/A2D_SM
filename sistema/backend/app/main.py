@@ -31,6 +31,16 @@ app.include_router(users.router, prefix=settings.api_v1_prefix)
 def create_tables() -> None:
     Base.metadata.create_all(bind=engine)
 
+
+@app.get("/", tags=["Health"])
+def root() -> dict[str, str]:
+    return {
+        "message": "API A2D_SM funcionando",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
 def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz
     return {"status": "ok"}  # Retornamos un diccionario con el estado de la API

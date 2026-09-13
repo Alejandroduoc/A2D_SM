@@ -7,7 +7,7 @@ class UsuarioCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     full_name: str = Field(min_length=2, max_length=120)
     password: str = Field(min_length=8, max_length=128)
-    role: RolUsuario = RolUsuario.OPERATOR
+    role: RolUsuario = RolUsuario.OPERADOR_RECEPCION
 
 
 class UsuarioRead(BaseModel):

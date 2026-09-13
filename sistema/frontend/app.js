@@ -17,7 +17,12 @@ function initials(name = '') {
 }
 
 function roleLabel(user) {
-  return (user.roles || []).map((role) => role === 'admin' ? 'Administrador' : 'Operador').join(', ') || 'Sin rol';
+  const labels = {
+    operador_recepcion: 'Operador recepción', operador_proceso: 'Operador proceso',
+    operador_bodega: 'Operador bodega', supervisor: 'Supervisor',
+    administrador: 'Administrador', productor_externo: 'Productor externo', cliente: 'Cliente',
+  };
+  return (user.roles || []).map((role) => labels[role] || role).join(', ') || 'Sin rol';
 }
 
 function showAlert(message, type = 'error') {
@@ -112,7 +117,7 @@ async function handleBootstrap() {
   clearAlert(); const values = Object.fromEntries(new FormData(document.querySelector('.login-card')).entries());
   const button = document.querySelector('[data-create-admin]'); button.disabled = true; button.textContent = 'Creando cuenta…';
   try {
-    const response = await fetch(`${API_BASE}/users/bootstrap`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, role: 'admin' }) });
+    const response = await fetch(`${API_BASE}/users/bootstrap`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, role: 'administrador' }) });
     await readResponse(response, 'No fue posible crear el administrador.');
     renderLogin(); showAlert('Administrador creado. Ya puedes ingresar.', 'success');
   } catch (error) { showAlert(error.message); button.disabled = false; button.textContent = 'Crear cuenta administradora →'; }
@@ -147,7 +152,7 @@ async function loadUsers() {
 }
 
 function renderUsersTable() {
-  const admins = state.users.filter((user) => (user.roles || []).includes('admin')).length;
+  const admins = state.users.filter((user) => (user.roles || []).includes('administrador')).length;
   document.querySelector('[data-total]').textContent = state.users.length;
   document.querySelector('[data-admins]').textContent = admins;
   const table = state.users.length ? `<div class="table-wrap"><table><thead><tr><th>Persona</th><th>Usuario</th><th>Roles</th><th>Estado</th></tr></thead><tbody>${state.users.map((user) => `<tr><td><div class="person"><span class="avatar">${initials(user.full_name)}</span><div><strong>${user.full_name}</strong><span>Cuenta de acceso</span></div></div></td><td>${user.username}</td><td><span class="role-badge">${roleLabel(user)}</span></td><td><span class="active-badge">● Activo</span></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><strong>Aún no hay usuarios</strong><span>Crea la primera cuenta desde el botón de arriba.</span></div>';
@@ -155,7 +160,7 @@ function renderUsersTable() {
 }
 
 function renderUserModal() {
-  const modal = document.createElement('div'); modal.className = 'modal-backdrop'; modal.innerHTML = `<form class="modal" data-user-form><div class="modal-head"><div><span class="eyebrow">Directorio</span><h2>Nuevo usuario</h2></div><button type="button" class="close-btn" data-close-modal aria-label="Cerrar">×</button></div><div class="alert hidden" data-alert></div><div class="form-grid"><div class="field"><label>Nombre completo</label><input name="full_name" required placeholder="Ej. Diego Carrillo" /></div><div class="field"><label>Usuario</label><input name="username" required placeholder="Ej. dcarrillo" /></div><div class="field"><label>Correo</label><input name="email" type="email" required placeholder="nombre@empresa.cl" /></div><div class="field"><label>Rol</label><select name="role"><option value="operator">Operador</option><option value="admin">Administrador</option></select></div><div class="field"><label>Contraseña temporal</label><input name="password" type="password" minlength="8" required placeholder="Mínimo 8 caracteres" /></div></div><div class="modal-actions"><button type="button" class="outline-btn" data-close-modal>Cancelar</button><button class="primary-btn" type="submit">Crear usuario</button></div></form>`;
+  const modal = document.createElement('div'); modal.className = 'modal-backdrop'; modal.innerHTML = `<form class="modal" data-user-form><div class="modal-head"><div><span class="eyebrow">Directorio</span><h2>Nuevo usuario</h2></div><button type="button" class="close-btn" data-close-modal aria-label="Cerrar">×</button></div><div class="alert hidden" data-alert></div><div class="form-grid"><div class="field"><label>Nombre completo</label><input name="full_name" required placeholder="Ej. Diego Carrillo" /></div><div class="field"><label>Usuario</label><input name="username" required placeholder="Ej. dcarrillo" /></div><div class="field"><label>Rol</label><select name="role"><option value="operador_recepcion">Operador recepción</option><option value="operador_proceso">Operador proceso</option><option value="operador_bodega">Operador bodega</option><option value="supervisor">Supervisor</option><option value="administrador">Administrador</option></select></div><div class="field"><label>Contraseña temporal</label><input name="password" type="password" minlength="8" required placeholder="Mínimo 8 caracteres" /></div></div><div class="modal-actions"><button type="button" class="outline-btn" data-close-modal>Cancelar</button><button class="primary-btn" type="submit">Crear usuario</button></div></form>`;
   document.body.appendChild(modal); modal.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => modal.remove())); modal.querySelector('[data-user-form]').addEventListener('submit', handleCreateUser);
 }
 

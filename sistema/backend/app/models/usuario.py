@@ -9,8 +9,13 @@ from app.core.database import Base
 
 
 class RolUsuario(str, Enum):
-	ADMIN = "admin"
-	OPERATOR = "operator"
+	OPERADOR_RECEPCION = "operador_recepcion"
+	OPERADOR_PROCESO = "operador_proceso"
+	OPERADOR_BODEGA = "operador_bodega"
+	SUPERVISOR = "supervisor"
+	ADMINISTRADOR = "administrador"
+	PRODUCTOR_EXTERNO = "productor_externo"
+	CLIENTE = "cliente"
 
 
 class Usuario(Base):
