@@ -39,7 +39,7 @@ def bootstrap_admin(data: UsuarioCreate, db: DbSession) -> Usuario:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El administrador inicial ya fue creado",
         )
-    data.role = RolUsuario.ADMIN
+    data.role = RolUsuario.ADMINISTRADOR
     user = build_user(data)
     db.add(user)
     db.commit()

@@ -35,7 +35,7 @@ CurrentUser = Annotated[Usuario, Depends(get_current_user)]
 
 
 def get_current_admin(user: CurrentUser) -> Usuario:
-    if RolUsuario.ADMIN not in user.roles:
+    if RolUsuario.ADMINISTRADOR not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requiere el rol administrador",
