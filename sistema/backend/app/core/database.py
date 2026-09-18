@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 # Clase base para declarar los modelos de la base de datos.
 # Representa una sesión activa para ejecutar consultas y transacciones.
 # Crea una fábrica reutilizable de sesiones de base de datos.
-from sqlalchemy.orm import Declarativebase,Session,sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 # Importa la configuración de conexión definida para la aplicación.
 from app.core.config import settings 

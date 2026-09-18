@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     #seguridad 
     secret_key: str="CAMBIAR_EN_.env_NUNCA_USAR_ESTE_VALOR_EN_PRODUCCION"# Un atributo con type hint (str) y un valor por defecto. Pydantic busca SECRET_KEY en el entorno; si no la encuentra, usa ese string.
     algorithm: str="HS256" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca ALGORITHM en el entorno; si no la encuentra, usa ese string.
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+
     #--APP ---
     project_name: str="A2D_SM" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca PROJECT_NAME en el entorno; si no la encuentra, usa ese string.
     api_v1_prefix: str="/api/v1" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca API_V1_PREFIX en el entorno; si no la encuentra, usa ese string.

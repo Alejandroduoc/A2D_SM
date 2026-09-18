@@ -1,8 +1,8 @@
 from fastapi import FastAPI #Creamos la instancia de la aplicación FastAPI
 from fastapi.middleware.cors import CORSMiddleware #Agregamos el middleware CORS para permitir solicitudes desde diferentes orígenes
 
-from app.api.routers import auth # Importamos el enrutador de autenticación
-from app.core.cofing import settings # Importamos la configuración
+#from app.api.routers import auth # Importamos el enrutador de autenticación
+from app.core.config import settings # Importamos la configuración
 
 
 app = FastAPI(
@@ -19,9 +19,9 @@ app.add_middleware(
     allow_headers=["*"],  # Permitir todos los encabezados
 )       
 
-app.include_router(auth.router,
-                   prefix=settings.api_v1_prefix
-                   )  # Incluimos el enrutador de autenticación
+#app.include_router(auth.router,
+ #                  prefix=settings.api_v1_prefix
+  #                 )  # Incluimos el enrutador de autenticación
 
 @app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
 def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz
