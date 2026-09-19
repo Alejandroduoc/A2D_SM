@@ -92,9 +92,21 @@ ceremonias de planificación, revisión y retrospectiva.
 
 ## Instrucciones para ejecutar el proyecto localmente
 
-> Por definir. Se documentarán los pasos para levantar el backend (FastAPI),
-> el frontend (React) y la conexión a Microsoft SQL Server, junto con las
-> variables de entorno necesarias.
+Guía completa (requisitos, variables de entorno, SQL Server en Docker y
+backend FastAPI): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
+
+Resumen rápido, con Docker Desktop abierto y los `.env` creados a partir de los
+`.env.example` (raíz y `sistema/backend/`):
+
+```powershell
+docker compose up -d                     # desde la raíz: SQL Server
+cd sistema\backend
+.venv\Scripts\activate                   # tras crearlo: python -m venv .venv
+pip install -r requirements.txt
+uvicorn app.main:app --reload            # http://localhost:8000/health
+```
+
+> El frontend (React) todavía no está creado.
 
 ## Estructura del repositorio
 
