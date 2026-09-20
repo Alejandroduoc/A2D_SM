@@ -1,0 +1,17 @@
+# Lista de archivos que Docker NO debe enviar al construir la imagen
+# (funciona como un .gitignore, pero para "docker build").
+
+# Entorno virtual de Python de tu PC: en Windows no sirve dentro de Linux y pesa mucho.
+.venv/
+
+# Caché de Python: se regenera sola y no aporta nada a la imagen.
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Variables secretas (contraseñas, SECRET_KEY): nunca deben quedar dentro de la imagen.
+# Se entregan al contenedor en tiempo de ejecución desde docker-compose.yml.
+.env
+
+# Historial de git: no se necesita en la imagen.
+.git/
