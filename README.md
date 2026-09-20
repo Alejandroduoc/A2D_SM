@@ -92,19 +92,20 @@ ceremonias de planificación, revisión y retrospectiva.
 
 ## Instrucciones para ejecutar el proyecto localmente
 
-Guía completa (requisitos, variables de entorno, SQL Server en Docker y
-backend FastAPI): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
+Todo el entorno corre en Docker: no hace falta instalar Python ni SQL Server.
+Guía completa (variables de entorno, creación de la base, Alembic y errores
+frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
 
 Resumen rápido, con Docker Desktop abierto y los `.env` creados a partir de los
-`.env.example` (raíz y `sistema/backend/`):
+`.env.example` (raíz y `sistema/backend/`), desde la raíz del repositorio:
 
 ```powershell
-docker compose up -d                     # desde la raíz: SQL Server
-cd sistema\backend
-.venv\Scripts\activate                   # tras crearlo: python -m venv .venv
-pip install -r requirements.txt
-uvicorn app.main:app --reload            # http://localhost:8000/health
+docker compose up -d --build             # SQL Server + backend (FastAPI)
+# solo la primera vez, cuando la base esté "healthy" (docker compose ps):
+docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
 ```
+
+API en http://localhost:8000/health · documentación en http://localhost:8000/docs
 
 > El frontend (React) todavía no está creado.
 

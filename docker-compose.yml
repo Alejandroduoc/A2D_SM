@@ -1,20 +1,78 @@
+# docker-compose.yml: define y levanta todos los contenedores del proyecto juntos
+# con un solo comando ("docker compose up -d"). Se lee desde la raíz del repositorio.
+# Las variables ${...} se toman del archivo .env de la raíz (MSSQL_SA_PASSWORD).
+
+# Nombre del proyecto en Docker. Fija los nombres de red y volumen (a2d_sm_...)
+# sin depender del nombre de la carpeta.
 name: a2d_sm
+
 services:
 
+  # ---------------------------------------------------------------- Base de datos
   db:
+    # Imagen oficial de Microsoft con SQL Server 2022 (se descarga la primera vez).
     image: mcr.microsoft.com/mssql/server:2022-latest
+    # Nombre fijo del contenedor (si no, Docker inventa uno). Lo usamos en "docker exec".
     container_name: a2d_sqlserver
     environment:
+      # Acepta la licencia de SQL Server; sin esto el contenedor no arranca.
       ACCEPT_EULA: "Y"
+      # Contraseña del usuario "sa" (administrador). Viene del .env de la raíz.
+      # OJO: solo se aplica la primera vez que arranca con un volumen vacío.
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
+      # "puerto de tu PC : puerto del contenedor". Permite conectarte a la base
+      # desde tu PC (por ejemplo con el backend local) usando localhost:1433.
       - "1433:1433"
     volumes:
-      - sqlserver_data:/var/opt/mssql   # los datos sobreviven a `docker compose down`
+      # Guarda los datos de SQL Server en el volumen "sqlserver_data" (declarado
+      # abajo). Así los datos sobreviven a "docker compose down" o a reiniciar.
+      - sqlserver_data:/var/opt/mssql
     healthcheck:
+      # Docker ejecuta este comando cada cierto tiempo para saber si SQL Server ya
+      # está listo (hace un "SELECT 1"). "$$" evita que compose interprete la
+      # variable: la lee el propio contenedor. -C acepta el certificado de prueba.
       test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      # Cada cuántos segundos se repite la comprobación.
       interval: 10s
+      # Cuántos fallos seguidos se toleran antes de marcarlo como "unhealthy".
       retries: 10
 
+  # ------------------------------------------------------------------ Backend API
+  backend:
+    # Construye la imagen usando el Dockerfile de esta carpeta.
+    build: ./sistema/backend
+    container_name: a2d_backend
+    # Carga las variables de sistema/backend/.env dentro del contenedor (SECRET_KEY, etc.).
+    env_file: ./sistema/backend/.env
+    environment:
+      # Tiene prioridad sobre env_file. Dentro de la red de Docker la base de datos
+      # ya no está en "localhost" sino en el servicio "db" (su nombre en este archivo),
+      # y el driver ODBC instalado en la imagen es el 18. La contraseña sale de
+      # MSSQL_SA_PASSWORD para no repetirla. Por eso el .env local no se toca y
+      # sigue sirviendo para correr la API directo en tu PC.
+      DATABASE_URL: mssql+pyodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/a2d_sm?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+    ports:
+      # Publica la API: http://localhost:8000 en tu PC llega al puerto 8000 del contenedor.
+      - "8000:8000"
+    volumes:
+      # Comparte toda tu carpeta sistema/backend con el contenedor (/app). Cada cambio
+      # que guardes se ve dentro del contenedor al instante, sin reconstruir la imagen.
+      # Además, lo que Alembic genere dentro del contenedor (alembic.ini y las
+      # migraciones en migrations/) queda guardado en tu PC y se puede subir a git.
+      - ./sistema/backend:/app
+    # Reemplaza el CMD del Dockerfile. --reload reinicia la API sola cuando cambia el
+    # código, y --reload-dir app limita la vigilancia a esa carpeta (así no reinicia
+    # por cambios en migrations/ ni revisa miles de archivos de otras carpetas).
+    # Solo para desarrollo.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    depends_on:
+      db:
+        # Espera a que la base esté "healthy" (ver healthcheck) antes de iniciar
+        # el backend; si no, la API arrancaría antes de que SQL Server esté listo.
+        condition: service_healthy
+
+# Volúmenes con nombre: almacenamiento que administra Docker y que persiste aunque
+# se elimine el contenedor. "docker compose down -v" los borra (¡y con ellos los datos!).
 volumes:
   sqlserver_data:
