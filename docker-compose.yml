@@ -66,6 +66,15 @@ services:
     # por cambios en migrations/ ni revisa miles de archivos de otras carpetas).
     # Solo para desarrollo.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    healthcheck:
+      # Docker llama a /health cada 15 s para saber si la API responde (curl viene
+      # instalado en la imagen). Si falla 5 veces seguidas, el contenedor queda "unhealthy".
+      test: curl -f http://localhost:8000/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Tiempo de gracia al arrancar, antes de empezar a contar fallos.
+      start_period: 20s
     depends_on:
       db:
         # Espera a que la base esté "healthy" (ver healthcheck) antes de iniciar

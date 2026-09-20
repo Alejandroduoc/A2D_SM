@@ -1,0 +1,34 @@
+# docker-compose.prod.yml: cambios para PRODUCCIÓN sobre el docker-compose.yml de desarrollo.
+# No se usa solo: se combina con el archivo base, y este archivo tiene prioridad:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Para ver el resultado final de la combinación sin levantar nada:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+#
+# Antes de desplegar, revisar la lista de pendientes de producción en
+# "avances a2d_sm/Avances_para_el_equipo_2026-09-19.md" (sección 8).
+
+services:
+
+  db:
+    # Reinicia el contenedor solo si se cae o si se reinicia el servidor.
+    restart: unless-stopped
+    # !reset borra la lista de puertos del archivo base: SQL Server ya NO se publica
+    # fuera de Docker. El backend sigue llegando a la base por la red interna (db:1433).
+    ports: !reset []
+
+  backend:
+    restart: unless-stopped
+    # !reset quita la carpeta compartida: en producción corre el código que está DENTRO
+    # de la imagen (copiado con COPY . . en el Dockerfile), no el de una carpeta del servidor.
+    volumes: !reset []
+    # Sin --reload: no vigila archivos ni se reinicia solo, que es solo para desarrollo.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Se conserva el puerto 8000 publicado porque todavía no hay proxy HTTPS delante.
+    # Cuando exista (nginx u otro), quitarlo con "ports: !reset []" y que el proxy sea
+    # lo único expuesto: el tráfico sin cifrar no debe salir a Internet.
+
+volumes:
+  sqlserver_data:
