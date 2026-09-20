@@ -146,7 +146,18 @@ docker compose up -d
 | Eliminar los contenedores (conserva los datos) | `docker compose down` |
 | Borrar contenedores **y todos los datos** | `docker compose down -v` |
 
-## 8. Problemas frecuentes
+## 8. Producción
+
+Todo lo anterior es el entorno de **desarrollo**. Para producción existe `docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario: quita la carpeta compartida (corre el código de la imagen), quita `--reload`, deja de publicar el puerto de SQL Server y reinicia los contenedores si se caen.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver el resultado sin levantar nada
+```
+
+**Aún no está listo para desplegar**: faltan el proxy con HTTPS, un usuario de SQL Server distinto de `sa`, respaldos, contraseñas privadas, restringir CORS y apagar `echo=True` en `database.py`. La lista completa, con responsables propuestos, está en `Avances_para_el_equipo_2026-09-19.md`, sección 8. **No uses este archivo en un servidor real hasta resolverlas.**
+
+## 9. Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 | --- | --- | --- |
@@ -163,7 +174,7 @@ docker compose up -d
 | El contenedor de SQL Server se cae al iniciar | Contraseña que no cumple la complejidad | Usar una más fuerte y recrear (`docker compose down -v`) |
 | El editor marca imports en rojo (sqlalchemy, fastapi...) | Tu PC no tiene esos paquetes instalados (solo están en el contenedor) | No afecta la ejecución; es solo el resaltado del editor |
 
-## 9. Qué hay construido hasta ahora
+## 10. Qué hay construido hasta ahora
 
 - API base con `GET /health`.
 - Configuración por variables de entorno (`app/core/config.py`).
