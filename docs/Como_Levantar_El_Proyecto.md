@@ -112,15 +112,157 @@ La contraseña de `sa` se fija **solo la primera vez** que arranca un volumen va
 
   Debe imprimir `a2d_sm`.
 
-## 6. Ejecutar comandos dentro del backend (Alembic, scripts)
+## 6. Tablas de la base de datos (Alembic) y comandos dentro del backend
 
-Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la raíz). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `sistema/backend/`**, porque esa carpeta está compartida con el contenedor.
+Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la raíz del repositorio). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `sistema/backend/`**, porque esa carpeta está compartida con el contenedor.
+
+**Alembic** es la herramienta que crea y modifica las tablas de SQL Server a partir de los modelos de Python (`app/models/`). Cada cambio queda guardado como un archivo de *migración* en `sistema/backend/migrations/versions/`, que se sube a git para que todo el equipo tenga las mismas tablas. **No se usa `Base.metadata.create_all()`** para crear tablas.
+
+Hay que distinguir dos situaciones:
+
+| Situación | Qué hacer |
+| --- | --- |
+| **Configurar Alembic por primera vez en el proyecto** (lo hace **una sola persona**, una vez) | Sección 6.1 y 6.2 |
+| **Ya existe la carpeta `migrations/` en el repositorio** (cualquier integrante que clona o actualiza el proyecto) | Solo la sección 6.3: `alembic upgrade head` |
+
+> Requisito previo: el stack levantado (`docker compose ps` con `a2d_sqlserver` en `healthy` y `a2d_backend` en `Up`) y la base `a2d_sm` ya creada (sección 4.2). Alembic crea las **tablas**, no la base de datos.
+
+### 6.1. Configurar Alembic (solo la primera vez en el proyecto)
+
+**Paso 1 — Crear los `__init__.py`.** Archivos **vacíos**, para que Python trate las carpetas como paquetes:
+
+```text
+sistema/backend/app/__init__.py
+sistema/backend/app/core/__init__.py
+sistema/backend/app/models/__init__.py
+```
+
+**Paso 2 — Inicializar Alembic:**
 
 ```powershell
-docker compose exec backend alembic init migrations              # solo una vez
+docker compose exec backend alembic init migrations
+```
+
+*Comprueba* que aparecieron `sistema/backend/alembic.ini` y la carpeta `sistema/backend/migrations/` (con `env.py`, `script.py.mako` y `versions/`).
+
+**Paso 3 — Vaciar la URL de `alembic.ini`.** Abre `sistema/backend/alembic.ini`, busca esta línea:
+
+```ini
+sqlalchemy.url = driver://user:pass@localhost/dbname
+```
+
+y déjala así (vacía):
+
+```ini
+sqlalchemy.url =
+```
+
+*Por qué:* la URL real se toma de la configuración de la app (`settings`), que ya la recibe desde el `docker-compose.yml`. Así no hay contraseñas en un archivo que se sube a git.
+
+**Paso 4 — Configurar `sistema/backend/migrations/env.py`.** Haz tres cambios:
+
+1. Debajo de los imports que ya trae el archivo, agrega:
+
+   ```python
+   from app.core.config import settings
+   from app.core.database import Base
+   from app.models import usuario  # noqa: F401  (importarlo registra las tablas en Base.metadata)
+   ```
+
+   Cada modelo nuevo que se cree en el futuro debe importarse aquí también; si no, Alembic no lo ve y la migración sale **vacía** sin dar error.
+2. Justo después de la línea `config = context.config`, agrega:
+
+   ```python
+   config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+   ```
+
+   (El `replace` evita que un `%` dentro de la contraseña rompa el archivo de configuración.)
+3. Busca `target_metadata = None` y cámbialo por:
+
+   ```python
+   target_metadata = Base.metadata
+   ```
+
+*Comprueba* que Alembic arranca sin errores:
+
+```powershell
+docker compose exec backend alembic current
+```
+
+(No imprime versiones todavía; lo importante es que no muestre un error.)
+
+### 6.2. Crear y aplicar la primera migración
+
+**Paso 5 — Generar la migración.** Alembic compara los modelos con la base y escribe lo que falta:
+
+```powershell
 docker compose exec backend alembic revision --autogenerate -m "esquema inicial"
-docker compose exec backend alembic upgrade head                 # crea/actualiza las tablas
-docker compose exec backend python -m app.scripts.crear_admin    # ejemplo de script
+```
+
+Se crea un archivo nuevo en `sistema/backend/migrations/versions/` (con un nombre tipo `abc123_esquema_inicial.py`).
+
+**Paso 6 — Revisarla antes de aplicarla.** Ábrela. En la función `upgrade()` debe haber:
+
+- `op.create_table('usuarios', ...)` con las columnas `id`, `nombre_usuario`, `nombre_completo`, `password_hash`, `activo` y `creado_en`;
+- `op.create_table('usuario_roles', ...)` con clave primaria compuesta `(usuario_id, rol)` y clave foránea a `usuarios.id`;
+- un índice único sobre `nombre_usuario`.
+
+Si `upgrade()` solo contiene `pass`, la migración está vacía: falta el import del modelo en `env.py` (paso 4). Borra el archivo generado y repite el paso 5.
+
+**Paso 7 — Aplicarla:**
+
+```powershell
+docker compose exec backend alembic upgrade head
+```
+
+**Paso 8 — Comprobar que las tablas existen** (usa la contraseña de `A2D_SM/.env`):
+
+```powershell
+docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -d a2d_sm -Q "SELECT name FROM sys.tables"
+```
+
+Deben aparecer `usuarios`, `usuario_roles` y `alembic_version` (esta última la crea Alembic para saber qué migración está aplicada).
+
+**Paso 9 — (Opcional) Probar que la migración es reversible:**
+
+```powershell
+docker compose exec backend alembic downgrade base    # borra las tablas
+docker compose exec backend alembic upgrade head      # las vuelve a crear
+```
+
+**Paso 10 — Subir a git** `alembic.ini`, `migrations/env.py`, `migrations/script.py.mako` y el archivo de `migrations/versions/`. Así el resto del equipo no repite los pasos 1 a 6.
+
+### 6.3. Trabajo diario con migraciones
+
+**Si te bajas el proyecto (o alguien subió una migración nueva):** solo aplicas lo que falte. No se ejecuta `alembic init` ni `revision`:
+
+```powershell
+docker compose exec backend alembic upgrade head
+```
+
+**Si cambias un modelo** (una columna nueva, una tabla nueva):
+
+```powershell
+docker compose exec backend alembic revision --autogenerate -m "descripcion corta del cambio"
+# revisar el archivo generado en migrations/versions/
+docker compose exec backend alembic upgrade head
+```
+
+Comandos útiles:
+
+| Comando | Para qué |
+| --- | --- |
+| `docker compose exec backend alembic current` | Ver qué migración tiene aplicada la base |
+| `docker compose exec backend alembic history` | Ver la lista de migraciones |
+| `docker compose exec backend alembic downgrade -1` | Deshacer la última migración |
+| `docker compose exec backend alembic upgrade head` | Aplicar todas las pendientes |
+
+> Nunca edites una migración que ya subiste a git y aplicaron otros: crea una nueva.
+
+### 6.4. Otros comandos dentro del contenedor
+
+```powershell
+docker compose exec backend python -m app.scripts.crear_admin    # ejemplo: script del primer administrador
 docker compose exec backend bash                                 # terminal dentro del contenedor
 ```
 
@@ -132,7 +274,7 @@ Una vez creada la base (sección 4.2), el día a día es solo abrir Docker Deskt
 docker compose up -d
 ```
 
-**No hay que volver a crear la base de datos.** El código se recarga solo al guardar. Solo hay que reconstruir la imagen (`docker compose up -d --build backend`) si cambias `requirements.txt` o el `Dockerfile`.
+**No hay que volver a crear la base de datos.** Si al actualizar el proyecto llegaron migraciones nuevas, aplícalas con `docker compose exec backend alembic upgrade head` (sección 6.3). El código se recarga solo al guardar. Solo hay que reconstruir la imagen (`docker compose up -d --build backend`) si cambias `requirements.txt` o el `Dockerfile`.
 
 | Acción | Comando (desde la raíz) |
 | --- | --- |
@@ -172,6 +314,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 | `port is already allocated` (8000) | Otro programa usa el puerto 8000 | Cerrarlo o cambiar el puerto en `docker-compose.yml` |
 | Cambié `requirements.txt` y no se ve el paquete nuevo | La imagen no se reconstruyó | `docker compose up -d --build backend` |
 | El contenedor de SQL Server se cae al iniciar | Contraseña que no cumple la complejidad | Usar una más fuerte y recrear (`docker compose down -v`) |
+| `alembic revision` genera una migración vacía (solo `pass`) | El modelo no está importado en `migrations/env.py` | Agregar `from app.models import usuario` (sección 6.1, paso 4), borrar la migración vacía y repetir |
+| `ModuleNotFoundError: No module named 'app'` al correr Alembic | Faltan los `__init__.py` o se ejecutó fuera del contenedor | Crear los `__init__.py` (sección 6.1, paso 1) y usar `docker compose exec backend alembic ...` |
+| `Target database is not up to date` | Hay migraciones sin aplicar | `docker compose exec backend alembic upgrade head` |
+| `Can't locate revision ...` | La base tiene una versión que no existe en `migrations/versions/` (por ejemplo tras borrar migraciones o cambiar de rama) | Recrear la base (sección 4.3) o pedir la migración faltante al equipo |
+| `There is already an object named 'usuarios'` al aplicar | Las tablas ya existían (creadas fuera de Alembic) | Borrar las tablas o recrear la base (sección 4.3) y volver a aplicar |
 | El editor marca imports en rojo (sqlalchemy, fastapi...) | Tu PC no tiene esos paquetes instalados (solo están en el contenedor) | No afecta la ejecución; es solo el resaltado del editor |
 
 ## 10. Qué hay construido hasta ahora
