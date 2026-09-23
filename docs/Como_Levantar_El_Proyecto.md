@@ -129,6 +129,8 @@ Hay que distinguir dos situaciones:
 
 ### 6.1. Configurar Alembic (solo la primera vez en el proyecto)
 
+> ✅ **Este proyecto ya lo tiene hecho y subido a git** (`alembic.ini`, `migrations/` y la migración inicial `4e5b5d399259`). Si esas carpetas existen en tu copia, **sáltate las secciones 6.1 y 6.2** y ve directo a la 6.3 (`alembic upgrade head`). Ejecutar `alembic init` de nuevo falla con `Directory migrations already exists`. Esta sección queda como referencia de cómo se configuró.
+
 **Paso 1 — Crear los `__init__.py`.** Archivos **vacíos**, para que Python trate las carpetas como paquetes:
 
 ```text
@@ -327,6 +329,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 - Configuración por variables de entorno (`app/core/config.py`).
 - Conexión a SQL Server con SQLAlchemy (`app/core/database.py`).
 - Utilidades de seguridad: hash de contraseñas y JWT (`app/core/security.py`) y validación de RUT (`app/core/validators.py`).
-- Modelo de usuarios y roles (`app/models/usuario.py`).
+- Modelo de usuarios y roles (`app/models/usuario.py`): `RolUsuario` (5 roles), `Usuario` y `UsuarioRol`. Comentado línea por línea.
+- Migraciones con Alembic (`alembic.ini`, `migrations/`): la migración inicial `4e5b5d399259` crea las tablas `usuarios` y `usuario_roles` (más `alembic_version`). Se aplica con `docker compose exec backend alembic upgrade head`.
+- Schemas de autenticación (`app/schemas/auth.py`): `LoginRequest`, `TokenResponse`, `UsuarioCreate`, `UsuarioUpdate` y `UsuarioOut` (este último nunca expone la contraseña). Comentado línea por línea.
 
-En construcción: Épica 1 (autenticación, usuarios y roles). Las tablas aún no se crean en la base: falta configurar Alembic. El router de autenticación está desactivado en `main.py` hasta que exista.
+En construcción: Épica 1 (autenticación, usuarios y roles). Falta:
+
+- `app/api/deps.py`: identificar al usuario autenticado y exigir roles.
+- `app/scripts/crear_admin.py`: crear el primer administrador.
+- `app/api/routers/auth.py`: login y gestión de usuarios. El router de autenticación está desactivado en `main.py` hasta que exista, así que hoy la API solo expone `GET /health`.
+
+Detalle del plan y de las tareas por persona: `Plan_Proximos_Avances_2026-09-20.md` en la carpeta `avances a2d_sm`.
