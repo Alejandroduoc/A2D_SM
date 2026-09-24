@@ -333,9 +333,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 - Migraciones con Alembic (`alembic.ini`, `migrations/`): la migración inicial `4e5b5d399259` crea las tablas `usuarios` y `usuario_roles` (más `alembic_version`). Se aplica con `docker compose exec backend alembic upgrade head`.
 - Schemas de autenticación (`app/schemas/auth.py`): `LoginRequest`, `TokenResponse`, `UsuarioCreate`, `UsuarioUpdate` y `UsuarioOut` (este último nunca expone la contraseña). Comentado línea por línea.
 
+- Dependencias de autenticación y roles (`app/api/deps.py`): `get_current_user`, `require_rol` y `require_roles`. Comentado línea por línea. Se verifican con las 15 pruebas de `tests/probar_deps.py`:
+
+  ```powershell
+  docker compose exec backend python -m tests.probar_deps
+  ```
+
+  Debe terminar con `RESULTADO: todas las pruebas pasaron`. El script usa una transacción con `rollback`, así que no deja usuarios en la base.
+
 En construcción: Épica 1 (autenticación, usuarios y roles). Falta:
 
-- `app/api/deps.py`: identificar al usuario autenticado y exigir roles.
 - `app/scripts/crear_admin.py`: crear el primer administrador.
 - `app/api/routers/auth.py`: login y gestión de usuarios. El router de autenticación está desactivado en `main.py` hasta que exista, así que hoy la API solo expone `GET /health`.
 
