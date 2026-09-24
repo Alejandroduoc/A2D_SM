@@ -75,12 +75,13 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
    cd A2D_SM
    ```
 
-2. Crear los archivos `.env` a partir de los `.env.example` (en la raíz y en
+2. Crear los archivos `.env` a partir de los `.env.example` (en `sistema/` y en
    `sistema/backend/`) y completar las contraseñas.
 
-3. Levantar los contenedores (SQL Server + backend FastAPI):
+3. Desde la carpeta `sistema/`, levantar los contenedores (SQL Server + backend FastAPI):
 
    ```powershell
+   cd sistema
    docker compose up -d --build
    ```
 
@@ -141,10 +142,12 @@ Frontend (React)  →  Router (FastAPI)  →  Service (lógica de negocio)  → 
 ```text
 A2D_SM/
 ├── README.md
-├── docker-compose.yml
-├── docker-compose.prod.yml
 ├── docs/                         # Documentación técnica
 ├── sistema/
+│   ├── .gitignore                # Archivos que no se suben a git (.env, cachés, etc.)
+│   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
+│   ├── docker-compose.yml        # Entorno de desarrollo
+│   ├── docker-compose.prod.yml   # Ajustes para producción
 │   └── backend/                  # API FastAPI (app/, migrations/, tests/)
 └── Fase 1/
     ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
