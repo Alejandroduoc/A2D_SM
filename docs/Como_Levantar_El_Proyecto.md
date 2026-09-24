@@ -17,13 +17,13 @@ Tu PC (Docker Desktop)
 └── contenedor "a2d_backend"    API FastAPI, puerto 8000      ← backend (Python + driver ODBC ya incluidos)
 ```
 
-Son dos contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`sistema/backend/`) se comparte con el contenedor, así que lo que edites se aplica al instante. Todo se define en `docker-compose.yml` (raíz); la imagen del backend, en `sistema/backend/Dockerfile`. Ambos archivos están comentados línea por línea.
+Son dos contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`sistema/backend/`) se comparte con el contenedor, así que lo que edites se aplica al instante. Todo se define en `sistema/docker-compose.yml`; la imagen del backend, en `sistema/backend/Dockerfile`. Ambos archivos están comentados línea por línea.
 
 ## 3. Configuración (solo la primera vez)
 
 Hay **dos** archivos `.env`. Ninguno se sube a git; cada integrante crea los suyos copiando los `.env.example`.
 
-**3.1. `A2D_SM/.env`** (raíz):
+**3.1. `sistema/.env`:**
 
 ```env
 MSSQL_SA_PASSWORD=<tu-contraseña>
@@ -41,7 +41,7 @@ Reglas importantes:
 - Evita `@ : / ? #` en la contraseña: rompen la URL de conexión.
 - **No hay que escribir `DATABASE_URL`:** el `docker-compose.yml` la arma solo (servidor `db`, driver 18) usando `MSSQL_SA_PASSWORD`. Así la contraseña se escribe una sola vez. Si quedó una línea `DATABASE_URL` en tu `sistema/backend/.env`, bórrala: no hace daño (el compose tiene prioridad) pero confunde.
 
-> **¿Cómo llega la URL al backend?** `MSSQL_SA_PASSWORD` (`.env` de la raíz) → `docker-compose.yml` arma `DATABASE_URL` (`...@db:1433/a2d_sm...`) y la entrega al contenedor como variable de entorno → `app/core/config.py` la lee en `settings.database_url` → `app/core/database.py` crea la conexión. `db` es el nombre del servicio de SQL Server dentro de la red de Docker (no `localhost`). Para ver qué recibió, sin mostrar la contraseña: `docker compose exec backend python -c "from app.core.config import settings; print(settings.database_url.split('@')[1])"`.
+> **¿Cómo llega la URL al backend?** `MSSQL_SA_PASSWORD` (`sistema/.env`) → `docker-compose.yml` arma `DATABASE_URL` (`...@db:1433/a2d_sm...`) y la entrega al contenedor como variable de entorno → `app/core/config.py` la lee en `settings.database_url` → `app/core/database.py` crea la conexión. `db` es el nombre del servicio de SQL Server dentro de la red de Docker (no `localhost`). Para ver qué recibió, sin mostrar la contraseña: `docker compose exec backend python -c "from app.core.config import settings; print(settings.database_url.split('@')[1])"`.
 - Si falta `SECRET_KEY` o `MSSQL_SA_PASSWORD`, la API **no arranca** (error `Field required`). Es intencional: no hay valores por defecto.
 
 ## 4. Levantar el proyecto
@@ -58,9 +58,10 @@ Distinguir tres cosas, porque se hacen en momentos distintos:
 
 ### 4.1. Levantar los contenedores
 
-Desde la raíz del repositorio (`A2D_SM/`):
+Desde la carpeta `sistema/` (ahí están el `docker-compose.yml` y el `.env`):
 
 ```powershell
+cd sistema
 docker compose up -d --build
 docker compose ps
 ```
@@ -75,7 +76,7 @@ docker compose ps
 docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
 ```
 
-- Usa la contraseña que pusiste en `A2D_SM/.env` (`MSSQL_SA_PASSWORD`).
+- Usa la contraseña que pusiste en `sistema/.env` (`MSSQL_SA_PASSWORD`).
 - Si funciona, **no imprime nada** (es normal).
 - Para comprobar que existe:
 
@@ -91,7 +92,7 @@ docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P
 
 La contraseña de `sa` se fija **solo la primera vez** que arranca un volumen vacío. Editar el `.env` después no la cambia: el contenedor sigue con la anterior y la API da `Login failed for user 'sa'`. Mientras la base no tenga datos que quieras conservar:
 
-1. Actualiza `MSSQL_SA_PASSWORD` en `A2D_SM/.env`.
+1. Actualiza `MSSQL_SA_PASSWORD` en `sistema/.env`.
 2. Recrea el volumen (**esto borra todos los datos**):
 
    ```powershell
@@ -114,7 +115,7 @@ La contraseña de `sa` se fija **solo la primera vez** que arranca un volumen va
 
 ## 6. Tablas de la base de datos (Alembic) y comandos dentro del backend
 
-Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la raíz del repositorio). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `sistema/backend/`**, porque esa carpeta está compartida con el contenedor.
+Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la carpeta `sistema/`). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `sistema/backend/`**, porque esa carpeta está compartida con el contenedor.
 
 **Alembic** es la herramienta que crea y modifica las tablas de SQL Server a partir de los modelos de Python (`app/models/`). Cada cambio queda guardado como un archivo de *migración* en `sistema/backend/migrations/versions/`, que se sube a git para que todo el equipo tenga las mismas tablas. **No se usa `Base.metadata.create_all()`** para crear tablas.
 
@@ -217,7 +218,7 @@ Si `upgrade()` solo contiene `pass`, la migración está vacía: falta el import
 docker compose exec backend alembic upgrade head
 ```
 
-**Paso 8 — Comprobar que las tablas existen** (usa la contraseña de `A2D_SM/.env`):
+**Paso 8 — Comprobar que las tablas existen** (usa la contraseña de `sistema/.env`):
 
 ```powershell
 docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -d a2d_sm -Q "SELECT name FROM sys.tables"
@@ -270,7 +271,7 @@ docker compose exec backend bash                                 # terminal dent
 
 ## 7. Uso diario
 
-Una vez creada la base (sección 4.2), el día a día es solo abrir Docker Desktop y, desde la raíz:
+Una vez creada la base (sección 4.2), el día a día es solo abrir Docker Desktop y, desde la carpeta `sistema/`:
 
 ```powershell
 docker compose up -d
@@ -278,7 +279,7 @@ docker compose up -d
 
 **No hay que volver a crear la base de datos.** Si al actualizar el proyecto llegaron migraciones nuevas, aplícalas con `docker compose exec backend alembic upgrade head` (sección 6.3). El código se recarga solo al guardar. Solo hay que reconstruir la imagen (`docker compose up -d --build backend`) si cambias `requirements.txt` o el `Dockerfile`.
 
-| Acción | Comando (desde la raíz) |
+| Acción | Comando (desde `sistema/`) |
 | --- | --- |
 | Ver estado de los contenedores | `docker compose ps` |
 | Ver logs del backend en vivo (Ctrl+C para salir) | `docker compose logs -f backend` |
@@ -292,7 +293,7 @@ docker compose up -d
 
 ## 8. Producción
 
-Todo lo anterior es el entorno de **desarrollo**. Para producción existe `docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario: quita la carpeta compartida (corre el código de la imagen), quita `--reload`, deja de publicar el puerto de SQL Server y reinicia los contenedores si se caen.
+Todo lo anterior es el entorno de **desarrollo**. Para producción existe `sistema/docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario: quita la carpeta compartida (corre el código de la imagen), quita `--reload`, deja de publicar el puerto de SQL Server y reinicia los contenedores si se caen.
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
@@ -306,12 +307,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 | Síntoma | Causa | Solución |
 | --- | --- | --- |
 | `error during connect ... dockerDesktopLinuxEngine` | Docker Desktop apagado | Abrirlo y esperar "Engine running" |
-| `Field required` en los logs del backend | Falta `sistema/backend/.env` o `SECRET_KEY`, o falta `MSSQL_SA_PASSWORD` en el `.env` de la raíz | Crearlos desde los `.env.example` |
+| `Field required` en los logs del backend | Falta `sistema/backend/.env` o `SECRET_KEY`, o falta `MSSQL_SA_PASSWORD` en `sistema/.env` | Crearlos desde los `.env.example` |
 | `Login failed for user 'sa'` + `Cannot open database "a2d_sm"` | La base aún no existe | Ejecutar el `CREATE DATABASE` de la sección 4.2 |
 | `Login failed for user 'sa'` con la base creada | El volumen se creó con otra contraseña | Sección 4.3 (`docker compose down -v`; borra los datos) |
 | `a2d_backend` se reinicia o falla al conectar | La base no existe o la contraseña no es la del volumen | `docker compose logs backend`; revisar secciones 4.2 y 4.3 |
 | `Conflict. The container name "/a2d_sqlserver" is already in use` | Hay un contenedor viejo con ese nombre | `docker rm -f a2d_sqlserver` y `docker compose up -d` |
-| `No such container: a2d_sqlserver` (o `a2d_backend`) | Los contenedores no están creados | `docker compose up -d` desde la raíz |
+| `No such container: a2d_sqlserver` (o `a2d_backend`) | Los contenedores no están creados | `docker compose up -d` desde `sistema/` |
 | `port is already allocated` (1433) | Otro SQL Server usa el puerto | Detener el otro servicio o cambiar el puerto en `docker-compose.yml` |
 | `port is already allocated` (8000) | Otro programa usa el puerto 8000 | Cerrarlo o cambiar el puerto en `docker-compose.yml` |
 | Cambié `requirements.txt` y no se ve el paquete nuevo | La imagen no se reconstruyó | `docker compose up -d --build backend` |
