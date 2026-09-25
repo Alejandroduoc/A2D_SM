@@ -1,23 +1,23 @@
 # A2D_SM
 
-> Sistema de trazabilidad para una planta procesadora de fruta.
+**Nombre del proyecto:** A2D SM — Sistema de trazabilidad para planta procesadora de fruta
 
-Proyecto APT122 — Duoc UC
+**Descripción:** Sistema web de trazabilidad que moderniza y complementa el
+sistema legado de una planta procesadora de fruta, permitiendo gestionar la
+recepción de fruta y el procesamiento de tarjas de forma segura, mantenible y
+auditable. Proyecto de Título APT122 — Duoc UC, Ingeniería Informática.
 
 ---
 
 ## Tabla de contenidos
 
 - [Descripción](#descripción)
-- [Problema que resuelve](#problema-que-resuelve)
-- [Usuarios objetivo](#usuarios-objetivo)
-- [Alcance funcional](#alcance-funcional)
 - [Tecnologías utilizadas](#tecnologías-utilizadas)
-- [Arquitectura de la solución](#arquitectura-de-la-solución)
-- [Metodología de trabajo](#metodología-de-trabajo)
 - [Instrucciones para ejecutar el proyecto localmente](#instrucciones-para-ejecutar-el-proyecto-localmente)
-- [Estructura del repositorio](#estructura-del-repositorio)
 - [Integrantes del equipo](#integrantes-del-equipo)
+- [Metodología de trabajo](#metodología-de-trabajo)
+- [Arquitectura de la solución](#arquitectura-de-la-solución)
+- [Estructura del repositorio](#estructura-del-repositorio)
 
 ## Descripción
 
@@ -26,14 +26,14 @@ fruta. Su objetivo es modernizar y complementar el sistema legado actual,
 permitiendo gestionar el flujo de recepción y procesamiento de tarjas de fruta
 de manera más segura, mantenible y auditable.
 
-## Problema que resuelve
+### Problema que resuelve
 
 La planta depende hoy de un sistema antiguo difícil de mantener. A2D SM entrega
 una plataforma moderna que permite controlar la recepción de fruta, el
 procesamiento de tarjas, la gestión de catálogos y la auditoría de cambios,
 asegurando la disponibilidad y confiabilidad de la información.
 
-## Usuarios objetivo
+### Usuarios objetivo
 
 | Rol | Necesidad principal |
 | --- | --- |
@@ -42,7 +42,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Administrador | Gestionar catálogos, usuarios y parámetros del sistema |
 | Personal de gestión de planta | Consultar trazabilidad e historial de cambios |
 
-## Alcance funcional
+### Alcance funcional
 
 - Recepción de fruta.
 - Procesamiento de tarjas.
@@ -51,18 +51,68 @@ asegurando la disponibilidad y confiabilidad de la información.
 
 ## Tecnologías utilizadas
 
-| Capa | Tecnología |
+| Categoría | Tecnología |
 | --- | --- |
-| Lenguaje (backend) | Python |
-| Framework (backend) | FastAPI |
-| Autenticación | JWT (JSON Web Tokens) |
-| Frontend | React |
-| Base de datos | Microsoft SQL Server |
+| Lenguajes | Python (backend), JavaScript (frontend) |
+| Frameworks | FastAPI, SQLAlchemy 2.0 + Alembic, React (Vite) + Tailwind |
+| Base de datos | Microsoft SQL Server 2022 |
+| Autenticación | JWT (access + refresh) |
+| Infraestructura | Docker + Docker Compose |
 | Cloud | Por definir |
+
+## Instrucciones para ejecutar el proyecto localmente
+
+Todo el entorno corre en Docker: no hace falta instalar Python ni SQL Server.
+Guía completa (variables de entorno, creación de la base, Alembic y errores
+frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
+
+**Requisitos:** Docker Desktop y Git.
+
+1. Clonar el repositorio y entrar a la carpeta:
+
+   ```powershell
+   git clone <url-del-repositorio>
+   cd A2D_SM
+   ```
+
+2. Crear los archivos `.env` a partir de los `.env.example` (en `sistema/` y en
+   `sistema/backend/`) y completar las contraseñas.
+
+3. Desde la carpeta `sistema/`, levantar los contenedores (SQL Server + backend FastAPI):
+
+   ```powershell
+   cd sistema
+   docker compose up -d --build
+   ```
+
+4. Solo la primera vez, cuando la base esté "healthy" (`docker compose ps`),
+   crear la base de datos:
+
+   ```powershell
+   docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
+   ```
+
+5. Abrir la API en http://localhost:8000/health y la documentación en
+   http://localhost:8000/docs
+
+> El frontend (React) todavía no está creado.
+
+## Integrantes del equipo
+
+| Integrante | Rol |
+| --- | --- |
+| Alejandro Rodríguez | Project Manager |
+| Diego Carrillo | Analista de Base de Datos |
+| Angelo Galindo | QA |
+
+## Metodología de trabajo
+
+El equipo trabaja con **Scrum**, organizando el desarrollo en sprints con
+ceremonias de planificación, revisión y retrospectiva.
 
 ## Arquitectura de la solución
 
-## 1. Decisiones de arquitectura
+### Decisiones de arquitectura
 
 | Decisión | Elección | Motivo |
 |---|---|---|
@@ -73,11 +123,13 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Autenticación | JWT (access + refresh) | Sin sesiones server-side acopladas a un solo servidor. |
 | Infraestructura | Docker + docker-compose | Portable y reproducible entre miembros del equipo. |
 
-**Principio no negociable:** ningún cliente (browser) accede directo a la base de datos. Todo pasa por la API. Esta es la corrección central del problema de seguridad del sistema legacy (VB.NET 2008 WinForms + PHP, con SQL injection y conexión directa cliente-BD verificadas en el código fuente real — `Backup/socradex/Form4.vb`).
+**Principio no negociable:** ningún cliente (browser) accede directo a la base
+de datos. Todo pasa por la API. Esta es la corrección central del problema de
+seguridad del sistema legacy (VB.NET 2008 WinForms + PHP, con SQL injection y
+conexión directa cliente-BD verificadas en el código fuente real —
+`Backup/socradex/Form4.vb`).
 
----
-
-## 2. Arquitectura en capas
+### Arquitectura en capas
 
 Toda petición sigue el mismo camino, sin excepciones:
 
@@ -85,51 +137,19 @@ Toda petición sigue el mismo camino, sin excepciones:
 Frontend (React)  →  Router (FastAPI)  →  Service (lógica de negocio)  →  Model (SQLAlchemy)  →  Base de datos
 ```
 
-## Metodología de trabajo
-
-El equipo trabaja con **Scrum**, organizando el desarrollo en sprints con
-ceremonias de planificación, revisión y retrospectiva.
-
-## Instrucciones para ejecutar el proyecto localmente
-
-Todo el entorno corre en Docker: no hace falta instalar Python ni SQL Server.
-Guía completa (variables de entorno, creación de la base, Alembic y errores
-frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
-
-Resumen rápido, con Docker Desktop abierto y los `.env` creados a partir de los
-`.env.example` (raíz y `sistema/backend/`), desde la raíz del repositorio:
-
-```powershell
-docker compose up -d --build             # SQL Server + backend (FastAPI)
-# solo la primera vez, cuando la base esté "healthy" (docker compose ps):
-docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
-```
-
-API en http://localhost:8000/health · documentación en http://localhost:8000/docs
-
-> El frontend (React) todavía no está creado.
-
 ## Estructura del repositorio
 
 ```text
 A2D_SM/
 ├── README.md
-└── Fase_1/
-    ├── Evidencias_Grupales/
-    └── Evidencias_Individuales/
-        ├── Alejandro_Rodriguez/
-        ├── Angelo_Galindo/
-        └── Diego_Carrillo/
+├── docs/                         # Documentación técnica
+├── sistema/
+│   ├── .gitignore                # Archivos que no se suben a git (.env, cachés, etc.)
+│   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
+│   ├── docker-compose.yml        # Entorno de desarrollo
+│   ├── docker-compose.prod.yml   # Ajustes para producción
+│   └── backend/                  # API FastAPI (app/, migrations/, tests/)
+└── Fase 1/
+    ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
+    └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
 ```
-
-- **`Fase_1/Evidencias_Grupales/`** — entregables desarrollados por el equipo.
-- **`Fase_1/Evidencias_Individuales/`** — autoevaluaciones, diarios de reflexión
-  y evidencias personales de cada integrante.
-
-## Integrantes del equipo
-
-| Integrante | Rol | Carpeta de evidencias |
-| --- | --- | --- |
-| Alejandro Rodríguez | Project manager | [Alejandro_Rodriguez](Fase_1/Evidencias_Individuales/Alejandro_Rodriguez/) |
-| Diego Carrillo | Analista BD | [Diego_Carrillo](Fase_1/Evidencias_Individuales/Diego_Carrillo/) |
-| Angelo Galindo | QA | [Angelo_Galindo](Fase_1/Evidencias_Individuales/Angelo_Galindo/) |

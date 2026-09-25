@@ -1,6 +1,6 @@
 # docker-compose.yml: define y levanta todos los contenedores del proyecto juntos
-# con un solo comando ("docker compose up -d"). Se lee desde la raíz del repositorio.
-# Las variables ${...} se toman del archivo .env de la raíz (MSSQL_SA_PASSWORD).
+# con un solo comando ("docker compose up -d"). Se ejecuta desde la carpeta sistema/.
+# Las variables ${...} se toman del archivo sistema/.env (MSSQL_SA_PASSWORD).
 
 # Nombre del proyecto en Docker. Fija los nombres de red y volumen (a2d_sm_...)
 # sin depender del nombre de la carpeta.
@@ -17,7 +17,7 @@ services:
     environment:
       # Acepta la licencia de SQL Server; sin esto el contenedor no arranca.
       ACCEPT_EULA: "Y"
-      # Contraseña del usuario "sa" (administrador). Viene del .env de la raíz.
+      # Contraseña del usuario "sa" (administrador). Viene de sistema/.env.
       # OJO: solo se aplica la primera vez que arranca con un volumen vacío.
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
@@ -41,10 +41,10 @@ services:
   # ------------------------------------------------------------------ Backend API
   backend:
     # Construye la imagen usando el Dockerfile de esta carpeta.
-    build: ./sistema/backend
+    build: ./backend
     container_name: a2d_backend
     # Carga las variables de sistema/backend/.env dentro del contenedor (SECRET_KEY, etc.).
-    env_file: ./sistema/backend/.env
+    env_file: ./backend/.env
     environment:
       # Tiene prioridad sobre env_file. Dentro de la red de Docker la base de datos
       # ya no está en "localhost" sino en el servicio "db" (su nombre en este archivo),
@@ -60,7 +60,7 @@ services:
       # que guardes se ve dentro del contenedor al instante, sin reconstruir la imagen.
       # Además, lo que Alembic genere dentro del contenedor (alembic.ini y las
       # migraciones en migrations/) queda guardado en tu PC y se puede subir a git.
-      - ./sistema/backend:/app
+      - ./backend:/app
     # Reemplaza el CMD del Dockerfile. --reload reinicia la API sola cuando cambia el
     # código, y --reload-dir app limita la vigilancia a esa carpeta (así no reinicia
     # por cambios en migrations/ ni revisa miles de archivos de otras carpetas).

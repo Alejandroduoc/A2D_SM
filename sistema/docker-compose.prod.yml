@@ -1,5 +1,6 @@
 # docker-compose.prod.yml: cambios para PRODUCCIÓN sobre el docker-compose.yml de desarrollo.
-# No se usa solo: se combina con el archivo base, y este archivo tiene prioridad:
+# No se usa solo: se combina con el archivo base, y este archivo tiene prioridad
+# (ejecutar desde la carpeta sistema/):
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
