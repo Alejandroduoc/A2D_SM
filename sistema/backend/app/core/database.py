@@ -21,9 +21,9 @@ from app.core.config import settings
 
 # Crea el motor que administra las conexiones con la base de datos.
 # Usa la URL de conexión configurada en settings.
-# echo=True muestra en la consola las consultas SQL ejecutadas.
+# echo=False oculta en la consola las consultas SQL ejecutadas.
 # future=True utiliza el estilo moderno de SQLAlchemy.
-engine = create_engine(settings.database_url, echo=True, future=True)
+engine = create_engine(settings.database_url, echo=False, future=True)
 
 # Crea una fábrica para generar nuevas sesiones de base de datos.
 # autocommit=False exige confirmar manualmente las operaciones mediante commit().
