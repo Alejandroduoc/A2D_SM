@@ -206,8 +206,7 @@ def actualizar_usuario(
     todos los roles actuales del usuario.
     """
 
-    _ = usuario_administrador
-
+    # Busca por clave primaria; si el id no existe responde 404.
     usuario = db.get(Usuario, usuario_id)
     if usuario is None:
         raise HTTPException(
@@ -215,8 +214,14 @@ def actualizar_usuario(
             detail="Usuario no encontrado",
         )
 
+    # exclude_unset deja solo los campos que vinieron en el JSON, para
+    # distinguir "no enviado" de "enviado con False" y poder desactivar.
+    # exclude_none descarta los enviados como null: sin esto, "roles": null
+    # dejaria al usuario sin roles y "activo": null intentaria guardar NULL.
     cambios = datos.model_dump(exclude_unset=True, exclude_none=True)
 
+    # Un administrador no puede desactivarse a si mismo: podria quedar el
+    # sistema sin nadie que administre usuarios.
     if (
         cambios.get("activo") is False
         and usuario.id == usuario_administrador.id
@@ -226,6 +231,8 @@ def actualizar_usuario(
             detail="No puedes desactivar tu propio usuario administrador",
         )
 
+    # Por el mismo motivo, tampoco puede quitarse el rol administrador al
+    # reemplazar su propia lista de roles.
     if (
         usuario.id == usuario_administrador.id
         and "roles" in cambios
@@ -236,12 +243,15 @@ def actualizar_usuario(
             detail="No puedes quitarte el rol administrador a ti mismo",
         )
 
+    # Aplica solo los campos enviados; el resto queda como estaba.
     if "nombre_completo" in cambios:
         usuario.nombre_completo = cambios["nombre_completo"]
 
     if "activo" in cambios:
         usuario.activo = cambios["activo"]
 
+    # La lista nueva reemplaza todos los roles. delete-orphan borra las filas
+    # de usuario_roles que ya no estan en la lista.
     if "roles" in cambios:
         usuario.roles_asignados = [
             UsuarioRol(rol=rol)
