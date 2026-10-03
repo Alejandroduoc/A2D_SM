@@ -40,10 +40,11 @@ def crear(nombre, roles, activo=True):
 try:
     admin = crear("t_admin", [RolUsuario.ADMINISTRADOR])
     sup = crear("t_super", [RolUsuario.SUPERVISOR])
-    op_bod = crear("t_bodega", [RolUsuario.OPERADOR_BODEGA])
-    op_dos = crear("t_dos_roles", [RolUsuario.OPERADOR_RECEPCION, RolUsuario.OPERADOR_BODEGA])
+    op_recepcion = crear("t_recepcion", [RolUsuario.OPERADOR_RECEPCION])
+    op_proceso = crear("t_proceso", [RolUsuario.OPERADOR_PROCESO])
+    op_dos = crear("t_dos_roles", [RolUsuario.OPERADOR_RECEPCION, RolUsuario.OPERADOR_PROCESO])
     inactivo = crear("t_inactivo", [RolUsuario.ADMINISTRADOR], activo=False)
-    db.add_all([admin, sup, op_bod, op_dos, inactivo])
+    db.add_all([admin, sup, op_recepcion, op_proceso, op_dos, inactivo])
     db.flush()  # los envía a la base dentro de la transacción, sin confirmarlos
 
     def tok(u):
@@ -62,13 +63,13 @@ try:
     exige_super = require_rol(RolUsuario.SUPERVISOR)
     probar("administrador pasa require_rol(ADMINISTRADOR)", lambda: exige_admin(admin), 200)
     probar("supervisor NO pasa require_rol(ADMINISTRADOR)", lambda: exige_admin(sup), 403)
-    probar("operador NO pasa require_rol(ADMINISTRADOR)", lambda: exige_admin(op_bod), 403)
+    probar("operador NO pasa require_rol(ADMINISTRADOR)", lambda: exige_admin(op_recepcion), 403)
     probar("administrador pasa require_rol(SUPERVISOR)", lambda: exige_super(admin), 200)
-    probar("operador NO pasa require_rol(SUPERVISOR)", lambda: exige_super(op_bod), 403)
+    probar("operador NO pasa require_rol(SUPERVISOR)", lambda: exige_super(op_recepcion), 403)
 
     print("--- require_roles (lista exacta)")
     recepcion_o_admin = require_roles(RolUsuario.OPERADOR_RECEPCION, RolUsuario.ADMINISTRADOR)
-    probar("operador_bodega NO está en la lista", lambda: recepcion_o_admin(op_bod), 403)
+    probar("operador_proceso NO está en la lista", lambda: recepcion_o_admin(op_proceso), 403)
     probar("usuario con 2 roles: uno está en la lista", lambda: recepcion_o_admin(op_dos), 200)
     probar("supervisor NO está en la lista (aunque tenga más rango)", lambda: recepcion_o_admin(sup), 403)
 finally:

@@ -16,7 +16,7 @@ from app.models.usuario import RolUsuario, Usuario
 # Configura OAuth2 indicando la ruta donde los clientes obtienen el token.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
-# Jerarquía simple de roles para el PMV (de menor a mayor privilegio). Los tres
+# Jerarquía simple de roles para el PMV (de menor a mayor privilegio). Los dos
 # operador_* están al mismo rango — son especialidades, no niveles entre sí; lo
 # que los distingue es `require_roles` (membresía exacta), no `require_rol`.
 # Define el nivel de privilegio asociado a cada rol.
@@ -25,8 +25,6 @@ _JERARQUIA_ROLES = {
     RolUsuario.OPERADOR_RECEPCION: 1,
     # El operador de proceso tiene el mismo nivel que los demás operadores.
     RolUsuario.OPERADOR_PROCESO: 1,
-    # El operador de bodega tiene el mismo nivel que los demás operadores.
-    RolUsuario.OPERADOR_BODEGA: 1,
     # El supervisor tiene un nivel intermedio de privilegios.
     RolUsuario.SUPERVISOR: 2,
     # El administrador tiene el nivel más alto de privilegios.
