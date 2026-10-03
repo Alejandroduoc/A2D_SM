@@ -25,8 +25,8 @@ _JERARQUIA_ROLES = {
     RolUsuario.OPERADOR_RECEPCION: 1,
     # El operador de proceso tiene el mismo nivel que los demás operadores.
     RolUsuario.OPERADOR_PROCESO: 1,
-    # El supervisor tiene un nivel intermedio de privilegios.
-    RolUsuario.SUPERVISOR: 2,
+    # La gerencia tiene un nivel intermedio de privilegios.
+    RolUsuario.GERENCIA: 2,
     # El administrador tiene el nivel más alto de privilegios.
     RolUsuario.ADMINISTRADOR: 3,
 }
@@ -109,7 +109,7 @@ def require_roles(*roles_permitidos: RolUsuario) -> Callable[[Usuario], Usuario]
     Uso: dependencies=[Depends(require_roles(RolUsuario.OPERADOR_RECEPCION, RolUsuario.ADMINISTRADOR))]
     A diferencia de `require_rol` (jerárquico, "rol mínimo"), exige tener al menos
     uno de los roles de la lista dada. Hace falta para casos como "editar tarja":
-    solo operador_recepcion y administrador pueden, aunque supervisor tenga más
+    solo operador_recepcion y administrador pueden, aunque gerencia tenga más
     privilegio en la jerarquía — no es un caso de "rol mínimo".
     """
 

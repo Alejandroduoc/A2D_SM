@@ -10,7 +10,8 @@ que no cumple (con un 422 automático) y describir /docs.
 # BaseModel: clase base de la que heredan todos los schemas.
 # Field: permite agregar reglas extra a un campo (largo mínimo/máximo, etc.),
 # además de su tipo y su valor por defecto.
-from pydantic import BaseModel, Field
+# field_validator: permite revisar o transformar un campo después de validarlo.
+from pydantic import BaseModel, Field, field_validator
 
 # RolUsuario es el mismo enum que usa la tabla usuario_roles. Se reutiliza acá
 # para que un rol inválido (que no sea uno de los 4 definidos) se rechace solo,
@@ -62,6 +63,15 @@ class UsuarioCreate(BaseModel):
     # usuario sin ningún rol asignado por olvido.
     roles: list[RolUsuario] = Field(min_length=1)
 
+    # Se ejecuta después de validar que cada rol existe en RolUsuario.
+    @field_validator("roles")
+    @classmethod
+    def quitar_roles_repetidos(cls, roles: list[RolUsuario]) -> list[RolUsuario]:
+        # usuario_roles tiene clave primaria (usuario_id, rol): un rol repetido
+        # haría fallar el INSERT en SQL Server. dict.fromkeys elimina los
+        # repetidos y conserva el orden en que se enviaron.
+        return list(dict.fromkeys(roles))
+
 
 class UsuarioUpdate(BaseModel):
     """
@@ -81,6 +91,18 @@ class UsuarioUpdate(BaseModel):
     # None = no tocar el estado. True/False = activar o desactivar el login del
     # usuario sin borrarlo (columna Usuario.activo).
     activo: bool | None = None
+
+    # Misma regla que en UsuarioCreate: quita roles repetidos.
+    @field_validator("roles")
+    @classmethod
+    def quitar_roles_repetidos(
+        cls, roles: list[RolUsuario] | None
+    ) -> list[RolUsuario] | None:
+        # Si se envió "roles": null, se devuelve None sin cambios: el router lo
+        # descarta con exclude_none y los roles actuales no se tocan.
+        if roles is None:
+            return None
+        return list(dict.fromkeys(roles))
 
 
 class UsuarioOut(BaseModel):

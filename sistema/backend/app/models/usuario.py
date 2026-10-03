@@ -1,9 +1,9 @@
 """
 E1 — Autenticación y control de acceso.
 
- Roles: operador_recepcion, operador_proceso, supervisor y administrador.
+ Roles: operador_recepcion, operador_proceso, gerencia y administrador.
  Los dos operadores son especialidades del mismo rango (no niveles entre sí);
- supervisor y administrador están por encima de ellos.
+ gerencia y administrador están por encima de ellos.
 
 Un usuario puede tener más de un rol a la vez, por eso `rol` no es una columna
 de `Usuario`: es una tabla de asociación (`UsuarioRol`, N:M). `Usuario.roles`
@@ -45,7 +45,7 @@ from app.core.database import Base
 class RolUsuario(str, enum.Enum):
     OPERADOR_RECEPCION = "operador_recepcion"
     OPERADOR_PROCESO = "operador_proceso"
-    SUPERVISOR = "supervisor"
+    GERENCIA = "gerencia"
     ADMINISTRADOR = "administrador"
 
 
@@ -99,7 +99,7 @@ class UsuarioRol(Base):
     # Apunta al id de usuarios. Es parte de la clave primaria (ver abajo).
     usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("usuarios.id"), primary_key=True)
     # Enum(RolUsuario): SQLAlchemy guarda el NOMBRE del rol como texto
-    # (ej. "ADMINISTRADOR"), y solo permite los 5 valores del enum.
+    # (ej. "ADMINISTRADOR"), y solo permite los 4 valores del enum.
     rol: Mapped[RolUsuario] = mapped_column(Enum(RolUsuario), primary_key=True)
     # usuario_id + rol como clave primaria COMPUESTA (las dos columnas tienen
     # primary_key=True): impide repetir el mismo rol dos veces para el mismo
