@@ -1,9 +1,9 @@
 """
 E1 — Autenticación y control de acceso.
 
-Roles: operador_recepcion, operador_proceso, operador_bodega, supervisor y
-administrador. Los tres operadores son especialidades del mismo rango (no
-niveles entre sí); supervisor y administrador están por encima de ellos.
+ Roles: operador_recepcion, operador_proceso, supervisor y administrador.
+ Los dos operadores son especialidades del mismo rango (no niveles entre sí);
+ supervisor y administrador están por encima de ellos.
 
 Un usuario puede tener más de un rol a la vez, por eso `rol` no es una columna
 de `Usuario`: es una tabla de asociación (`UsuarioRol`, N:M). `Usuario.roles`
@@ -41,11 +41,10 @@ from app.core.database import Base
 
 # str + enum.Enum: cada rol se comporta como texto (se guarda como texto en la
 # base y se serializa como texto en JSON), pero solo puede valer uno de los
-# 5 nombres definidos acá abajo — cualquier otro valor lo rechaza Python solo.
+# 4 nombres definidos acá abajo — cualquier otro valor lo rechaza Python solo.
 class RolUsuario(str, enum.Enum):
     OPERADOR_RECEPCION = "operador_recepcion"
     OPERADOR_PROCESO = "operador_proceso"
-    OPERADOR_BODEGA = "operador_bodega"
     SUPERVISOR = "supervisor"
     ADMINISTRADOR = "administrador"
 

@@ -330,7 +330,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 - Configuración por variables de entorno (`app/core/config.py`).
 - Conexión a SQL Server con SQLAlchemy (`app/core/database.py`).
 - Utilidades de seguridad: hash de contraseñas y JWT (`app/core/security.py`) y validación de RUT (`app/core/validators.py`).
-- Modelo de usuarios y roles (`app/models/usuario.py`): `RolUsuario` (5 roles), `Usuario` y `UsuarioRol`. Comentado línea por línea.
+- Modelo de usuarios y roles (`app/models/usuario.py`): `RolUsuario` (4 roles), `Usuario` y `UsuarioRol`. Comentado línea por línea. El rol `OPERADOR_BODEGA` queda fuera del alcance actual.
 - Migraciones con Alembic (`alembic.ini`, `migrations/`): la migración inicial `4e5b5d399259` crea las tablas `usuarios` y `usuario_roles` (más `alembic_version`). Se aplica con `docker compose exec backend alembic upgrade head`.
 - Schemas de autenticación (`app/schemas/auth.py`): `LoginRequest`, `TokenResponse`, `UsuarioCreate`, `UsuarioUpdate` y `UsuarioOut` (este último nunca expone la contraseña). Comentado línea por línea.
 
@@ -340,11 +340,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
   docker compose exec backend python -m tests.probar_deps
   ```
 
-  Debe terminar con `RESULTADO: todas las pruebas pasaron`. El script usa una transacción con `rollback`, así que no deja usuarios en la base.
+   Debe terminar con `RESULTADO: todas las pruebas pasaron`. El script usa una transacción con `rollback`, así que no deja usuarios en la base.
 
-En construcción: Épica 1 (autenticación, usuarios y roles). Falta:
+Épica 1 (autenticación, usuarios y roles) verificada en desarrollo:
 
-- `app/scripts/crear_admin.py`: crear el primer administrador.
-- `app/api/routers/auth.py`: login y gestión de usuarios. El router de autenticación está desactivado en `main.py` hasta que exista, así que hoy la API solo expone `GET /health`.
+- `app/scripts/crear_admin.py`: crear el primer administrador mediante `docker compose exec backend python -m app.scripts.crear_admin`.
+- `app/api/routers/auth.py`: login, usuario actual y gestión de usuarios.
+- `app/main.py`: router de autenticación activo bajo `/api/v1`.
+- Endpoints disponibles: `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `GET /api/v1/auth/usuarios`, `POST /api/v1/auth/usuarios` y `PUT /api/v1/auth/usuarios/{usuario_id}`.
+- Criterios HTTP de E1 registrados en `Resultados_Pruebas_E1_2026-10-03.md` dentro del repositorio de avances.
 
 Detalle del plan y de las tareas por persona: `Plan_Proximos_Avances_2026-09-20.md` en la carpeta `avances a2d_sm`.

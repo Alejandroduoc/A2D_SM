@@ -13,7 +13,7 @@ que no cumple (con un 422 automático) y describir /docs.
 from pydantic import BaseModel, Field
 
 # RolUsuario es el mismo enum que usa la tabla usuario_roles. Se reutiliza acá
-# para que un rol inválido (que no sea uno de los 5 definidos) se rechace solo,
+# para que un rol inválido (que no sea uno de los 4 definidos) se rechace solo,
 # sin tener que validarlo a mano en el router.
 from app.models.usuario import RolUsuario
 

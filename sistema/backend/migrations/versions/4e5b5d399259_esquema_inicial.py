@@ -32,7 +32,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_usuarios_nombre_usuario'), 'usuarios', ['nombre_usuario'], unique=True)
     op.create_table('usuario_roles',
     sa.Column('usuario_id', sa.String(length=36), nullable=False),
-    sa.Column('rol', sa.Enum('OPERADOR_RECEPCION', 'OPERADOR_PROCESO', 'OPERADOR_BODEGA', 'SUPERVISOR', 'ADMINISTRADOR', name='rolusuario'), nullable=False),
+    sa.Column('rol', sa.Enum('OPERADOR_RECEPCION', 'OPERADOR_PROCESO', 'SUPERVISOR', 'ADMINISTRADOR', name='rolusuario'), nullable=False),
     sa.ForeignKeyConstraint(['usuario_id'], ['usuarios.id'], ),
     sa.PrimaryKeyConstraint('usuario_id', 'rol')
     )
