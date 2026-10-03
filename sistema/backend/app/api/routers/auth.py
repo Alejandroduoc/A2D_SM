@@ -215,9 +215,10 @@ def actualizar_usuario(
             detail="Usuario no encontrado",
         )
 
+    cambios = datos.model_dump(exclude_unset=True, exclude_none=True)
+
     if (
-        "activo" in datos.model_dump(exclude_unset=True)
-        and datos.activo is False
+        cambios.get("activo") is False
         and usuario.id == usuario_administrador.id
     ):
         raise HTTPException(
@@ -225,9 +226,15 @@ def actualizar_usuario(
             detail="No puedes desactivar tu propio usuario administrador",
         )
 
-    # exclude_unset distingue entre un campo no enviado y un campo enviado
-    # con False, lo que permite desactivar correctamente a un usuario.
-    cambios = datos.model_dump(exclude_unset=True)
+    if (
+        usuario.id == usuario_administrador.id
+        and "roles" in cambios
+        and RolUsuario.ADMINISTRADOR not in cambios["roles"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes quitarte el rol administrador a ti mismo",
+        )
 
     if "nombre_completo" in cambios:
         usuario.nombre_completo = cambios["nombre_completo"]
@@ -238,7 +245,7 @@ def actualizar_usuario(
     if "roles" in cambios:
         usuario.roles_asignados = [
             UsuarioRol(rol=rol)
-            for rol in datos.roles or []
+            for rol in cambios["roles"]
         ]
 
     db.commit()
