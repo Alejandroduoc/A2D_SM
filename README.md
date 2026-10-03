@@ -40,7 +40,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Operador de recepción | Registrar el ingreso de fruta y sus tarjas |
 | Operador de proceso | Consultar y actualizar el estado del procesamiento |
 | Administrador | Gestionar catálogos, usuarios y parámetros del sistema |
-| Personal de gestión de planta | Consultar trazabilidad e historial de cambios |
+| Genrencia  | Consultar trazabilidad e historial de cambios |
 
 ### Alcance funcional
 
@@ -58,7 +58,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Base de datos | Microsoft SQL Server 2022 |
 | Autenticación | JWT (access + refresh) |
 | Infraestructura | Docker + Docker Compose |
-| Cloud | Por definir |
+
 
 ## Instrucciones para ejecutar el proyecto localmente
 
