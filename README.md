@@ -40,7 +40,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Operador de recepción | Registrar el ingreso de fruta y sus tarjas |
 | Operador de proceso | Consultar y actualizar el estado del procesamiento |
 | Administrador | Gestionar catálogos, usuarios y parámetros del sistema |
-| Genrencia  | Consultar trazabilidad e historial de cambios |
+| Gerencia  | Consultar trazabilidad e historial de cambios |
 
 ### Alcance funcional
 
