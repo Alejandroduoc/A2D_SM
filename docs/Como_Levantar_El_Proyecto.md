@@ -1,6 +1,6 @@
-# Cómo levantar el proyecto (backend + SQL Server, todo en Docker)
+# Cómo levantar el proyecto (frontend + backend + SQL Server, todo en Docker)
 
-Guía para dejar funcionando en tu PC lo que hay construido hasta ahora: la API (FastAPI) y la base de datos SQL Server. **Todo corre dentro de Docker**: no necesitas instalar Python, entornos virtuales ni drivers de SQL Server en tu PC.
+Guía para dejar funcionando en tu PC el frontend React, la API FastAPI y la base de datos SQL Server. **Todo corre dentro de Docker**: no necesitas instalar Node, Python, entornos virtuales ni drivers de SQL Server en tu PC.
 
 ## 1. Requisitos
 
@@ -14,10 +14,11 @@ Guía para dejar funcionando en tu PC lo que hay construido hasta ahora: la API 
 ```text
 Tu PC (Docker Desktop)
 ├── contenedor "a2d_sqlserver"  SQL Server 2022, puerto 1433  ← base de datos
-└── contenedor "a2d_backend"    API FastAPI, puerto 8000      ← backend (Python + driver ODBC ya incluidos)
+├── contenedor "a2d_backend"    API FastAPI, puerto 8000      ← backend (Python + driver ODBC ya incluidos)
+└── contenedor "a2d_frontend"  React/Vite, puerto 5173       ← interfaz web
 ```
 
-Son dos contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`sistema/backend/`) se comparte con el contenedor, así que lo que edites se aplica al instante. Todo se define en `sistema/docker-compose.yml`; la imagen del backend, en `sistema/backend/Dockerfile`. Ambos archivos están comentados línea por línea.
+Son tres contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`sistema/backend/`) y del frontend (`sistema/frontend/`) se comparten con sus contenedores, así que lo que edites se aplica al instante. Todo se define en `sistema/docker-compose.yml`; las imágenes están en `sistema/backend/Dockerfile` y `sistema/frontend/Dockerfile`.
 
 ## 3. Configuración (solo la primera vez)
 
@@ -50,7 +51,7 @@ Distinguir tres cosas, porque se hacen en momentos distintos:
 
 | Qué | Cuándo se hace | Cómo |
 | --- | --- | --- |
-| **Levantar los contenedores** (SQL Server y API) | Cada vez que enciendes Docker | `docker compose up -d` |
+| **Levantar los contenedores** (SQL Server, API y frontend) | Cada vez que enciendes Docker | `docker compose up -d` |
 | **Crear la base de datos `a2d_sm`** (la "carpeta" vacía dentro del motor) | **Una sola vez**, o de nuevo si se borra el volumen | Sección 4.2 |
 | **Crear las tablas** (`usuarios`, etc.) | Al aplicar las migraciones de Alembic | Sección 6 |
 
@@ -69,6 +70,8 @@ docker compose ps
 - `--build` construye la imagen del backend. La primera vez tarda unos minutos (descarga SQL Server, ~1.5 GB, e instala el driver); después usa la caché.
 - Espera a que `a2d_sqlserver` diga `healthy` y `a2d_backend` diga `Up`. El backend espera a que la base esté lista antes de arrancar.
 - **No sigas al paso 4.2 hasta que la base diga `healthy`**: si el motor aún está arrancando, el comando falla.
+- El frontend queda disponible en `http://localhost:5173`; la API queda disponible en `http://localhost:8000`.
+- El primer arranque instala las dependencias de React dentro de `a2d_frontend`; no es necesario instalar Node en el PC.
 
 ### 4.2. Crear la base `a2d_sm` (solo la primera vez)
 
