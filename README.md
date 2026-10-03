@@ -92,10 +92,12 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
    docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
    ```
 
-5. Abrir la API en http://localhost:8000/health y la documentación en
-   http://localhost:8000/docs
+5. Abrir el frontend en http://localhost:5173, la API en
+   http://localhost:8000/health y la documentación en http://localhost:8000/docs.
 
-> El frontend (React) todavía no está creado.
+   El frontend se sirve desde Docker con React, Vite y Tailwind. Para probar el
+   login, primero crea el administrador con el script indicado en la guía de
+   levantamiento y luego ingresa desde http://localhost:5173.
 
 ## Integrantes del equipo
 
@@ -148,7 +150,8 @@ A2D_SM/
 │   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
 │   ├── docker-compose.yml        # Entorno de desarrollo
 │   ├── docker-compose.prod.yml   # Ajustes para producción
-│   └── backend/                  # API FastAPI (app/, migrations/, tests/)
+│   ├── backend/                  # API FastAPI (app/, migrations/, tests/)
+│   └── frontend/                 # Interfaz React/Vite + Tailwind
 └── Fase 1/
     ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
     └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante

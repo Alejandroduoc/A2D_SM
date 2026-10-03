@@ -1,0 +1,23 @@
+/* Carga las capas base, componentes y utilidades de Tailwind. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Define la apariencia general sobria y legible de la aplicación. */
+body {
+  @apply bg-hielo text-slate-800 antialiased;
+}
+
+/* Evita que el contenido desborde en pantallas pequeñas. */
+#root {
+  @apply min-h-screen;
+}
+
+/* Permite usar un fondo técnico sutil sin imágenes externas. */
+.fondo-tecnico {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.72)),
+    linear-gradient(135deg, rgba(40, 104, 143, 0.08) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(193, 139, 44, 0.06) 25%, transparent 25%);
+  background-position: 0 0, 0 0, 24px 24px;
+  background-size: auto, 48px 48px, 48px 48px;
+}

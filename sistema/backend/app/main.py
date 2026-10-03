@@ -15,8 +15,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,  # Permitir todas las solicitudes desde cualquier origen
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos los métodos HTTP
-    allow_headers=["*"],  # Permitir todos los encabezados
+    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Métodos usados por la aplicación
+    allow_headers=["Authorization", "Content-Type"],  # Token y cuerpos JSON
 )       
 
 app.include_router(
