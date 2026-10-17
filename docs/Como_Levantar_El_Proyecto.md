@@ -303,7 +303,15 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver el resultado sin levantar nada
 ```
 
-**Aún no está listo para desplegar**: faltan el proxy con HTTPS, un usuario de SQL Server distinto de `sa`, respaldos, contraseñas privadas, restringir CORS y apagar `echo=True` en `database.py`. La lista completa, con responsables propuestos, está en `Avances_para_el_equipo_2026-09-19.md`, sección 8. **No uses este archivo en un servidor real hasta resolverlas.**
+**Aún no está listo para desplegar.** Faltan:
+
+- un proxy con HTTPS delante de la API (hoy el puerto 8000 se publica sin cifrar);
+- un usuario de SQL Server propio de la aplicación, distinto de `sa`;
+- respaldos de la base de datos;
+- contraseñas y `SECRET_KEY` propias del servidor, distintas de las de desarrollo;
+- definir cómo se publica el frontend (hoy `docker-compose.prod.yml` no ajusta ese servicio y se levanta el servidor de desarrollo de Vite).
+
+CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.py`) y el eco de SQL está apagado (`echo=False` en `app/core/database.py`). **No uses este archivo en un servidor real hasta resolver la lista anterior.**
 
 ## 9. Problemas frecuentes
 
@@ -337,7 +345,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 - Migraciones con Alembic (`alembic.ini`, `migrations/`): la migración inicial `4e5b5d399259` crea las tablas `usuarios` y `usuario_roles` (más `alembic_version`). Se aplica con `docker compose exec backend alembic upgrade head`.
 - Schemas de autenticación (`app/schemas/auth.py`): `LoginRequest`, `TokenResponse`, `UsuarioCreate`, `UsuarioUpdate` y `UsuarioOut` (este último nunca expone la contraseña). Comentado línea por línea.
 
-- Dependencias de autenticación y roles (`app/api/deps.py`): `get_current_user`, `require_rol` y `require_roles`. Comentado línea por línea. Se verifican con las 15 pruebas de `tests/probar_deps.py`:
+- Dependencias de autenticación y roles (`app/api/deps.py`): `get_current_user`, `require_rol` y `require_roles`. Comentado línea por línea. Se verifican con las 14 pruebas de `tests/probar_deps.py`:
 
   ```powershell
   docker compose exec backend python -m tests.probar_deps
@@ -351,6 +359,6 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 - `app/api/routers/auth.py`: login, usuario actual y gestión de usuarios.
 - `app/main.py`: router de autenticación activo bajo `/api/v1`.
 - Endpoints disponibles: `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `GET /api/v1/auth/usuarios`, `POST /api/v1/auth/usuarios` y `PUT /api/v1/auth/usuarios/{usuario_id}`.
-- Criterios HTTP de E1 registrados en `Resultados_Pruebas_E1_2026-10-03.md` dentro del repositorio de avances.
+- Resultados de las pruebas de E1 (15 de aceptación HTTP, 14 automáticas de `deps.py` y 17 complementarias de QA): `docs/pruebas/Resultados_Pruebas_E1_2026-10-03.md`.
 
-Detalle del plan y de las tareas por persona: `Plan_Proximos_Avances_2026-09-20.md` en la carpeta `avances a2d_sm`.
+La planificación por sprint está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).
