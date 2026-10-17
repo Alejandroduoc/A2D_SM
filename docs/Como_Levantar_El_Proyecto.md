@@ -359,6 +359,6 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 - `app/api/routers/auth.py`: login, usuario actual y gestión de usuarios.
 - `app/main.py`: router de autenticación activo bajo `/api/v1`.
 - Endpoints disponibles: `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `GET /api/v1/auth/usuarios`, `POST /api/v1/auth/usuarios` y `PUT /api/v1/auth/usuarios/{usuario_id}`.
-- Resultados de las pruebas de E1 (15 de aceptación HTTP, 14 automáticas de `deps.py` y 17 complementarias de QA): `docs/pruebas/Resultados_Pruebas_E1_2026-10-03.md`.
+- Resultados de las pruebas de E1 (15 de aceptación HTTP, 14 automáticas de `deps.py` y 17 complementarias de QA): `docs/Pruebas/Pruebas.docx`.
 
-La planificación por sprint está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).
+La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).
