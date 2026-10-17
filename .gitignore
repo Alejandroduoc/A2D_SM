@@ -1,1 +1,3 @@
 .DS_Store
+# Archivos temporales que crea Word/Excel mientras un documento está abierto
+~$*
