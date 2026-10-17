@@ -167,8 +167,9 @@ A2D_SM/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
 │   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
 └── Fase 2/
+    ├── Actas/                    # Actas de control de avance (evidencia de retrospectiva)
     ├── Evidencias Grupales/      # Guía 2.4 (desarrollo) e informe final 2.6
     ├── Evidencias Individuales/  # Diarios de reflexión 2.1 de cada integrante
     └── Evidencias Proyecto (version Agil)/  # Product Vision, Product Backlog, Sprint Backlog,
-                                             # Definition of Done, Documento de Diseño y Retrospectivas
+                                             # Definition of Done y Documento de Diseño
 ```

@@ -9,7 +9,8 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml config
 #
 # Antes de desplegar, revisar la lista de pendientes de producción en
-# "avances a2d_sm/Avances_para_el_equipo_2026-09-19.md" (sección 8).
+# docs/Como_Levantar_El_Proyecto.md, sección 8 (proxy HTTPS, usuario propio de SQL Server,
+# respaldos, claves del servidor y publicación del frontend).
 
 services:
 
