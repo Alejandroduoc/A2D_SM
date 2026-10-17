@@ -56,7 +56,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Lenguajes | Python (backend), JavaScript (frontend) |
 | Frameworks | FastAPI, SQLAlchemy 2.0 + Alembic, React (Vite) + Tailwind |
 | Base de datos | Microsoft SQL Server 2022 |
-| Autenticación | JWT (access + refresh) |
+| Autenticación | JWT (token de acceso de 30 minutos; renovación con *refresh token* planificada) |
 | Infraestructura | Docker + Docker Compose |
 
 
@@ -92,12 +92,23 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
    docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
    ```
 
-5. Abrir el frontend en http://localhost:5173, la API en
-   http://localhost:8000/health y la documentación en http://localhost:8000/docs.
+5. Crear las tablas aplicando las migraciones de Alembic (la primera vez y cada
+   vez que lleguen migraciones nuevas):
 
-   El frontend se sirve desde Docker con React, Vite y Tailwind. Para probar el
-   login, primero crea el administrador con el script indicado en la guía de
-   levantamiento y luego ingresa desde http://localhost:5173.
+   ```powershell
+   docker compose exec backend alembic upgrade head
+   ```
+
+6. Solo la primera vez, crear el primer administrador (el script pide el nombre
+   de usuario, el nombre completo y la contraseña por teclado):
+
+   ```powershell
+   docker compose exec backend python -m app.scripts.crear_admin
+   ```
+
+7. Abrir el frontend en http://localhost:5173 e iniciar sesión con ese
+   administrador. La API responde en http://localhost:8000/health y su
+   documentación está en http://localhost:8000/docs.
 
 ## Integrantes del equipo
 
@@ -120,9 +131,9 @@ ceremonias de planificación, revisión y retrospectiva.
 |---|---|---|
 | Backend | **Python + FastAPI** | Tipado con Pydantic, docs OpenAPI automáticas. |
 | ORM / Migraciones | SQLAlchemy 2.0 + Alembic | Estándar de facto en el ecosistema FastAPI. |
-| Base de datos | **SQL Server** (se mantiene) | Migración de datos motor-a-mismo-motor es más simple; se reutiliza lógica de ~30 stored procedures existentes del sistema legacy en vez de reescribirla de cero. |
+| Base de datos | **SQL Server** (se mantiene) | Es el motor que ya usa la planta y que el equipo conoce. La migración de los datos del sistema legado está fuera del alcance del PMV; el modelo nuevo se diseñó desde cero, con claves foráneas y transacciones que el legado no tenía. |
 | Frontend | **React (Vite) + Tailwind** | SPA desacoplada, consistente con el backend REST. |
-| Autenticación | JWT (access + refresh) | Sin sesiones server-side acopladas a un solo servidor. |
+| Autenticación | JWT (token de acceso de 30 minutos) | Sin sesiones server-side acopladas a un solo servidor. La renovación con *refresh token* (`POST /auth/refresh`) queda para una etapa posterior: al vencer el token se vuelve a iniciar sesión. |
 | Infraestructura | Docker + docker-compose | Portable y reproducible entre miembros del equipo. |
 
 **Principio no negociable:** ningún cliente (browser) accede directo a la base
@@ -152,7 +163,12 @@ A2D_SM/
 │   ├── docker-compose.prod.yml   # Ajustes para producción
 │   ├── backend/                  # API FastAPI (app/, migrations/, tests/)
 │   └── frontend/                 # Interfaz React/Vite + Tailwind
-└── Fase 1/
-    ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
-    └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
+├── Fase 1/
+│   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
+│   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
+└── Fase 2/
+    ├── Evidencias Grupales/      # Guía 2.4 (desarrollo) e informe final 2.6
+    ├── Evidencias Individuales/  # Diarios de reflexión 2.1 de cada integrante
+    └── Evidencias Proyecto (version Agil)/  # Product Vision, Product Backlog, Sprint Backlog,
+                                             # Definition of Done, Documento de Diseño y Retrospectivas
 ```
