@@ -40,3 +40,16 @@ def validar_rut_chileno(rut: str) -> bool:
 
     # Devuelve True si el dígito ingresado coincide con el dígito calculado.
     return dv_ingresado == dv_esperado
+
+
+# Unifica la presentación de un RUT cuyo dígito verificador ya fue validado.
+def normalizar_rut(rut: str) -> str:
+    """Devuelve cuerpo decimal-DV sin ceros iniciales; requiere un RUT válido."""
+    # Utiliza la misma limpieza del validador y deja la letra K en mayúsculas.
+    limpio = re.sub(r"[.\-\s]", "", rut).upper()
+    # Separa el cuerpo numérico del último carácter, que es el dígito verificador.
+    cuerpo, digito_verificador = limpio[:-1], limpio[-1]
+    # Unifica el cuerpo numérico como texto decimal, sin ceros iniciales.
+    cuerpo = str(int(cuerpo))
+    # Mantiene una representación común para altas, ediciones y búsquedas.
+    return f"{cuerpo}-{digito_verificador}"

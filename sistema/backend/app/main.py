@@ -1,7 +1,7 @@
 from fastapi import FastAPI #Creamos la instancia de la aplicación FastAPI
 from fastapi.middleware.cors import CORSMiddleware #Agregamos el middleware CORS para permitir solicitudes desde diferentes orígenes
 
-from app.api.routers import auth # Importamos el enrutador de autenticación
+from app.api.routers import auth, productores # Importamos autenticación y mantenimiento de productores.
 from app.core.config import settings # Importamos la configuración
 
 
@@ -23,6 +23,12 @@ app.include_router(
     auth.router,
     prefix=settings.api_v1_prefix,
 )  # Incluimos el enrutador de autenticación
+
+# Publica el mantenimiento de productores bajo el prefijo general de la API.
+app.include_router(
+    productores.router,  # Incorpora las cuatro operaciones protegidas del módulo.
+    prefix=settings.api_v1_prefix,  # Conserva /api/v1 como prefijo común.
+)  # Finaliza el registro del router de productores.
 
 @app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
 def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz
