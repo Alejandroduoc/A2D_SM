@@ -7,7 +7,8 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import usuario  # noqa: F401  (importarlo registra las tablas en Base.metadata)
+# Importar ambos modelos registra sus tablas en Base.metadata para Alembic.
+from app.models import auditoria, usuario  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
