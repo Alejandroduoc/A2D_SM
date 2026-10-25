@@ -2,6 +2,8 @@ from fastapi import FastAPI #Creamos la instancia de la aplicación FastAPI
 from fastapi.middleware.cors import CORSMiddleware #Agregamos el middleware CORS para permitir solicitudes desde diferentes orígenes
 
 from app.api.routers import auth, especies, productores, variedades # Importamos autenticación y los mantenimientos disponibles.
+from app.api.routers.calidades import router as calidades_router
+from app.api.routers.sistemas_productivos import router as sistemas_productivos_router
 from app.core.config import settings # Importamos la configuración
 
 
@@ -41,6 +43,10 @@ app.include_router(
     variedades.router,  # Incluye listado, detalle, creación y actualización.
     prefix=settings.api_v1_prefix,  # El router no repite este prefijo general.
 )  # Finaliza el registro del mantenimiento de variedades.
+
+# Publica los dos mantenimientos administrativos independientes de HU09.
+app.include_router(calidades_router, prefix=settings.api_v1_prefix)
+app.include_router(sistemas_productivos_router, prefix=settings.api_v1_prefix)
 
 @app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
 def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz

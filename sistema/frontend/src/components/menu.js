@@ -23,6 +23,11 @@ export const MENU = [
     etiqueta: "Especies y variedades", // Identifica los dos catálogos relacionados.
     roles: ["administrador"], // Las consultas también exigen este rol en la API.
   },
+  {
+    ruta: "/calidades-sistemas-productivos",
+    etiqueta: "Calidades y sistemas productivos",
+    roles: ["administrador"],
+  },
 ];
 
 // Devuelve las opciones permitidas sin modificar el arreglo compartido.
