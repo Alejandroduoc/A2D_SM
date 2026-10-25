@@ -7,7 +7,7 @@ import { extraerMensajeError } from "../api/client";
 // Operaciones de usuarios.
 import { actualizarUsuario, crearUsuario, listarUsuarios } from "../api/usuarios";
 // Estilos y reglas compartidas con los catálogos.
-import { BOTON_EDITAR, BOTON_PRINCIPAL, BOTON_SECUNDARIO, botonEstado, claseFila, confirmarCambioEstado, enfocar } from "../components/catalogo";
+import { BOTON_EDITAR, BOTON_PRINCIPAL, BOTON_SECUNDARIO, botonEstado, claseEstado, claseFila, confirmarCambioEstado, enfocar } from "../components/catalogo";
 // Nombres legibles de cada rol.
 import { NOMBRE_ROL } from "../components/menu";
 
@@ -16,7 +16,7 @@ const ROLES = ["operador_recepcion", "operador_proceso", "gerencia", "administra
 // Formulario vacío para un alta.
 const FORM_VACIO = { id: null, nombre_usuario: "", nombre_completo: "", password: "", roles: [] };
 // Clases comunes de los campos de texto.
-const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100";
+const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-100";
 
 // Bytes UTF-8 de un texto: bcrypt admite hasta 72.
 function bytesUtf8(texto) {
@@ -162,19 +162,20 @@ export default function Usuarios() {
     <section aria-labelledby="titulo-usuarios" className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 id="titulo-usuarios" className="text-3xl font-semibold text-frigorifico-950">Usuarios</h1>
-          <p className="mt-2 text-slate-500">Cuentas, roles y estado del personal que usa el sistema.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">E1 · Accesos</p>
+          <h1 id="titulo-usuarios" className="text-2xl font-bold text-frigorifico-900">Usuarios</h1>
+          <p className="mt-2 text-sm text-slate-500">Cuentas, roles y estado del personal que usa el sistema.</p>
         </div>
         <button type="button" onClick={() => abrir()} disabled={ocupado || form !== null} className={BOTON_PRINCIPAL}>Nuevo usuario</button>
       </div>
 
-      {mensaje && <p role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{mensaje}</p>}
-      {error && form === null && <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+      {mensaje && <p role="status" className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{mensaje}</p>}
+      {error && form === null && <p role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
 
       {/* Formulario de alta o edición. */}
       {form !== null && (
-        <form onSubmit={guardar} aria-labelledby="titulo-form-usuario" className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 id="titulo-form-usuario" className="text-xl font-semibold text-frigorifico-950">{form.id === null ? "Nuevo usuario" : `Editar «${form.nombre_usuario}»`}</h2>
+        <form onSubmit={guardar} aria-labelledby="titulo-form-usuario" className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
+          <h2 id="titulo-form-usuario" className="text-lg font-bold text-frigorifico-900">{form.id === null ? "Nuevo usuario" : `Editar «${form.nombre_usuario}»`}</h2>
           {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
           <fieldset disabled={guardando} className="mt-5 grid min-w-0 gap-5 sm:grid-cols-2">
             <div>
@@ -216,7 +217,7 @@ export default function Usuarios() {
       )}
 
       {/* Buscador y recarga. */}
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-lg border border-slate-200 bg-white shadow-sm p-5">
         <div className="w-full min-w-0 flex-1 sm:w-auto">
           <label htmlFor="buscar-usuarios" className="mb-2 block text-sm font-semibold text-slate-700">Buscar</label>
           <input id="buscar-usuarios" type="search" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Usuario o nombre" className={CAMPO} />
@@ -227,16 +228,16 @@ export default function Usuarios() {
       {/* Tabla con estados de carga, error y vacío. */}
       <div className="mt-6 min-w-0" aria-busy={cargando}>
         {cargando ? (
-          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">Cargando usuarios…</p>
+          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">Cargando usuarios…</p>
         ) : errorListado ? (
-          <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{errorListado}</p>
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">{errorListado}</p>
         ) : visibles.length === 0 ? (
-          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">No hay usuarios que coincidan</p>
+          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">No hay usuarios que coincidan</p>
         ) : (
-          <div role="region" aria-label="Listado de usuarios" tabIndex={0} className="overflow-x-auto rounded-2xl border border-slate-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700">
+          <div role="region" aria-label="Listado de usuarios" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
             <table className="w-full min-w-[760px] text-left text-sm">
               <caption className="sr-only">Usuarios del sistema</caption>
-              <thead className="border-b border-slate-200 bg-frigorifico-50 text-frigorifico-950">
+              <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th scope="col" className="px-5 py-4 font-semibold">Usuario</th>
                   <th scope="col" className="px-5 py-4 font-semibold">Nombre completo</th>
@@ -252,7 +253,7 @@ export default function Usuarios() {
                     <td className="px-5 py-4 text-slate-800">{cuenta.nombre_completo}</td>
                     <td className="px-5 py-4 text-slate-600">{cuenta.roles.map((rol) => NOMBRE_ROL[rol] ?? rol).join(" · ")}</td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${cuenta.activo ? "bg-emerald-50 text-emerald-800 ring-emerald-600/20" : "bg-slate-100 text-slate-600 ring-slate-500/20"}`}>{cuenta.activo ? "Activo" : "Inactivo"}</span>
+                      <span className={claseEstado(cuenta.activo)}>{cuenta.activo ? "Activo" : "Inactivo"}</span>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-2">

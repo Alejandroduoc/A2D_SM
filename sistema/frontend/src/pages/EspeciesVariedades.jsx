@@ -10,6 +10,7 @@ import {
   BOTON_PRINCIPAL,
   BOTON_SECUNDARIO,
   botonEstado,
+  claseEstado,
   claseFila,
   confirmarCambioEstado,
   enfocar,
@@ -23,7 +24,7 @@ function activoDesdeFiltro(filtro) {
 // Muestra un estado comprensible por texto, además del color de la etiqueta.
 function EtiquetaEstado({ activo, femenino = false }) {
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${activo ? "bg-emerald-50 text-emerald-800 ring-emerald-600/20" : "bg-slate-100 text-slate-600 ring-slate-500/20"}`}>
+    <span className={claseEstado(activo)}>
       {activo ? (femenino ? "Activa" : "Activo") : (femenino ? "Inactiva" : "Inactivo")}
     </span>
   );
@@ -282,18 +283,19 @@ export default function EspeciesVariedades() {
 
   return (
     <section aria-labelledby="titulo-especies-variedades" className="min-w-0">
-      <h1 id="titulo-especies-variedades" className="text-3xl font-semibold text-frigorifico-950">Especies y variedades</h1>
-      <p className="mt-2 text-slate-500">Consulta los catálogos y las variedades asociadas a cada especie.</p>
+      {/* Se muestra dentro de la pestaña de Mantenedores: el título visible es el de la pestaña. */}
+      <h2 id="titulo-especies-variedades" className="sr-only">Especies y variedades</h2>
+      <p className="text-sm text-slate-500">Especie de fruta (ej. Cereza, Uva). Elige una especie para ver y mantener sus variedades.</p>
 
-      <div className="mt-8 grid min-w-0 gap-8 lg:grid-cols-2 lg:items-start">
-        <section aria-labelledby="titulo-especies" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 id="titulo-especies" className="text-xl font-semibold text-frigorifico-950">Especies</h2>
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2 lg:items-start">
+        <section aria-labelledby="titulo-especies" className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
+          <h2 id="titulo-especies" className="text-lg font-bold text-frigorifico-900">Especies</h2>
           {mensajeEspecies && <p role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{mensajeEspecies}</p>}
           {errorOperacionEspecies && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorOperacionEspecies}</p>}
-          <form onSubmit={guardarEspecie} className="mt-5 rounded-xl bg-slate-50 p-4">
+          <form onSubmit={guardarEspecie} className="mt-5 rounded-lg bg-slate-50 p-4">
             <label htmlFor="nombre-especie" className="block text-sm font-semibold text-slate-700">{formEspecie.id === null ? "Nueva especie" : "Editar especie"}</label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input ref={campoEspecie} id="nombre-especie" type="text" required maxLength={50} value={formEspecie.nombre} onChange={(event) => setFormEspecie((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoEspecie} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
+              <input ref={campoEspecie} id="nombre-especie" type="text" required maxLength={50} value={formEspecie.nombre} onChange={(event) => setFormEspecie((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoEspecie} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-100" />
               <button type="submit" disabled={guardandoEspecie} className={BOTON_PRINCIPAL}>{guardandoEspecie ? "Guardando…" : "Guardar"}</button>
               {formEspecie.id !== null && <button type="button" onClick={() => setFormEspecie({ id: null, nombre: "" })} disabled={guardandoEspecie} className={BOTON_SECUNDARIO}>Cancelar</button>}
             </div>
@@ -301,27 +303,27 @@ export default function EspeciesVariedades() {
           <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
             <div className="w-full sm:w-auto">
               <label htmlFor="filtro-especies" className="mb-2 block text-sm font-semibold text-slate-700">Mostrar especies</label>
-              <select id="filtro-especies" value={filtroEspecies} onChange={cambiarFiltroEspecies} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 sm:min-w-48">
+              <select id="filtro-especies" value={filtroEspecies} onChange={cambiarFiltroEspecies} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 sm:min-w-48">
                 <option value="todos">Todos</option>
                 <option value="activos">Activos</option>
                 <option value="inactivos">Inactivos</option>
               </select>
             </div>
-            <button type="button" onClick={() => setRecargaEspecies((valor) => valor + 1)} disabled={cargandoEspecies} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">Recargar especies</button>
+            <button type="button" onClick={() => setRecargaEspecies((valor) => valor + 1)} disabled={cargandoEspecies} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ambar disabled:cursor-not-allowed disabled:opacity-50">Recargar especies</button>
           </div>
 
           <div className="mt-6 min-w-0" aria-busy={cargandoEspecies}>
             {cargandoEspecies ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">Cargando especies…</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Cargando especies…</p>
             ) : errorEspecies ? (
-              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">{errorEspecies}</p>
+              <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">{errorEspecies}</p>
             ) : especies.length === 0 ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">No hay especies con este filtro</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay especies con este filtro</p>
             ) : (
-              <div role="region" aria-label="Listado de especies" tabIndex={0} className="overflow-x-auto rounded-xl border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700">
+              <div role="region" aria-label="Listado de especies" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
                 <table className="w-full min-w-[520px] text-left text-sm">
                   <caption className="sr-only">Especies según el filtro seleccionado</caption>
-                  <thead className="border-b border-slate-200 bg-frigorifico-50 text-frigorifico-950">
+                  <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -333,7 +335,7 @@ export default function EspeciesVariedades() {
                           <td className="px-4 py-4"><EtiquetaEstado activo={especie.activo} femenino /></td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
-                              <button type="button" onClick={() => seleccionarEspecie(especie.id)} aria-pressed={seleccionada} className={`rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700 ${seleccionada ? "border-frigorifico-800 bg-frigorifico-900 text-white" : "border-slate-300 text-frigorifico-900 hover:bg-frigorifico-50"}`}>{seleccionada ? "Seleccionada" : "Ver variedades"}</button>
+                              <button type="button" onClick={() => seleccionarEspecie(especie.id)} aria-pressed={seleccionada} className={`rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar ${seleccionada ? "border-frigorifico-800 bg-frigorifico-900 text-white" : "border-slate-300 text-frigorifico-900 hover:bg-frigorifico-50"}`}>{seleccionada ? "Seleccionada" : "Ver variedades"}</button>
                               <button type="button" onClick={() => editarEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`Editar ${especie.nombre}`} className={BOTON_EDITAR}>Editar</button>
                               <button type="button" onClick={() => cambiarEstadoEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`${especie.activo ? "Desactivar" : "Activar"} ${especie.nombre}`} className={botonEstado(especie.activo)}>{cambiandoEspecieId === especie.id ? "Actualizando…" : especie.activo ? "Desactivar" : "Activar"}</button>
                             </div>
@@ -348,17 +350,17 @@ export default function EspeciesVariedades() {
           </div>
         </section>
 
-        <section aria-labelledby="titulo-variedades" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <section aria-labelledby="titulo-variedades" className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
           <div className="flex min-h-14 flex-wrap items-center justify-between gap-3">
-            <h2 id="titulo-variedades" className="text-xl font-semibold text-frigorifico-950">{especieSeleccionada ? `Variedades de ${especieSeleccionada.nombre}` : "Variedades"}</h2>
+            <h2 id="titulo-variedades" className="text-lg font-bold text-frigorifico-900">{especieSeleccionada ? `Variedades de ${especieSeleccionada.nombre}` : "Variedades"}</h2>
             {especieSeleccionada && <EtiquetaEstado activo={especieSeleccionada.activo} femenino />}
           </div>
           {mensajeVariedades && <p role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{mensajeVariedades}</p>}
           {errorOperacionVariedades && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorOperacionVariedades}</p>}
-          <form onSubmit={guardarVariedad} className="mt-5 rounded-xl bg-slate-50 p-4">
+          <form onSubmit={guardarVariedad} className="mt-5 rounded-lg bg-slate-50 p-4">
             <label htmlFor="nombre-variedad" className="block text-sm font-semibold text-slate-700">{formVariedad.id === null ? "Nueva variedad" : "Editar variedad"}</label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input ref={campoVariedad} id="nombre-variedad" type="text" required maxLength={50} value={formVariedad.nombre} onChange={(event) => setFormVariedad((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
+              <input ref={campoVariedad} id="nombre-variedad" type="text" required maxLength={50} value={formVariedad.nombre} onChange={(event) => setFormVariedad((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-100" />
               <button type="submit" disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className={BOTON_PRINCIPAL}>{guardandoVariedad ? "Guardando…" : "Guardar"}</button>
               {formVariedad.id !== null && <button type="button" onClick={() => setFormVariedad({ id: null, nombre: "" })} disabled={guardandoVariedad} className={BOTON_SECUNDARIO}>Cancelar</button>}
             </div>
@@ -368,33 +370,33 @@ export default function EspeciesVariedades() {
           <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
             <div className="w-full sm:w-auto">
               <label htmlFor="filtro-variedades" className="mb-2 block text-sm font-semibold text-slate-700">Mostrar variedades</label>
-              <select id="filtro-variedades" value={filtroVariedades} disabled={!puedeConsultarVariedades} onChange={(event) => setFiltroVariedades(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:cursor-not-allowed disabled:bg-slate-100 sm:min-w-48">
+              <select id="filtro-variedades" value={filtroVariedades} disabled={!puedeConsultarVariedades} onChange={(event) => setFiltroVariedades(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:cursor-not-allowed disabled:bg-slate-100 sm:min-w-48">
                 <option value="todos">Todos</option>
                 <option value="activos">Activos</option>
                 <option value="inactivos">Inactivos</option>
               </select>
             </div>
-            <button type="button" onClick={() => setRecargaVariedades((valor) => valor + 1)} disabled={!puedeConsultarVariedades || cargandoVariedades} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">Recargar variedades</button>
+            <button type="button" onClick={() => setRecargaVariedades((valor) => valor + 1)} disabled={!puedeConsultarVariedades || cargandoVariedades} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ambar disabled:cursor-not-allowed disabled:opacity-50">Recargar variedades</button>
           </div>
 
           <div className="mt-6 min-w-0" aria-busy={cargandoVariedades}>
             {cargandoEspecies ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">Actualizando especies antes de consultar sus variedades…</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Actualizando especies antes de consultar sus variedades…</p>
             ) : errorEspecies ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">Corrige la consulta de especies para recuperar este listado.</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Corrige la consulta de especies para recuperar este listado.</p>
             ) : !especieSeleccionada ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">Selecciona una especie para consultar sus variedades</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Selecciona una especie para consultar sus variedades</p>
             ) : cargandoVariedades ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">Cargando variedades…</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Cargando variedades…</p>
             ) : errorVariedades ? (
-              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">{errorVariedades}</p>
+              <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">{errorVariedades}</p>
             ) : variedades.length === 0 ? (
-              <p role="status" className="rounded-xl bg-slate-50 p-5 text-slate-500">No hay variedades de esta especie con este filtro</p>
+              <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay variedades de esta especie con este filtro</p>
             ) : (
-              <div role="region" aria-label={`Variedades de ${especieSeleccionada.nombre}`} tabIndex={0} className="overflow-x-auto rounded-xl border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700">
+              <div role="region" aria-label={`Variedades de ${especieSeleccionada.nombre}`} tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
                 <table className="w-full min-w-[520px] text-left text-sm">
                   <caption className="sr-only">Variedades de la especie seleccionada</caption>
-                  <thead className="border-b border-slate-200 bg-frigorifico-50 text-frigorifico-950"><tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr></thead>
+                  <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {variedades.map((variedad) => (
                       <tr key={variedad.id} className={claseFila(formVariedad.id === variedad.id)} aria-current={formVariedad.id === variedad.id ? "true" : undefined}>

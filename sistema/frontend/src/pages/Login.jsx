@@ -1,11 +1,14 @@
 // Importa el estado local del formulario.
 import { useState } from "react";
-// Importa redirección y navegación programática.
+// Importa redirección, navegación programática y lectura de la URL.
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 // Importa la normalización de errores.
 import { extraerMensajeError } from "../api/client";
 // Importa el estado de autenticación.
 import { useAuth } from "../api/AuthContext";
+
+// Clases comunes de los dos campos.
+const CAMPO = "w-full rounded border border-slate-300 px-3 py-2.5 text-slate-800 outline-none transition focus:border-ambar focus:ring-2 focus:ring-ambar/20";
 
 // Muestra el acceso institucional al sistema.
 export default function Login() {
@@ -40,73 +43,72 @@ export default function Login() {
   }
 
   return (
-    <main className="fondo-tecnico flex min-h-screen items-center justify-center px-4 py-10">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-panel lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="relative hidden overflow-hidden bg-frigorifico-950 p-12 text-white lg:block">
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full border-[28px] border-white/10" />
-          <div className="absolute -bottom-24 -left-20 h-72 w-72 rounded-full border-[36px] border-ambar/30" />
-          <div className="relative flex h-full flex-col justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-ambar">A2D SM</p>
-              <h1 className="mt-8 max-w-md text-4xl font-semibold leading-tight">
-                Trazabilidad con precisión y control.
-              </h1>
-              <p className="mt-6 max-w-md text-base leading-7 text-blue-100">
-                Plataforma operativa para una planta procesadora de fruta, diseñada para mantener cada etapa bajo control.
-              </p>
+    <main className="flex min-h-[calc(100vh-50px)] items-center justify-center px-4 py-10">
+      <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white/95 shadow-xl shadow-slate-900/10 md:grid md:grid-cols-[0.9fr_1.1fr]">
+        {/* Panel de marca: azul marino con círculos decorativos (solo en pantallas medianas o más). */}
+        <div className="relative hidden overflow-hidden bg-frigorifico-900 p-10 text-white md:flex md:flex-col md:justify-between">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full border border-ambar/40" aria-hidden="true" />
+          <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full border border-white/10" aria-hidden="true" />
+          <div className="relative">
+            <div className="mb-10 flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center border border-ambar text-lg font-bold text-ambar-claro">A</div>
+              <div>
+                <p className="font-serif text-lg tracking-wide">A2D SM</p>
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-300">Trazabilidad frutícola</p>
+              </div>
             </div>
-            <div className="border-l-2 border-ambar pl-4 text-sm text-blue-100">
-              <p className="font-semibold text-white">Sistema de gestión operacional</p>
-              <p className="mt-1">Acceso seguro para personal autorizado</p>
-            </div>
+            <p className="max-w-xs text-sm leading-6 text-slate-300">
+              Control preciso y seguro para cada etapa de la operación de la planta.
+            </p>
           </div>
+          <p className="relative text-xs uppercase tracking-[0.18em] text-ambar-claro">Acceso para personal autorizado</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 sm:p-12">
-          <div className="mb-10">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-frigorifico-700">Acceso al sistema</p>
-            <h2 className="mt-3 text-3xl font-semibold text-frigorifico-950">Iniciar sesión</h2>
-            <p className="mt-2 text-sm text-slate-500">Ingresa tus credenciales para continuar.</p>
+        <form onSubmit={handleSubmit} className="p-7 sm:p-10">
+          <div className="mb-8">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">Acceso seguro</p>
+            <h1 className="mb-2 text-2xl font-bold text-frigorifico-900">Bienvenido</h1>
+            <p className="text-sm text-slate-500">Ingresa con tus credenciales para continuar.</p>
           </div>
 
           {/* Explica por qué se volvió al login sin que la persona cerrara sesión. */}
           {sesionExpirada && !error && (
-            <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div role="status" className="mb-5 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Tu sesión expiró. Vuelve a ingresar para continuar.
             </div>
           )}
 
           {error && (
-            <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="mb-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          <label htmlFor="nombre-usuario" className="mb-2 block text-sm font-semibold text-slate-700">
+          <label htmlFor="nombre-usuario" className="mb-1 block text-sm font-semibold text-slate-700">
             Usuario
           </label>
           <input
             id="nombre-usuario"
             autoComplete="username"
             maxLength={50}
-            className="mb-5 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 outline-none transition focus:border-frigorifico-700 focus:bg-white focus:ring-4 focus:ring-frigorifico-100"
+            className={`mb-5 ${CAMPO}`}
             value={nombreUsuario}
             onChange={(event) => setNombreUsuario(event.target.value)}
             autoFocus
             required
           />
 
-          <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">
+          <label htmlFor="password" className="mb-1 block text-sm font-semibold text-slate-700">
             Contraseña
           </label>
           {/* El botón queda dentro del campo y alterna entre texto oculto y visible. */}
-          <div className="relative mb-8">
+          <div className="relative mb-7">
             <input
               id="password"
               type={verPassword ? "text" : "password"}
               autoComplete="current-password"
               maxLength={128}
-              className="w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-4 pr-24 outline-none transition focus:border-frigorifico-700 focus:bg-white focus:ring-4 focus:ring-frigorifico-100"
+              className={`${CAMPO} pr-24`}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -116,7 +118,7 @@ export default function Login() {
               onClick={() => setVerPassword((actual) => !actual)}
               aria-pressed={verPassword}
               aria-controls="password"
-              className="absolute inset-y-0 right-2 my-auto h-9 rounded-md px-3 text-sm font-semibold text-frigorifico-800 hover:bg-frigorifico-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700"
+              className="absolute inset-y-0 right-2 my-auto h-8 rounded px-3 text-sm font-semibold text-frigorifico-800 hover:text-ambar focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar"
             >
               {verPassword ? "Ocultar" : "Mostrar"}
             </button>
@@ -125,12 +127,12 @@ export default function Login() {
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-lg bg-frigorifico-900 py-3 font-semibold text-white shadow-lg shadow-frigorifico-900/20 transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded bg-frigorifico-900 py-2.5 font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ambar disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {enviando ? "Validando..." : "Ingresar al sistema"}
+            {enviando ? "Ingresando..." : "Ingresar al sistema"}
           </button>
         </form>
-      </section>
+      </div>
     </main>
   );
 }
