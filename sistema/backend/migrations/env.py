@@ -7,8 +7,16 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
-# Importa los cinco módulos para registrar todas sus tablas en Base.metadata.
-from app.models import auditoria, especie, productor, usuario, variedad  # noqa: F401
+# Importa los siete módulos para registrar todas sus tablas en Base.metadata.
+from app.models import (  # noqa: F401
+    auditoria,
+    calidad,
+    especie,
+    productor,
+    sistema_productivo,
+    usuario,
+    variedad,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Productores from "./pages/Productores";
 // Presenta los catálogos relacionados de especies y variedades.
 import EspeciesVariedades from "./pages/EspeciesVariedades";
+import CalidadesSistemasProductivos from "./pages/CalidadesSistemasProductivos";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
               <Route path="productores" element={<Productores />} />
               <Route path="especies-variedades" element={<EspeciesVariedades />} />
+              <Route path="calidades-sistemas-productivos" element={<CalidadesSistemasProductivos />} />
             </Route>
           </Route>
         </Route>
