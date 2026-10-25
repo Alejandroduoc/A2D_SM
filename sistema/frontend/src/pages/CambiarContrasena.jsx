@@ -13,7 +13,7 @@ function bytesUtf8(texto) {
 }
 
 // Clases comunes de los campos de contraseña.
-const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-50";
+const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-50";
 
 // Permite a cualquier perfil cambiar su propia contraseña.
 export default function CambiarContrasena() {
@@ -61,10 +61,11 @@ export default function CambiarContrasena() {
 
   return (
     <section aria-labelledby="titulo-cambiar-contrasena" className="max-w-xl">
-      <h1 id="titulo-cambiar-contrasena" className="text-3xl font-semibold text-frigorifico-950">Cambiar contraseña</h1>
-      <p className="mt-2 text-slate-500">Por seguridad se pide tu contraseña actual.</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">Mi cuenta</p>
+      <h1 id="titulo-cambiar-contrasena" className="text-2xl font-bold text-frigorifico-900">Cambiar contraseña</h1>
+      <p className="mt-2 text-sm text-slate-500">Por seguridad se pide tu contraseña actual.</p>
 
-      <form onSubmit={enviar} className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <form onSubmit={enviar} className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
         {exito && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{exito}</p>}
         {error && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 

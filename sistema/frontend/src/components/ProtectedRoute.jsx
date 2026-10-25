@@ -9,7 +9,7 @@ export default function ProtectedRoute({ rolesPermitidos }) {
 
   // Evita redirigir antes de validar un token al recargar.
   if (cargando) {
-    return <div className="flex min-h-screen items-center justify-center text-frigorifico-800">Validando sesión...</div>;
+    return <div className="flex min-h-screen items-center justify-center text-frigorifico-900">Validando sesión...</div>;
   }
 
   // Envía al login a quien no tiene una sesión válida.

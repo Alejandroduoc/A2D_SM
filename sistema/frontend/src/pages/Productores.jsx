@@ -6,6 +6,8 @@ import { extraerMensajeError } from "../api/client";
 import { actualizarProductor, crearProductor, listarProductores } from "../api/productores";
 // Presenta el RUT y anticipa errores sin sustituir los controles del servidor.
 import { formatearRut, normalizarRut, validarRut } from "../utils/rut";
+// Estilos compartidos con los demás mantenedores.
+import { BOTON_EDITAR, BOTON_PRINCIPAL, BOTON_SECUNDARIO, botonEstado, claseEstado } from "../components/catalogo";
 
 // Valores iniciales de los cuatro campos de negocio del formulario.
 const FORM_VACIO = { rut: "", razon_social: "", direccion: "", telefono: "" };
@@ -258,54 +260,55 @@ export default function Productores() {
       {/* Conserva la presentación del mantenimiento y su identidad dentro del menú. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 id="titulo-productores" className="text-3xl font-semibold text-frigorifico-950">Productores</h1>
-          <p className="mt-2 text-slate-500">Gestión de los datos y el estado de los productores de la planta.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">E2 · Maestros</p>
+          <h1 id="titulo-productores" className="text-2xl font-bold text-frigorifico-900">Productores</h1>
+          <p className="mt-2 text-sm text-slate-500">Gestión de los datos y el estado de los productores de la planta.</p>
         </div>
-        <button type="button" onClick={() => abrirFormulario()} disabled={ocupado || editando !== null} className="rounded-lg bg-frigorifico-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">Nuevo productor</button>
+        <button type="button" onClick={() => abrirFormulario()} disabled={ocupado || editando !== null} className={BOTON_PRINCIPAL}>Nuevo productor</button>
       </div>
 
       {/* La confirmación de escritura permanece visible aunque falle el listado. */}
-      {mensajeExito && <p id="mensaje-productores" role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{mensajeExito}</p>}
+      {mensajeExito && <p id="mensaje-productores" role="status" className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{mensajeExito}</p>}
       {/* Los errores de estado no se confunden con los del formulario o la consulta. */}
-      {errorOperacion && <p id="error-operacion-productor" role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorOperacion}</p>}
+      {errorOperacion && <p id="error-operacion-productor" role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorOperacion}</p>}
 
       {/* El panel de datos no repite el layout y conserva el registro original al editar. */}
       {editando !== null && (
-        <form onSubmit={guardar} aria-labelledby="titulo-form-productor" className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 id="titulo-form-productor" className="text-xl font-semibold text-frigorifico-950">{editando.id !== undefined ? "Editar productor" : "Nuevo productor"}</h2>
+        <form onSubmit={guardar} aria-labelledby="titulo-form-productor" className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
+          <h2 id="titulo-form-productor" className="text-lg font-bold text-frigorifico-900">{editando.id !== undefined ? "Editar productor" : "Nuevo productor"}</h2>
           {errorForm && <p id="error-form-productor" role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorForm}</p>}
           {/* El bloqueo nativo incluye inputs, Guardar y Cancelar durante la escritura. */}
           <fieldset disabled={ocupado} className="mt-5 grid min-w-0 gap-5 sm:grid-cols-2">
             <div className="min-w-0">
               <label htmlFor="productor-rut" className="mb-2 block text-sm font-semibold text-slate-700">RUT</label>
-              <input id="productor-rut" name="rut" type="text" value={form.rut} onChange={cambiarCampo} onBlur={revisarRut} onInvalid={(event) => { event.preventDefault(); setRutRevisado(true); }} required autoFocus aria-invalid={Boolean(errorRut)} aria-describedby={`ayuda-rut-productor${errorRut ? " error-rut-productor" : ""}`} className={`w-full rounded-lg border px-4 py-2 outline-none focus:ring-4 disabled:bg-slate-50 ${errorRut ? "border-red-500 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-frigorifico-700 focus:ring-frigorifico-100"}`} />
+              <input id="productor-rut" name="rut" type="text" value={form.rut} onChange={cambiarCampo} onBlur={revisarRut} onInvalid={(event) => { event.preventDefault(); setRutRevisado(true); }} required autoFocus aria-invalid={Boolean(errorRut)} aria-describedby={`ayuda-rut-productor${errorRut ? " error-rut-productor" : ""}`} className={`w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 disabled:bg-slate-50 ${errorRut ? "border-red-500 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-ambar focus:ring-ambar/20"}`} />
               <p id="ayuda-rut-productor" className="mt-2 text-xs leading-5 text-slate-500">Puedes escribirlo con o sin puntos y guion. Al salir se mostrará como 12.345.678-5.</p>
               {errorRut && <p id="error-rut-productor" role="alert" className="mt-2 text-sm text-red-700">{errorRut}</p>}
             </div>
             <div className="min-w-0">
               <label htmlFor="productor-razon-social" className="mb-2 block text-sm font-semibold text-slate-700">Razón social</label>
-              <input id="productor-razon-social" name="razon_social" type="text" value={form.razon_social} onChange={cambiarCampo} required minLength={3} maxLength={150} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-50" />
+              <input id="productor-razon-social" name="razon_social" type="text" value={form.razon_social} onChange={cambiarCampo} required minLength={3} maxLength={150} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-50" />
             </div>
             <div className="min-w-0">
               <label htmlFor="productor-direccion" className="mb-2 block text-sm font-semibold text-slate-700">Dirección <span className="font-normal text-slate-500">(opcional)</span></label>
-              <input id="productor-direccion" name="direccion" type="text" value={form.direccion} onChange={cambiarCampo} maxLength={200} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-50" />
+              <input id="productor-direccion" name="direccion" type="text" value={form.direccion} onChange={cambiarCampo} maxLength={200} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-50" />
               {editando.direccion?.trim() && <p className="mt-2 text-xs leading-5 text-slate-500">Puedes reemplazar la dirección, pero todavía no quitarla.</p>}
             </div>
             <div className="min-w-0">
               <label htmlFor="productor-telefono" className="mb-2 block text-sm font-semibold text-slate-700">Teléfono <span className="font-normal text-slate-500">(opcional)</span></label>
-              <input id="productor-telefono" name="telefono" type="tel" value={form.telefono} onChange={cambiarCampo} maxLength={20} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-50" />
+              <input id="productor-telefono" name="telefono" type="tel" value={form.telefono} onChange={cambiarCampo} maxLength={20} className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-50" />
               {editando.telefono?.trim() && <p className="mt-2 text-xs leading-5 text-slate-500">Puedes reemplazar el teléfono, pero todavía no quitarlo.</p>}
             </div>
             <div className="flex flex-wrap gap-3 sm:col-span-2">
-              <button type="submit" disabled={!rutValido} className="rounded-lg bg-frigorifico-900 px-5 py-2 text-sm font-semibold text-white hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">{guardando ? "Guardando…" : "Guardar"}</button>
-              <button type="button" onClick={cerrarFormulario} className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">Cancelar</button>
+              <button type="submit" disabled={!rutValido} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
+              <button type="button" onClick={cerrarFormulario} className={BOTON_SECUNDARIO}>Cancelar</button>
             </div>
           </fieldset>
         </form>
       )}
 
       {/* Mantiene los controles utilizables en escritorio y en pantallas pequeñas. */}
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-lg border border-slate-200 bg-white shadow-sm p-5">
         <div className="w-full sm:w-auto">
           {/* La etiqueta visible identifica el selector también para lectores de pantalla. */}
           <label htmlFor="filtro-productores" className="mb-2 block text-sm font-semibold text-slate-700">Mostrar productores</label>
@@ -314,7 +317,7 @@ export default function Productores() {
             value={filtro}
             disabled={ocupado}
             onChange={(event) => setFiltro(event.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 sm:min-w-48"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 sm:min-w-48"
           >
             <option value="todos">Todos</option>
             <option value="activos">Activos</option>
@@ -330,7 +333,7 @@ export default function Productores() {
             value={busqueda}
             onChange={(event) => setBusqueda(event.target.value)}
             placeholder="Razón social o RUT"
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20"
           />
         </div>
         {/* Conserva el filtro al recargar; el selector sigue habilitado durante la carga. */}
@@ -338,7 +341,7 @@ export default function Productores() {
           type="button"
           onClick={() => setRecarga((anterior) => anterior + 1)}
           disabled={cargando || ocupado}
-          className="rounded-lg bg-frigorifico-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className={BOTON_PRINCIPAL}
         >
           Recargar
         </button>
@@ -347,20 +350,20 @@ export default function Productores() {
       {/* Los estados de consulta son excluyentes y anuncian cuándo se están cargando resultados. */}
       <div className="mt-6 min-w-0" aria-busy={cargando}>
         {cargando ? (
-          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">Cargando productores…</p>
+          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">Cargando productores…</p>
         ) : error ? (
-          <p id="error-listado-productores" role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{error}</p>
+          <p id="error-listado-productores" role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">{error}</p>
         ) : productores.length === 0 ? (
-          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">No hay productores con este filtro</p>
+          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">No hay productores con este filtro</p>
         ) : visibles.length === 0 ? (
           // La lista tiene datos, pero ninguno coincide con la búsqueda.
-          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">Ningún productor coincide con «{busqueda.trim()}»</p>
+          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">Ningún productor coincide con «{busqueda.trim()}»</p>
         ) : (
           // El desplazamiento de una tabla ancha queda dentro de su propio contenedor.
-          <div role="region" aria-label="Listado de productores" tabIndex={0} className="overflow-x-auto rounded-2xl border border-slate-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700">
+          <div role="region" aria-label="Listado de productores" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
             <table className="w-full min-w-[960px] text-left text-sm">
               <caption className="sr-only">Listado de productores según el filtro seleccionado</caption>
-              <thead className="border-b border-slate-200 bg-frigorifico-50 text-frigorifico-950">
+              <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th scope="col" className="px-5 py-4 font-semibold">RUT</th>
                   <th scope="col" className="px-5 py-4 font-semibold">Razón social</th>
@@ -380,15 +383,15 @@ export default function Productores() {
                     <td className="whitespace-nowrap px-5 py-4 text-slate-600">{productor.telefono || "—"}</td>
                     <td className="px-5 py-4">
                       {/* El texto distingue el estado además del color de su etiqueta. */}
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${productor.activo ? "bg-emerald-50 text-emerald-800 ring-emerald-600/20" : "bg-slate-100 text-slate-600 ring-slate-500/20"}`}>
+                      <span className={claseEstado(productor.activo)}>
                         {productor.activo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
                     <td className="px-5 py-4">
                       {/* Impide cambiar de registro o de estado mientras el panel está abierto. */}
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => abrirFormulario(productor)} disabled={ocupado || editando !== null} aria-label={`Editar ${productor.razon_social}`} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-frigorifico-900 hover:bg-frigorifico-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button>
-                        <button type="button" onClick={() => cambiarEstado(productor)} disabled={ocupado || editando !== null} aria-label={`${productor.activo ? "Desactivar" : "Activar"} ${productor.razon_social}`} className={`rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50 ${productor.activo ? "border-amber-300 text-amber-900 hover:bg-amber-50" : "border-emerald-300 text-emerald-800 hover:bg-emerald-50"}`}>
+                        <button type="button" onClick={() => abrirFormulario(productor)} disabled={ocupado || editando !== null} aria-label={`Editar ${productor.razon_social}`} className={BOTON_EDITAR}>Editar</button>
+                        <button type="button" onClick={() => cambiarEstado(productor)} disabled={ocupado || editando !== null} aria-label={`${productor.activo ? "Desactivar" : "Activar"} ${productor.razon_social}`} className={botonEstado(productor.activo)}>
                           {cambiandoEstadoId === productor.id ? "Actualizando…" : productor.activo ? "Desactivar" : "Activar"}
                         </button>
                       </div>

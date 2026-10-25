@@ -11,9 +11,8 @@ import Inicio from "./pages/Inicio";
 import Login from "./pages/Login";
 // Importa la página mínima del mantenimiento administrativo.
 import Productores from "./pages/Productores";
-// Presenta los catálogos relacionados de especies y variedades.
-import EspeciesVariedades from "./pages/EspeciesVariedades";
-import CalidadesSistemasProductivos from "./pages/CalidadesSistemasProductivos";
+// Agrupa en pestañas los catálogos de especies, variedades, calidades y sistemas productivos.
+import Mantenedores from "./pages/Mantenedores";
 // Administración de cuentas (solo administrador) y cambio de la propia contraseña (todos).
 import Usuarios from "./pages/Usuarios";
 import CambiarContrasena from "./pages/CambiarContrasena";
@@ -35,8 +34,10 @@ export default function App() {
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
               <Route path="productores" element={<Productores />} />
-              <Route path="especies-variedades" element={<EspeciesVariedades />} />
-              <Route path="calidades-sistemas-productivos" element={<CalidadesSistemasProductivos />} />
+              <Route path="mantenedores" element={<Mantenedores />} />
+              {/* Las direcciones anteriores siguen funcionando y abren su pestaña. */}
+              <Route path="especies-variedades" element={<Navigate to="/mantenedores?pestana=especies-variedades" replace />} />
+              <Route path="calidades-sistemas-productivos" element={<Navigate to="/mantenedores?pestana=calidades-sistemas" replace />} />
               <Route path="usuarios" element={<Usuarios />} />
             </Route>
           </Route>
