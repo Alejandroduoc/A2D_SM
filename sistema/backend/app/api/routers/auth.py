@@ -1,18 +1,18 @@
 """Endpoints de autenticacion y administracion de usuarios.
 
-La conexion a la base de datos se obtiene desde ``get_db``; 
+La conexion a la base de datos se obtiene desde ``get_db``;
 la validacion del token se obtiene desde ``get_current_user``;
 y la autorizacion por rol se obtiene desde ``require_rol``.
+Las altas y ediciones de usuarios se auditan en ``app/services/usuario.py``.
 """
 
 # APIRouter agrupa las rutas de autenticacion bajo un mismo prefijo.
 # Depends permite que FastAPI entregue automaticamente la sesion y el usuario.
 # HTTPException permite responder errores HTTP controlados.
+# Request entrega la IP del cliente para el limite de intentos.
+# Response permite responder 204 sin cuerpo.
 # status contiene constantes legibles para los codigos HTTP.
-from fastapi import APIRouter, Depends, HTTPException, status
-
-# Convierte una violacion de unicidad de SQL Server en una respuesta 409.
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 # Session representa una sesion activa de SQLAlchemy.
 from sqlalchemy.orm import Session
@@ -23,30 +23,50 @@ from app.api.deps import get_current_user, require_rol
 # Dependencia que abre y cierra una sesion por peticion.
 from app.core.database import get_db
 
+# Contador de intentos fallidos de login en memoria.
+from app.core.limite_login import limite_login
+
 # Funciones centrales de seguridad para contrasenas y tokens JWT.
 from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    hash_password,
-    verify_password,
-)
+    HASH_FICTICIO,  # Se compara cuando el usuario no existe, para igualar el tiempo.
+    create_access_token,  # Token de acceso de corta duracion.
+    create_refresh_token,  # Token para renovar la sesion.
+    decode_token,  # Valida firma, expiracion y campos obligatorios.
+    verify_password,  # Compara contra el hash bcrypt.
+)  # Finaliza las importaciones de seguridad.
 
-# Modelo de usuario, asociacion N:M y enum de roles validos.
-from app.models.usuario import RolUsuario, Usuario, UsuarioRol
+# Modelo de usuario y enum de roles validos.
+from app.models.usuario import RolUsuario, Usuario
 
 # Contratos de entrada y salida de los endpoints.
 from app.schemas.auth import (
-    LoginRequest,
-    TokenResponse,
-    UsuarioCreate,
-    UsuarioOut,
-    UsuarioUpdate,
-)
+    CambioPasswordRequest,  # Cambio de la propia contrasena.
+    LoginRequest,  # Credenciales del login.
+    RefreshRequest,  # Token de actualizacion.
+    TokenResponse,  # Par de tokens entregado al cliente.
+    UsuarioCreate,  # Alta de usuario.
+    UsuarioOut,  # Respuesta publica sin password_hash.
+    UsuarioUpdate,  # Edicion parcial de usuario.
+)  # Finaliza las importaciones de schemas.
+
+# Reglas de negocio y auditoria de usuarios.
+from app.services.usuario import (
+    PasswordActualIncorrectaError,  # Contrasena actual equivocada -> 400.
+    PasswordRepetidaError,  # Nueva igual a la actual -> 400.
+    UsuarioDuplicadoError,  # Nombre de usuario ocupado -> 409.
+    actualizar_usuario,  # Edita y audita.
+    buscar_por_nombre,  # Busca por nombre de login.
+    cambiar_password_propia,  # Cambia la propia contrasena y audita.
+    crear_usuario,  # Crea y audita.
+)  # Finaliza las importaciones del servicio.
 
 
 # Todas las rutas quedan bajo /auth.
 # main.py agrega posteriormente el prefijo general /api/v1.
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
+
+# Mensaje unico del login fallido: no revela si el usuario existe o esta inactivo.
+MENSAJE_LOGIN_FALLIDO = "Nombre de usuario o contraseña incorrectos"
 
 
 def convertir_usuario_a_salida(usuario: Usuario) -> UsuarioOut:
@@ -59,54 +79,95 @@ def convertir_usuario_a_salida(usuario: Usuario) -> UsuarioOut:
     return UsuarioOut.model_validate(usuario)
 
 
-def buscar_usuario_por_nombre(
-    db: Session,
-    nombre_usuario: str,
-) -> Usuario | None:
-    """Busca un usuario por su nombre de inicio de sesion."""
+def emitir_tokens(usuario: Usuario) -> TokenResponse:
+    """Entrega un par nuevo de tokens para un usuario ya validado."""
 
-    return (
-        db.query(Usuario)
-        .filter(Usuario.nombre_usuario == nombre_usuario)
-        .first()
+    # Los roles se incluyen en el token como informacion para el cliente.
+    # La autorizacion real vuelve a consultar la base de datos mediante
+    # get_current_user, por lo que el JWT no es la fuente de permisos.
+    roles = [rol.value for rol in usuario.roles]
+    return TokenResponse(
+        access_token=create_access_token(usuario.nombre_usuario, roles),
+        refresh_token=create_refresh_token(usuario.nombre_usuario),
     )
 
 
 @router.post("/login", response_model=TokenResponse)
 def iniciar_sesion(
     datos: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """Autentica a un usuario activo y entrega sus tokens.
 
     La respuesta es 401 cuando el usuario no existe, esta inactivo o la
     contrasena no coincide. El mensaje es el mismo para no revelar si un
-    nombre de usuario esta registrado.
+    nombre de usuario esta registrado. Tras varios fallos seguidos responde
+    429 hasta que termine el bloqueo.
     """
 
-    usuario = buscar_usuario_por_nombre(db, datos.nombre_usuario)
+    # IP del cliente (sin proxy delante es la IP real).
+    ip = request.client.host if request.client else "desconocida"
+
+    # Un usuario o una IP bloqueados no llegan a comparar la contrasena.
+    espera = limite_login.segundos_bloqueo(datos.nombre_usuario, ip)
+    if espera > 0:
+        minutos = (espera + 59) // 60
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Demasiados intentos fallidos. Intenta nuevamente en {minutos} minuto(s).",
+            headers={"Retry-After": str(espera)},
+        )
+
+    usuario = buscar_por_nombre(db, datos.nombre_usuario)
+
+    # Siempre se ejecuta bcrypt, exista o no el usuario: asi el tiempo de
+    # respuesta no delata que nombres de usuario estan registrados.
+    hash_a_comparar = usuario.password_hash if usuario is not None else HASH_FICTICIO
+    password_correcta = verify_password(datos.password, hash_a_comparar)
 
     # password_hash solo se usa para comparar; nunca se devuelve al cliente.
-    if (
-        usuario is None
-        or not usuario.activo
-        or not verify_password(datos.password, usuario.password_hash)
-    ):
+    if usuario is None or not usuario.activo or not password_correcta:
+        # Cuenta el fallo tambien para usuarios inexistentes (no revela nada).
+        limite_login.registrar_fallo(datos.nombre_usuario, ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Nombre de usuario o contraseña incorrectos",
+            detail=MENSAJE_LOGIN_FALLIDO,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Los roles se incluyen en el token como informacion para el cliente.
-    # La autorizacion real vuelve a consultar la base de datos mediante
-    # get_current_user, por lo que el JWT no es la fuente de permisos.
-    roles = [rol.value for rol in usuario.roles]
+    # Un login correcto borra los fallos acumulados de ese usuario.
+    limite_login.registrar_exito(datos.nombre_usuario, ip)
+    return emitir_tokens(usuario)
 
-    return TokenResponse(
-        access_token=create_access_token(usuario.nombre_usuario, roles),
-        refresh_token=create_refresh_token(usuario.nombre_usuario),
+
+@router.post("/refresh", response_model=TokenResponse)
+def renovar_sesion(
+    datos: RefreshRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Entrega tokens nuevos a partir de un refresh token vigente.
+
+    Vuelve a consultar la base: un usuario desactivado o eliminado ya no
+    puede renovar su sesion. Un access token no sirve aqui (type distinto).
+    """
+
+    # Error unico para cualquier token que no sirva.
+    error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sesión expirada. Inicia sesión nuevamente.",
+        headers={"WWW-Authenticate": "Bearer"},
     )
+    payload = decode_token(datos.refresh_token)
+    # Solo se aceptan tokens de tipo refresh.
+    if payload is None or payload.get("type") != "refresh":
+        raise error
+    usuario = buscar_por_nombre(db, payload["sub"])
+    # El estado real se lee de la base, no del token.
+    if usuario is None or not usuario.activo:
+        raise error
+    # Rotacion: cada renovacion entrega tambien un refresh token nuevo.
+    return emitir_tokens(usuario)
 
 
 @router.get("/me", response_model=UsuarioOut)
@@ -116,6 +177,28 @@ def obtener_usuario_actual(
     """Devuelve los datos publicos del usuario autenticado."""
 
     return convertir_usuario_a_salida(usuario)
+
+
+@router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def cambiar_mi_password(
+    datos: CambioPasswordRequest,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> Response:
+    """Cambia la contrasena de la propia cuenta (cualquier rol).
+
+    Exige la contrasena actual. Responde 204 sin cuerpo y deja el cambio
+    auditado sin guardar ninguna contrasena ni hash en la auditoria.
+    """
+
+    try:
+        cambiar_password_propia(db, usuario, datos.password_actual, datos.password_nueva)
+    except (PasswordActualIncorrectaError, PasswordRepetidaError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/usuarios", response_model=list[UsuarioOut])
@@ -144,7 +227,7 @@ def listar_usuarios(
     response_model=UsuarioOut,
     status_code=status.HTTP_201_CREATED,
 )
-def crear_usuario(
+def crear_usuario_endpoint(
     datos: UsuarioCreate,
     db: Session = Depends(get_db),
     usuario_administrador: Usuario = Depends(
@@ -153,46 +236,22 @@ def crear_usuario(
 ) -> UsuarioOut:
     """Crea un usuario con uno o varios roles validos.
 
-    Solo un administrador puede utilizar esta ruta. La contrasena se convierte
-    en hash antes de agregar el objeto a la sesion de SQLAlchemy.
+    Solo un administrador puede utilizar esta ruta. El servicio guarda el
+    hash de la contrasena y audita el alta con el administrador responsable.
     """
 
-    _ = usuario_administrador
-
-    # La comprobacion previa permite entregar un mensaje claro en el caso
-    # normal. La restriccion unique de la base cubre peticiones simultaneas.
-    if buscar_usuario_por_nombre(db, datos.nombre_usuario) is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El nombre de usuario ya existe",
-        )
-
-    usuario = Usuario(
-        nombre_usuario=datos.nombre_usuario,
-        nombre_completo=datos.nombre_completo,
-        password_hash=hash_password(datos.password),
-        roles_asignados=[UsuarioRol(rol=rol) for rol in datos.roles],
-    )
-
-    db.add(usuario)
-
     try:
-        db.commit()
-    except IntegrityError:
-        # La transaccion debe volver atras antes de responder el error.
-        db.rollback()
+        usuario = crear_usuario(db, datos, usuario_administrador)
+    except UsuarioDuplicadoError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="El nombre de usuario ya existe",
-        )
-
-    # Recarga los valores generados, como el UUID del usuario.
-    db.refresh(usuario)
+        ) from error
     return convertir_usuario_a_salida(usuario)
 
 
 @router.put("/usuarios/{usuario_id}", response_model=UsuarioOut)
-def actualizar_usuario(
+def actualizar_usuario_endpoint(
     usuario_id: str,
     datos: UsuarioUpdate,
     db: Session = Depends(get_db),
@@ -200,10 +259,10 @@ def actualizar_usuario(
         require_rol(RolUsuario.ADMINISTRADOR)
     ),
 ) -> UsuarioOut:
-    """Actualiza nombre completo, roles o estado de un usuario.
+    """Actualiza nombre completo, roles, estado o contrasena de un usuario.
 
     Todos los campos son opcionales. Si se envia roles, la lista reemplaza
-    todos los roles actuales del usuario.
+    todos los roles actuales del usuario. Solo se auditan cambios efectivos.
     """
 
     # Busca por clave primaria; si el id no existe responde 404.
@@ -243,21 +302,13 @@ def actualizar_usuario(
             detail="No puedes quitarte el rol administrador a ti mismo",
         )
 
-    # Aplica solo los campos enviados; el resto queda como estaba.
-    if "nombre_completo" in cambios:
-        usuario.nombre_completo = cambios["nombre_completo"]
+    # Su propia contrasena se cambia en /auth/me/password, que exige la actual.
+    if usuario.id == usuario_administrador.id and "password" in cambios:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Para cambiar tu propia contraseña usa la opción Cambiar contraseña",
+        )
 
-    if "activo" in cambios:
-        usuario.activo = cambios["activo"]
-
-    # La lista nueva reemplaza todos los roles. delete-orphan borra las filas
-    # de usuario_roles que ya no estan en la lista.
-    if "roles" in cambios:
-        usuario.roles_asignados = [
-            UsuarioRol(rol=rol)
-            for rol in cambios["roles"]
-        ]
-
-    db.commit()
-    db.refresh(usuario)
+    # El servicio aplica solo lo que cambia, audita y confirma.
+    usuario = actualizar_usuario(db, usuario, datos, usuario_administrador)
     return convertir_usuario_a_salida(usuario)

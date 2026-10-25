@@ -68,3 +68,33 @@ def normalizar_nombre_catalogo(valor: object) -> str:
     texto = unicodedata.normalize("NFC", valor)
     # Quita espacios exteriores y reduce secuencias de espacios en blanco a uno.
     return " ".join(texto.split())
+
+
+# Mismo límite que aplica bcrypt: lo que pase de 72 bytes se ignoraría al comparar.
+LIMITE_BYTES_PASSWORD = 72
+
+
+# Exige el largo de una contraseña nueva: 8 caracteres como mínimo y 72 bytes como máximo.
+def validar_password_nueva(valor: str) -> str:
+    # El mínimo se cuenta en caracteres, como lo ve la persona que la escribe.
+    if len(valor) < 8:
+        raise ValueError("La contraseña debe tener al menos 8 caracteres")
+    # El máximo se cuenta en bytes UTF-8: una tilde o una ñ ocupan 2 bytes.
+    if len(valor.encode("utf-8")) > LIMITE_BYTES_PASSWORD:
+        raise ValueError("La contraseña admite hasta 72 bytes (unos 72 caracteres sin tildes)")
+    # Devuelve la contraseña sin cambios: los espacios también cuentan.
+    return valor
+
+
+# Limpia un texto opcional (dirección, teléfono): quita espacios de más y deja None si queda vacío.
+def normalizar_texto_opcional(valor: object) -> str | None:
+    # None significa que el campo no se envió o se dejó sin valor.
+    if valor is None:
+        return None
+    # Rechaza números, listas u otros tipos que no son texto.
+    if not isinstance(valor, str):
+        raise ValueError("El valor debe ser texto")
+    # Reutiliza la misma limpieza de espacios que los catálogos.
+    texto = normalizar_nombre_catalogo(valor)
+    # Un texto solo con espacios equivale a no informar el dato.
+    return texto or None

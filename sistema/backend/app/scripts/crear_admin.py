@@ -18,6 +18,13 @@ from app.core.database import SessionLocal
 from app.core.security import hash_password
 # Modelos: el usuario, su tabla de roles y el enum con los roles válidos.
 from app.models.usuario import RolUsuario, Usuario, UsuarioRol
+# Misma regla de largo de contraseña que usa la API (8 caracteres a 72 bytes).
+from app.core.validators import validar_password_nueva
+# Acción y registro de auditoría (HU21): el alta inicial también queda registrada.
+from app.models.auditoria import AccionAuditoria
+from app.services.auditoria import registrar_auditoria
+# Instantánea del usuario sin password_hash, igual que en la API.
+from app.services.usuario import instantanea_usuario
 
 
 # Pide los datos por consola, los valida y los devuelve como una tupla.
@@ -38,9 +45,11 @@ def pedir_datos() -> tuple[str, str, str]:
     if not 3 <= len(nombre_completo) <= 150:
         print("Error: el nombre completo debe tener entre 3 y 150 caracteres.")
         sys.exit(1)
-    # Política actual de contraseñas: mínimo 8 caracteres (igual que UsuarioCreate).
-    if len(password) < 8:
-        print("Error: la contraseña debe tener al menos 8 caracteres.")
+    # Política de contraseñas compartida con UsuarioCreate: 8 caracteres a 72 bytes.
+    try:
+        validar_password_nueva(password)
+    except ValueError as error:
+        print(f"Error: {error}.")
         sys.exit(1)
     if password != confirmacion:
         print("Error: las contraseñas no coinciden.")
@@ -81,6 +90,18 @@ def crear_admin() -> None:
 
         # Agrega el usuario (y su rol, por la relación) a la sesión.
         db.add(usuario)
+        # flush genera el id del usuario para poder auditarlo.
+        db.flush()
+        # No existe otro administrador: el propio usuario creado figura como responsable.
+        registrar_auditoria(
+            db,  # Misma transacción que el alta.
+            usuario.id,  # Responsable: el mismo administrador inicial.
+            "usuarios",  # Tabla afectada.
+            usuario.id,  # Registro creado.
+            AccionAuditoria.INSERT,  # Alta.
+            despues=instantanea_usuario(usuario),  # Estado sin password_hash.
+            motivo="Alta inicial con el script crear_admin",  # Explica por qué el actor es él mismo.
+        )  # El evento se confirma junto con el usuario.
         # Confirma la transacción: recién aquí se escriben las filas en SQL Server.
         db.commit()
         print(f"Administrador '{nombre_usuario}' creado correctamente.")

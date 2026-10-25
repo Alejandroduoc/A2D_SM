@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     api_v1_prefix: str="/api/v1" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca API_V1_PREFIX en el entorno; si no la encuentra, usa ese string.
     #cors
     cors_origins: list[str]=["http://localhost:5173"] # direcciones permitidas
+    # Publica /docs, /redoc y /openapi.json. En producción se apaga con MOSTRAR_DOCS=false
+    # para no entregar el mapa completo de la API a cualquiera.
+    mostrar_docs: bool = True
+    # Límite de intentos fallidos de login: con login_max_intentos fallos seguidos del mismo
+    # usuario dentro de login_ventana_minutos, el login de ese usuario queda bloqueado
+    # durante login_bloqueo_minutos (responde 429).
+    login_max_intentos: int = 5
+    login_ventana_minutos: int = 15
+    login_bloqueo_minutos: int = 15
+    # Límite por dirección IP, más alto porque varias personas pueden compartir una IP.
+    login_max_intentos_ip: int = 30
 @lru_cache
 def get_settings() -> Settings:
     #función que devuelve una instancia de Settings. Al usar lru_cache, la primera vez que se llama, se crea la instancia y se guarda en memoria; las siguientes veces, se devuelve la misma instancia sin recalcularla.

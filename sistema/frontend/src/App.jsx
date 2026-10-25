@@ -14,6 +14,9 @@ import Productores from "./pages/Productores";
 // Presenta los catálogos relacionados de especies y variedades.
 import EspeciesVariedades from "./pages/EspeciesVariedades";
 import CalidadesSistemasProductivos from "./pages/CalidadesSistemasProductivos";
+// Administración de cuentas (solo administrador) y cambio de la propia contraseña (todos).
+import Usuarios from "./pages/Usuarios";
+import CambiarContrasena from "./pages/CambiarContrasena";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -27,11 +30,14 @@ export default function App() {
           <Route element={<Layout />}>
             {/* Inicio conserva el acceso de todos los perfiles. */}
             <Route index element={<Inicio />} />
+            {/* Cualquier perfil autenticado puede cambiar su contraseña. */}
+            <Route path="cambiar-contrasena" element={<CambiarContrasena />} />
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
               <Route path="productores" element={<Productores />} />
               <Route path="especies-variedades" element={<EspeciesVariedades />} />
               <Route path="calidades-sistemas-productivos" element={<CalidadesSistemasProductivos />} />
+              <Route path="usuarios" element={<Usuarios />} />
             </Route>
           </Route>
         </Route>

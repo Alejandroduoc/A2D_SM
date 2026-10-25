@@ -4,30 +4,43 @@ from datetime import datetime, timedelta, timezone
 # Importa Any para indicar que el payload puede contener distintos tipos de datos.
 from typing import Any
 
-# Importa el error de JWT y las funciones para codificar y decodificar tokens.
-from jose import JWTError, jwt
+# Biblioteca de hashing de contraseñas; se usa directo (passlib ya no se mantiene).
+import bcrypt
 
-# Importa la herramienta que administra el hashing y la verificación de contraseñas.
-from passlib.context import CryptContext
+# PyJWT firma y verifica los tokens (reemplaza a python-jose).
+import jwt
 
 # Importa la configuración general, incluida la clave secreta y los tiempos de expiración.
 from app.core.config import settings
 
-# Configura bcrypt como algoritmo para proteger las contraseñas.
-# deprecated="auto" permite identificar esquemas antiguos que deban actualizarse.
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Costo de bcrypt: 12 rondas es el mismo valor que usaba passlib, así los hashes
+# existentes siguen siendo válidos y el tiempo de verificación no cambia.
+_RONDAS_BCRYPT = 12
 
 
 # Convierte una contraseña en texto plano en un hash irreversible.
 def hash_password(password: str) -> str:
-    # Genera y devuelve el hash de la contraseña usando bcrypt.
-    return pwd_context.hash(password)
+    # bcrypt trabaja con bytes: la contraseña se codifica en UTF-8.
+    password_bytes = password.encode("utf-8")
+    # gensalt crea una sal aleatoria nueva para cada hash.
+    sal = bcrypt.gensalt(rounds=_RONDAS_BCRYPT)
+    # Devuelve el hash como texto ($2b$12$...) para guardarlo en la columna password_hash.
+    return bcrypt.hashpw(password_bytes, sal).decode("ascii")
 
 
 # Comprueba si una contraseña coincide con un hash almacenado.
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # Devuelve True si la contraseña es válida y False si no coincide.
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # checkpw recalcula el hash con la sal guardada y compara en tiempo constante.
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("ascii"))
+    except ValueError:
+        # Un hash con formato inválido nunca autentica, en vez de provocar un error 500.
+        return False
+
+
+# Hash de una contraseña aleatoria que no pertenece a nadie. El login lo compara cuando
+# el usuario no existe, para que esa respuesta tarde lo mismo que una contraseña incorrecta.
+HASH_FICTICIO = hash_password("usuario-inexistente-" + datetime.now(timezone.utc).isoformat())
 
 
 # Crea un token JWT de acceso para un usuario.
@@ -43,7 +56,6 @@ def create_access_token(subject: str, roles: list[str], expires_delta: timedelta
     # quiera leerlo sin pegarle a /auth/me) — la autorización real siempre
     # revalida contra la base de datos en get_current_user, nunca confía en el
     # contenido del token para decidir permisos.
-    # Construye el contenido del token con el usuario, sus roles y la fecha de expiración.
     # type permite distinguir este token de un token de actualización.
     to_encode: dict[str, Any] = {"sub": subject, "roles": roles, "exp": expire, "type": "access"}
     # Firma y devuelve el token usando la clave secreta y el algoritmo configurados.
@@ -63,8 +75,13 @@ def create_refresh_token(subject: str) -> str:
 # Intenta validar y decodificar un token JWT.
 def decode_token(token: str) -> dict[str, Any] | None:
     try:
-        # Verifica la firma, la expiración y el algoritmo del token.
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-    except JWTError:
+        # Verifica la firma, la expiración y el algoritmo; exige que existan sub, exp y type.
+        return jwt.decode(
+            token,  # Token recibido del cliente.
+            settings.secret_key,  # Misma clave con la que se firmó.
+            algorithms=[settings.algorithm],  # Lista fija: no acepta el algoritmo que diga el token.
+            options={"require": ["sub", "exp", "type"]},  # Rechaza tokens incompletos.
+        )  # Devuelve el payload validado.
+    except jwt.PyJWTError:
         # Devuelve None si el token es inválido, está vencido o no puede decodificarse.
         return None

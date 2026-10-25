@@ -1,0 +1,41 @@
+# Imagen de PRODUCCIÓN del frontend: compila la aplicación y la sirve con nginx.
+# En desarrollo se sigue usando Dockerfile (servidor de Vite con recarga en caliente).
+# Se construye desde docker-compose.prod.yml; no hace falta ejecutarla a mano.
+
+# ---- Etapa 1: compilar ----
+# Misma versión de Node que el Dockerfile de desarrollo.
+FROM node:20-alpine AS compilacion
+
+# Carpeta de trabajo de la compilación.
+WORKDIR /app
+
+# Copia primero las dependencias para aprovechar la caché de Docker.
+COPY package*.json ./
+
+# npm ci instala exactamente lo que dice package-lock.json.
+RUN npm ci
+
+# Copia el código del frontend.
+COPY . .
+
+# URL de la API vista desde el navegador. "/api/v1" = mismo servidor que el frontend
+# (nginx reenvía esas rutas al backend), así no hace falta CORS ni publicar el puerto 8000.
+ARG VITE_API_URL=/api/v1
+# Vite lee la variable al compilar y la deja escrita en el JavaScript final.
+ENV VITE_API_URL=$VITE_API_URL
+
+# Genera los archivos estáticos en /app/dist.
+RUN npm run build
+
+# ---- Etapa 2: servir ----
+# nginx liviano: la imagen final no lleva Node, código fuente ni node_modules.
+FROM nginx:1.27-alpine
+
+# Configuración propia: rutas de React, proxy a la API y cabeceras de seguridad.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Solo los archivos compilados de la etapa anterior.
+COPY --from=compilacion /app/dist /usr/share/nginx/html
+
+# Documenta el puerto HTTP del contenedor.
+EXPOSE 80
