@@ -5,6 +5,9 @@ Validadores compartidos que no dependen de un modelo/schema en particular.
 # Importa herramientas para buscar y reemplazar patrones de texto.
 import re
 
+# Permite unificar representaciones Unicode conservando letras y acentos.
+import unicodedata
+
 
 # Valida si un RUT chileno tiene un dígito verificador correcto.
 def validar_rut_chileno(rut: str) -> bool:
@@ -53,3 +56,15 @@ def normalizar_rut(rut: str) -> str:
     cuerpo = str(int(cuerpo))
     # Mantiene una representación común para altas, ediciones y búsquedas.
     return f"{cuerpo}-{digito_verificador}"
+
+
+# Prepara nombres de catálogos sin consultar la base ni alterar su capitalización.
+def normalizar_nombre_catalogo(valor: object) -> str:
+    # Rechaza tipos no textuales antes de intentar normalizarlos.
+    if not isinstance(valor, str):
+        # Los schemas convierten este error en una validación del campo nombre.
+        raise ValueError("El nombre debe ser texto")
+    # Unifica caracteres compuestos y descompuestos sin quitar sus tildes.
+    texto = unicodedata.normalize("NFC", valor)
+    # Quita espacios exteriores y reduce secuencias de espacios en blanco a uno.
+    return " ".join(texto.split())

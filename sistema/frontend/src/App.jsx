@@ -11,6 +11,8 @@ import Inicio from "./pages/Inicio";
 import Login from "./pages/Login";
 // Importa la página mínima del mantenimiento administrativo.
 import Productores from "./pages/Productores";
+// Presenta los catálogos relacionados de especies y variedades.
+import EspeciesVariedades from "./pages/EspeciesVariedades";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -27,6 +29,7 @@ export default function App() {
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
               <Route path="productores" element={<Productores />} />
+              <Route path="especies-variedades" element={<EspeciesVariedades />} />
             </Route>
           </Route>
         </Route>
