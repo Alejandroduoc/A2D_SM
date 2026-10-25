@@ -10,14 +10,19 @@ from app.core.config import settings # Importamos la configuración
 app = FastAPI(
     title=settings.project_name,  # Nombre del proyecto
     version="0.1.0",  # Versión de la API
+    # Con MOSTRAR_DOCS=false (producción) no se publican /docs, /redoc ni /openapi.json.
+    docs_url="/docs" if settings.mostrar_docs else None,
+    redoc_url="/redoc" if settings.mostrar_docs else None,
+    openapi_url="/openapi.json" if settings.mostrar_docs else None,
 )
 
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,  # Solo los orígenes de CORS_ORIGINS (el frontend, http://localhost:5173 en desarrollo)
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Métodos usados por la aplicación
+    # El token viaja en el header Authorization, no en cookies: no hace falta enviar credenciales.
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT"],  # Métodos usados por la aplicación (no hay DELETE: nada se borra)
     allow_headers=["Authorization", "Content-Type"],  # Token y cuerpos JSON
 )       
 

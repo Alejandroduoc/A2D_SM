@@ -21,9 +21,11 @@ services:
       # OJO: solo se aplica la primera vez que arranca con un volumen vacío.
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
-      # "puerto de tu PC : puerto del contenedor". Permite conectarte a la base
-      # desde tu PC (por ejemplo con el backend local) usando localhost:1433.
-      - "1433:1433"
+      # "IP : puerto de tu PC : puerto del contenedor". Permite conectarte a la base
+      # desde tu PC (por ejemplo con SSMS o Azure Data Studio) usando localhost:1433.
+      # 127.0.0.1 publica el puerto solo en tu PC: otros equipos de la misma red
+      # (wifi de la universidad, por ejemplo) no pueden intentar entrar como "sa".
+      - "127.0.0.1:1433:1433"
     volumes:
       # Guarda los datos de SQL Server en el volumen "sqlserver_data" (declarado
       # abajo). Así los datos sobreviven a "docker compose down" o a reiniciar.
@@ -54,7 +56,8 @@ services:
       DATABASE_URL: mssql+pyodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/a2d_sm?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
     ports:
       # Publica la API: http://localhost:8000 en tu PC llega al puerto 8000 del contenedor.
-      - "8000:8000"
+      # Solo en 127.0.0.1, igual que la base.
+      - "127.0.0.1:8000:8000"
     volumes:
       # Comparte toda tu carpeta sistema/backend con el contenedor (/app). Cada cambio
       # que guardes se ve dentro del contenedor al instante, sin reconstruir la imagen.
@@ -90,8 +93,8 @@ services:
       # El código se ejecuta en el navegador, por eso usa localhost.
       VITE_API_URL: http://localhost:8000/api/v1
     ports:
-      # Publica Vite en el puerto acordado para el desarrollo.
-      - "5173:5173"
+      # Publica Vite en el puerto acordado para el desarrollo (solo en tu PC).
+      - "127.0.0.1:5173:5173"
     volumes:
       # Comparte el código para habilitar la recarga en caliente.
       - ./frontend:/app

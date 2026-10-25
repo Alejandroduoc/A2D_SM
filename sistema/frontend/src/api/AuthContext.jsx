@@ -1,7 +1,7 @@
 // Importa las herramientas de estado y contexto de React.
 import { createContext, useContext, useEffect, useState } from "react";
-// Usa el cliente que agrega automáticamente el token.
-import client from "./client";
+// Usa el cliente que agrega automáticamente el token y lo renueva al vencer.
+import client, { borrarTokens, guardarTokens, LLAVE_ACCESS } from "./client";
 
 // Mantiene la sesión disponible para todas las pantallas.
 const AuthContext = createContext(null);
@@ -13,32 +13,33 @@ export function AuthProvider({ children }) {
 
   // Valida el token guardado cada vez que se abre o recarga la aplicación.
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem(LLAVE_ACCESS);
     if (!token) {
       setCargando(false);
       return;
     }
+    // Si el access venció, el cliente lo renueva solo antes de responder.
     client
       .get("/auth/me")
       .then((res) => setUsuario(res.data))
       .catch(() => {
-        localStorage.removeItem("access_token");
+        borrarTokens();
         setUsuario(null);
       })
       .finally(() => setCargando(false));
   }, []);
 
-  // Inicia sesión, guarda el token y carga los datos públicos del usuario.
+  // Inicia sesión, guarda ambos tokens y carga los datos públicos del usuario.
   async function login(nombre_usuario, password) {
     const res = await client.post("/auth/login", { nombre_usuario, password });
-    localStorage.setItem("access_token", res.data.access_token);
+    guardarTokens(res.data);
     const me = await client.get("/auth/me");
     setUsuario(me.data);
   }
 
-  // Elimina la sesión del navegador.
+  // Elimina la sesión del navegador (access y refresh).
   function logout() {
-    localStorage.removeItem("access_token");
+    borrarTokens();
     setUsuario(null);
   }
 

@@ -27,6 +27,7 @@ from app.schemas.productor import ProductorCreate, ProductorOut, ProductorUpdate
 # Delega consultas y escrituras al servicio, incluida la auditoría de HU21.
 from app.services.productor import (
     ProductorDuplicadoError,  # Identifica exclusivamente los conflictos de RUT.
+    ProductorNoEncontradoError,  # El productor desapareció durante la edición.
     actualizar_productor,  # Edita, corrige RUT y cambia el estado con auditoría.
     crear_productor,  # Confirma el alta y su evento de auditoría juntos.
     listar_productores,  # Consulta el catálogo con filtro opcional de estado.
@@ -130,6 +131,13 @@ def actualizar(
     try:
         # Delega cambios, estados anterior y posterior, auditoría y commit al servicio.
         return actualizar_productor(db, productor, datos, usuario_administrador)
+    # El registro se eliminó entre la búsqueda y el bloqueo de la fila.
+    except ProductorNoEncontradoError as error:
+        # Mismo mensaje que la búsqueda inicial.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,  # El recurso ya no existe.
+            detail="Productor no encontrado",  # Mensaje de negocio.
+        ) from error  # Conserva la causa.
     # Incluye un conflicto al corregir el RUT hacia el de otro productor inactivo.
     except ProductorDuplicadoError as error:
         # Mantiene fuera de la respuesta cualquier información del controlador SQL.

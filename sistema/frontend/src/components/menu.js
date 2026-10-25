@@ -28,6 +28,16 @@ export const MENU = [
     etiqueta: "Calidades y sistemas productivos",
     roles: ["administrador"],
   },
+  {
+    ruta: "/usuarios", // Administración de cuentas; la API también exige administrador.
+    etiqueta: "Usuarios", // Alta, roles, estado y restablecer contraseña.
+    roles: ["administrador"], // Solo este perfil puede ver la opción.
+  },
+  {
+    ruta: "/cambiar-contrasena", // Cada persona cambia su propia contraseña.
+    etiqueta: "Cambiar contraseña", // Disponible para todos los perfiles.
+    roles: ["operador_recepcion", "operador_proceso", "gerencia", "administrador"],
+  },
 ];
 
 // Devuelve las opciones permitidas sin modificar el arreglo compartido.

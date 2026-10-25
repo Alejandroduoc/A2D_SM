@@ -33,6 +33,11 @@ class ProductorDuplicadoError(Exception):
     """El RUT ya pertenece a otro productor, esté activo o inactivo."""
 
 
+# Señala que el productor desapareció durante la edición; el router responde 404.
+class ProductorNoEncontradoError(Exception):
+    """El productor ya no existe al momento de bloquearlo."""
+
+
 # Clasifica únicamente las violaciones del índice de RUT de productores.
 def _es_rut_duplicado(error: IntegrityError) -> bool:
     """Exige un código SQL Server de duplicidad y el índice exacto de RUT."""
@@ -139,6 +144,25 @@ def actualizar_productor(
         # No genera eventos ni confirma una edición que no modifica el registro.
         if not cambios:
             # Incluye un RUT equivalente con puntos o ceros iniciales ya normalizado.
+            return productor
+        # Bloquea la fila hasta el commit (como HU08 y HU09): si dos administradores
+        # editan a la vez, el segundo espera y compara contra el estado ya guardado.
+        # Usa execute (no scalar) para que el bloqueo sea independiente de la consulta de duplicados.
+        vigente = db.execute(
+            select(Productor)  # Relee el productor completo.
+            .where(Productor.id == productor.id)  # Solo la fila que se edita.
+            .with_hint(Productor, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")  # Bloqueo de actualización.
+            .execution_options(populate_existing=True)  # Reemplaza los valores antiguos en memoria.
+        ).scalars().first()  # populate_existing actualiza el mismo objeto que recibió el servicio.
+        # El registro pudo desaparecer entre la búsqueda del router y el bloqueo.
+        if vigente is None:
+            raise ProductorNoEncontradoError("Productor no encontrado")
+        # Recalcula los cambios contra el estado bloqueado.
+        productor = vigente
+        cambios = {campo: valor for campo, valor in enviados.items() if getattr(productor, campo) != valor}
+        # Otro administrador ya dejó exactamente estos valores: no hay nada que auditar.
+        if not cambios:
+            db.rollback()
             return productor
         # Consulta duplicados solo si el RUT realmente va a cambiar.
         if "rut" in cambios:

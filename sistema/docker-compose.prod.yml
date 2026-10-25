@@ -11,6 +11,10 @@
 # Antes de desplegar, revisar la lista de pendientes de producción en
 # docs/Como_Levantar_El_Proyecto.md, sección 8 (proxy HTTPS, usuario propio de SQL Server,
 # respaldos, claves del servidor y publicación del frontend).
+#
+# Esquema: el navegador solo habla con nginx (frontend, puerto 80). nginx entrega la
+# aplicación compilada y reenvía /api/ al backend por la red interna de Docker.
+# Ni la base ni el backend se publican fuera de Docker.
 
 services:
 
@@ -26,11 +30,37 @@ services:
     # !reset quita la carpeta compartida: en producción corre el código que está DENTRO
     # de la imagen (copiado con COPY . . en el Dockerfile), no el de una carpeta del servidor.
     volumes: !reset []
+    # El backend ya no se publica: solo nginx llega a él por la red interna (backend:8000).
+    ports: !reset []
+    environment:
+      # Sin /docs, /redoc ni /openapi.json en producción.
+      MOSTRAR_DOCS: "false"
+      # El frontend y la API comparten origen (nginx), así que CORS casi no se usa;
+      # se deja el dominio real por si se publica la API aparte. Cambiar al desplegar.
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
     # Sin --reload: no vigila archivos ni se reinicia solo, que es solo para desarrollo.
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-    # Se conserva el puerto 8000 publicado porque todavía no hay proxy HTTPS delante.
-    # Cuando exista (nginx u otro), quitarlo con "ports: !reset []" y que el proxy sea
-    # lo único expuesto: el tráfico sin cifrar no debe salir a Internet.
+    # --proxy-headers toma la IP real del cliente desde X-Forwarded-For, que nginx
+    # escribe; se confía en cualquier origen porque solo nginx puede llegar al backend.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+
+  frontend:
+    restart: unless-stopped
+    # Imagen de producción: compila con Vite y sirve los archivos con nginx.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Ruta relativa: el navegador llama a la API en el mismo servidor (/api/v1).
+        VITE_API_URL: /api/v1
+    # Sin carpetas compartidas: todo va dentro de la imagen.
+    volumes: !reset []
+    # La variable de desarrollo no aplica (la URL quedó fija al compilar).
+    environment: !reset {}
+    # Puerto público. Cuando exista HTTPS (certificado), publicar 443 y redirigir 80.
+    ports: !override
+      - "80:80"
+    depends_on: !override
+      - backend
 
 volumes:
   sqlserver_data:

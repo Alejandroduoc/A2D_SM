@@ -71,6 +71,8 @@ docker compose ps
 - Espera a que `a2d_sqlserver` diga `healthy` y `a2d_backend` diga `Up`. El backend espera a que la base esté lista antes de arrancar.
 - **No sigas al paso 4.2 hasta que la base diga `healthy`**: si el motor aún está arrancando, el comando falla.
 - El frontend queda disponible en `http://localhost:5173`; la API queda disponible en `http://localhost:8000`.
+- Los puertos 1433, 8000 y 5173 se publican solo en tu PC (`127.0.0.1`): otros equipos de la misma red no pueden conectarse a ellos.
+- Si al actualizar el repositorio cambió `sistema/backend/requirements.txt` o un `Dockerfile`, reconstruye con `docker compose up -d --build`.
 - El primer arranque instala las dependencias de React dentro de `a2d_frontend`; no es necesario instalar Node en el PC.
 
 ### 4.2. Crear la base `a2d_sm` (solo la primera vez)
@@ -296,7 +298,13 @@ docker compose up -d
 
 ## 8. Producción
 
-Todo lo anterior es el entorno de **desarrollo**. Para producción existe `sistema/docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario: quita la carpeta compartida (corre el código de la imagen), quita `--reload`, deja de publicar el puerto de SQL Server y reinicia los contenedores si se caen.
+Todo lo anterior es el entorno de **desarrollo**. Para producción existe `sistema/docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario:
+
+- quita las carpetas compartidas (corre el código de las imágenes) y `--reload`;
+- deja de publicar SQL Server y la API: solo se publica el frontend en el puerto 80;
+- el frontend se compila con `sistema/frontend/Dockerfile.prod` y lo sirve nginx (`sistema/frontend/nginx.conf`), que además reenvía `/api/` al backend por la red interna y agrega cabeceras de seguridad;
+- apaga `/docs`, `/redoc` y `/openapi.json` (`MOSTRAR_DOCS=false`);
+- reinicia los contenedores si se caen.
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
@@ -305,13 +313,13 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver e
 
 **Aún no está listo para desplegar.** Faltan:
 
-- un proxy con HTTPS delante de la API (hoy el puerto 8000 se publica sin cifrar);
+- HTTPS: un certificado para nginx (hoy el puerto 80 publica sin cifrar);
 - un usuario de SQL Server propio de la aplicación, distinto de `sa`;
 - respaldos de la base de datos;
-- contraseñas y `SECRET_KEY` propias del servidor, distintas de las de desarrollo;
-- definir cómo se publica el frontend (hoy `docker-compose.prod.yml` no ajusta ese servicio y se levanta el servidor de desarrollo de Vite).
+- contraseñas y `SECRET_KEY` propias del servidor, distintas de las de desarrollo (generar la clave con `docker compose exec backend python -c "import secrets; print(secrets.token_urlsafe(64))"`);
+- `CORS_ORIGINS` con el dominio real (variable de entorno al levantar).
 
-CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.py`) y el eco de SQL está apagado (`echo=False` en `app/core/database.py`). **No uses este archivo en un servidor real hasta resolver la lista anterior.**
+CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.py`), sin credenciales, y el eco de SQL está apagado (`echo=False` en `app/core/database.py`). El backend corre con un usuario sin privilegios dentro del contenedor. **No uses este archivo en un servidor real hasta resolver la lista anterior.**
 
 ## 9. Problemas frecuentes
 

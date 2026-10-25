@@ -3,9 +3,8 @@ uvicorn[standard]==0.34.0 #levanta el servicio en el puerto 8000
 sqlalchemy==2.0.36 #escritura de sql como clases 
 pydantic==2.10.4 #verifica lso datos de entrada y salida de la API
 pydantic-settings==2.7.1 #leer configuracion de variables de entorno 
-python-jose[cryptography]==3.3.0 #crea y verifica los JWT ,firma criptografica 
-passlib[bcrypt]==1.7.4 #maneja hashing  de contraseñas
-bcrypt==4.0.1 #el algoritmo de hasing que passlib ,esta version es compatible con passlib 
+PyJWT==2.10.1 #crea y verifica los JWT (reemplaza a python-jose, que tiene vulnerabilidades conocidas y poco mantenimiento)
+bcrypt==4.0.1 #hashing de contraseñas; se usa directo (passlib se retiró porque ya no se mantiene)
 python-multipart==0.0.20 #necesario apra fastapi pueda leer formularios 
 pyodbc==5.2.0 #driver para hablar con sqlserver
 alembic==1.14.0 #migraciones , cada cambio de migrado con alembic

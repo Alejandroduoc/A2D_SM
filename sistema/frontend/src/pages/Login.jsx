@@ -1,7 +1,7 @@
 // Importa el estado local del formulario.
 import { useState } from "react";
 // Importa redirección y navegación programática.
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 // Importa la normalización de errores.
 import { extraerMensajeError } from "../api/client";
 // Importa el estado de autenticación.
@@ -15,6 +15,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Permite ver la contraseña escrita para corregir errores de tipeo.
+  const [verPassword, setVerPassword] = useState(false);
+  // client.js agrega ?expirada=1 cuando la sesión ya no se pudo renovar.
+  const [parametros] = useSearchParams();
+  const sesionExpirada = parametros.get("expirada") === "1";
 
   // Evita mostrar el formulario a una persona ya autenticada.
   if (usuario) return <Navigate to="/" replace />;
@@ -64,6 +69,13 @@ export default function Login() {
             <p className="mt-2 text-sm text-slate-500">Ingresa tus credenciales para continuar.</p>
           </div>
 
+          {/* Explica por qué se volvió al login sin que la persona cerrara sesión. */}
+          {sesionExpirada && !error && (
+            <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Tu sesión expiró. Vuelve a ingresar para continuar.
+            </div>
+          )}
+
           {error && (
             <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
@@ -76,6 +88,7 @@ export default function Login() {
           <input
             id="nombre-usuario"
             autoComplete="username"
+            maxLength={50}
             className="mb-5 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 outline-none transition focus:border-frigorifico-700 focus:bg-white focus:ring-4 focus:ring-frigorifico-100"
             value={nombreUsuario}
             onChange={(event) => setNombreUsuario(event.target.value)}
@@ -86,20 +99,33 @@ export default function Login() {
           <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">
             Contraseña
           </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            className="mb-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 outline-none transition focus:border-frigorifico-700 focus:bg-white focus:ring-4 focus:ring-frigorifico-100"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
+          {/* El botón queda dentro del campo y alterna entre texto oculto y visible. */}
+          <div className="relative mb-8">
+            <input
+              id="password"
+              type={verPassword ? "text" : "password"}
+              autoComplete="current-password"
+              maxLength={128}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 py-3 pl-4 pr-24 outline-none transition focus:border-frigorifico-700 focus:bg-white focus:ring-4 focus:ring-frigorifico-100"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setVerPassword((actual) => !actual)}
+              aria-pressed={verPassword}
+              aria-controls="password"
+              className="absolute inset-y-0 right-2 my-auto h-9 rounded-md px-3 text-sm font-semibold text-frigorifico-800 hover:bg-frigorifico-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700"
+            >
+              {verPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          </div>
 
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-lg bg-frigorifico-900 py-3 font-semibold text-white shadow-lg shadow-frigorifico-900/20 transition hover:bg-frigorifico-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-frigorifico-900 py-3 font-semibold text-white shadow-lg shadow-frigorifico-900/20 transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-frigorifico-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {enviando ? "Validando..." : "Ingresar al sistema"}
           </button>

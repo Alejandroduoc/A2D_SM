@@ -10,6 +10,22 @@ import { formatearRut, normalizarRut, validarRut } from "../utils/rut";
 // Valores iniciales de los cuatro campos de negocio del formulario.
 const FORM_VACIO = { rut: "", razon_social: "", direccion: "", telefono: "" };
 
+// Quita tildes y mayúsculas para que "agricola" encuentre "Agrícola".
+function sinTildes(texto) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+// Indica si un productor coincide con la búsqueda por razón social o por RUT.
+function coincide(productor, busqueda) {
+  const termino = sinTildes(busqueda.trim());
+  // Sin texto de búsqueda se muestran todos.
+  if (!termino) return true;
+  // El RUT se compara sin puntos ni guion: "12.345" encuentra "12345678-5".
+  const rutBuscado = termino.replace(/[^0-9k]/g, "");
+  const rutProductor = productor.rut.toLowerCase().replace(/[^0-9k]/g, "");
+  return sinTildes(productor.razon_social).includes(termino) || (rutBuscado !== "" && rutProductor.includes(rutBuscado));
+}
+
 // Distingue un rechazo conocido de una escritura cuyo resultado quedó incierto.
 function mensajeDeEscritura(error, mensajePorDefecto) {
   // Mantiene los mensajes de validación y conflicto entregados por el servidor.
@@ -58,6 +74,9 @@ export default function Productores() {
   const escrituraEnCurso = useRef(false);
   // Comparte el bloqueo visual de todas las acciones de escritura.
   const ocupado = guardando || cambiandoEstadoId !== null;
+  // Texto del buscador; filtra en el navegador la lista ya cargada.
+  const [busqueda, setBusqueda] = useState("");
+  const visibles = productores.filter((productor) => coincide(productor, busqueda));
 
   // Consulta al entrar, cambiar el estado seleccionado o pulsar Recargar.
   useEffect(() => {
@@ -302,6 +321,18 @@ export default function Productores() {
             <option value="inactivos">Inactivos</option>
           </select>
         </div>
+        {/* Busca por razón social (sin importar tildes) o por parte del RUT. */}
+        <div className="w-full min-w-0 flex-1 sm:w-auto">
+          <label htmlFor="buscar-productores" className="mb-2 block text-sm font-semibold text-slate-700">Buscar</label>
+          <input
+            id="buscar-productores"
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Razón social o RUT"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100"
+          />
+        </div>
         {/* Conserva el filtro al recargar; el selector sigue habilitado durante la carga. */}
         <button
           type="button"
@@ -321,6 +352,9 @@ export default function Productores() {
           <p id="error-listado-productores" role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{error}</p>
         ) : productores.length === 0 ? (
           <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">No hay productores con este filtro</p>
+        ) : visibles.length === 0 ? (
+          // La lista tiene datos, pero ninguno coincide con la búsqueda.
+          <p role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">Ningún productor coincide con «{busqueda.trim()}»</p>
         ) : (
           // El desplazamiento de una tabla ancha queda dentro de su propio contenedor.
           <div role="region" aria-label="Listado de productores" tabIndex={0} className="overflow-x-auto rounded-2xl border border-slate-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700">
@@ -338,7 +372,7 @@ export default function Productores() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {/* Usa el id estable y conserva los textos recibidos sin interpretar HTML. */}
-                {productores.map((productor) => (
+                {visibles.map((productor) => (
                   <tr key={productor.id} className="hover:bg-slate-50">
                     <td className="whitespace-nowrap px-5 py-4 font-medium text-frigorifico-900">{formatearRut(productor.rut)}</td>
                     <td className="px-5 py-4 text-slate-800">{productor.razon_social}</td>

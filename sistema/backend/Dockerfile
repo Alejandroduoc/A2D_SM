@@ -46,6 +46,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # comparte tu carpeta con el contenedor; sirve para cuando se despliegue sin volumen.
 COPY . .
 
+# Usuario sin privilegios para correr la API: si alguien lograra ejecutar código a
+# través de la aplicación, no tendría permisos de root dentro del contenedor.
+# --uid 1000 es el usuario habitual de Linux/WSL; en desarrollo puede escribir en la
+# carpeta compartida (por ejemplo, las migraciones que genera Alembic).
+RUN useradd --create-home --uid 1000 app
+USER app
+
 # Documenta que la API escucha en el puerto 8000. No lo publica al exterior:
 # eso lo hace "ports" en docker-compose.yml.
 EXPOSE 8000

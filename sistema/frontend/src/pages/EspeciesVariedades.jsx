@@ -4,6 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { extraerMensajeError } from "../api/client";
 import { actualizarEspecie, crearEspecie, listarEspecies } from "../api/especies";
 import { actualizarVariedad, crearVariedad, listarVariedades } from "../api/variedades";
+// Estilos y reglas compartidas con las demás pantallas de catálogos.
+import {
+  BOTON_EDITAR,
+  BOTON_PRINCIPAL,
+  BOTON_SECUNDARIO,
+  botonEstado,
+  claseFila,
+  confirmarCambioEstado,
+  enfocar,
+} from "../components/catalogo";
 
 // Traduce los valores visibles del selector al contrato booleano de la API.
 function activoDesdeFiltro(filtro) {
@@ -45,6 +55,25 @@ export default function EspeciesVariedades() {
   const [mensajeVariedades, setMensajeVariedades] = useState("");
   const [errorOperacionVariedades, setErrorOperacionVariedades] = useState("");
   const escrituraVariedad = useRef(false);
+  // Campos de nombre, para llevar el foco ahí al pulsar "Editar".
+  const campoEspecie = useRef(null);
+  const campoVariedad = useRef(null);
+
+  // Carga la especie en el formulario y enfoca el campo.
+  function editarEspecie(especie) {
+    setMensajeEspecies("");
+    setErrorOperacionEspecies("");
+    setFormEspecie({ id: especie.id, nombre: especie.nombre });
+    enfocar(campoEspecie);
+  }
+
+  // Carga la variedad en el formulario y enfoca el campo.
+  function editarVariedad(variedad) {
+    setMensajeVariedades("");
+    setErrorOperacionVariedades("");
+    setFormVariedad({ id: variedad.id, nombre: variedad.nombre });
+    enfocar(campoVariedad);
+  }
 
   // La fila vigente es la única fuente para el nombre y estado del encabezado hijo.
   const especieSeleccionada = especies.find((especie) => especie.id === especieId) ?? null;
@@ -174,8 +203,8 @@ export default function EspeciesVariedades() {
   // Envía solo el nuevo booleano y conserva los conflictos explicados por la API.
   async function cambiarEstadoEspecie(especie) {
     if (escrituraEspecie.current) return;
-    const accion = especie.activo ? "desactivar" : "activar";
-    if (!window.confirm(`¿Deseas ${accion} la especie «${especie.nombre}»?`)) return;
+    // Solo desactivar pide confirmación, igual que en Productores.
+    if (!confirmarCambioEstado(especie.activo, `la especie «${especie.nombre}»`)) return;
     escrituraEspecie.current = true;
     setCambiandoEspecieId(especie.id);
     setMensajeEspecies("");
@@ -233,8 +262,8 @@ export default function EspeciesVariedades() {
       setErrorOperacionVariedades("La especie debe estar activa para habilitar una variedad");
       return;
     }
-    const accion = variedad.activo ? "desactivar" : "activar";
-    if (!window.confirm(`¿Deseas ${accion} la variedad «${variedad.nombre}»?`)) return;
+    // Solo desactivar pide confirmación.
+    if (!confirmarCambioEstado(variedad.activo, `la variedad «${variedad.nombre}»`)) return;
     escrituraVariedad.current = true;
     setCambiandoVariedadId(variedad.id);
     setMensajeVariedades("");
@@ -264,9 +293,9 @@ export default function EspeciesVariedades() {
           <form onSubmit={guardarEspecie} className="mt-5 rounded-xl bg-slate-50 p-4">
             <label htmlFor="nombre-especie" className="block text-sm font-semibold text-slate-700">{formEspecie.id === null ? "Nueva especie" : "Editar especie"}</label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input id="nombre-especie" type="text" required maxLength={50} value={formEspecie.nombre} onChange={(event) => setFormEspecie((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoEspecie} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
-              <button type="submit" disabled={guardandoEspecie} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{guardandoEspecie ? "Guardando…" : "Guardar"}</button>
-              {formEspecie.id !== null && <button type="button" onClick={() => setFormEspecie({ id: null, nombre: "" })} disabled={guardandoEspecie} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancelar</button>}
+              <input ref={campoEspecie} id="nombre-especie" type="text" required maxLength={50} value={formEspecie.nombre} onChange={(event) => setFormEspecie((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoEspecie} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
+              <button type="submit" disabled={guardandoEspecie} className={BOTON_PRINCIPAL}>{guardandoEspecie ? "Guardando…" : "Guardar"}</button>
+              {formEspecie.id !== null && <button type="button" onClick={() => setFormEspecie({ id: null, nombre: "" })} disabled={guardandoEspecie} className={BOTON_SECUNDARIO}>Cancelar</button>}
             </div>
           </form>
           <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
@@ -299,14 +328,14 @@ export default function EspeciesVariedades() {
                     {especies.map((especie) => {
                       const seleccionada = especie.id === especieId;
                       return (
-                        <tr key={especie.id} className={seleccionada ? "bg-frigorifico-50" : "hover:bg-slate-50"}>
+                        <tr key={especie.id} className={formEspecie.id === especie.id ? claseFila(true) : seleccionada ? "bg-frigorifico-50" : claseFila(false)} aria-current={formEspecie.id === especie.id ? "true" : undefined}>
                           <td className="px-4 py-4 font-medium text-frigorifico-900">{especie.nombre}</td>
                           <td className="px-4 py-4"><EtiquetaEstado activo={especie.activo} femenino /></td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
                               <button type="button" onClick={() => seleccionarEspecie(especie.id)} aria-pressed={seleccionada} className={`rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-frigorifico-700 ${seleccionada ? "border-frigorifico-800 bg-frigorifico-900 text-white" : "border-slate-300 text-frigorifico-900 hover:bg-frigorifico-50"}`}>{seleccionada ? "Seleccionada" : "Ver variedades"}</button>
-                              <button type="button" onClick={() => { setMensajeEspecies(""); setErrorOperacionEspecies(""); setFormEspecie({ id: especie.id, nombre: especie.nombre }); }} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-frigorifico-900 disabled:opacity-50">Editar</button>
-                              <button type="button" onClick={() => cambiarEstadoEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 disabled:opacity-50">{cambiandoEspecieId === especie.id ? "Actualizando…" : especie.activo ? "Desactivar" : "Activar"}</button>
+                              <button type="button" onClick={() => editarEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`Editar ${especie.nombre}`} className={BOTON_EDITAR}>Editar</button>
+                              <button type="button" onClick={() => cambiarEstadoEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`${especie.activo ? "Desactivar" : "Activar"} ${especie.nombre}`} className={botonEstado(especie.activo)}>{cambiandoEspecieId === especie.id ? "Actualizando…" : especie.activo ? "Desactivar" : "Activar"}</button>
                             </div>
                           </td>
                         </tr>
@@ -329,9 +358,9 @@ export default function EspeciesVariedades() {
           <form onSubmit={guardarVariedad} className="mt-5 rounded-xl bg-slate-50 p-4">
             <label htmlFor="nombre-variedad" className="block text-sm font-semibold text-slate-700">{formVariedad.id === null ? "Nueva variedad" : "Editar variedad"}</label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input id="nombre-variedad" type="text" required maxLength={50} value={formVariedad.nombre} onChange={(event) => setFormVariedad((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
-              <button type="submit" disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{guardandoVariedad ? "Guardando…" : "Guardar"}</button>
-              {formVariedad.id !== null && <button type="button" onClick={() => setFormVariedad({ id: null, nombre: "" })} disabled={guardandoVariedad} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancelar</button>}
+              <input ref={campoVariedad} id="nombre-variedad" type="text" required maxLength={50} value={formVariedad.nombre} onChange={(event) => setFormVariedad((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-frigorifico-700 focus:ring-4 focus:ring-frigorifico-100 disabled:bg-slate-100" />
+              <button type="submit" disabled={guardandoVariedad || !especieSeleccionada || (formVariedad.id === null && !especieSeleccionada.activo)} className={BOTON_PRINCIPAL}>{guardandoVariedad ? "Guardando…" : "Guardar"}</button>
+              {formVariedad.id !== null && <button type="button" onClick={() => setFormVariedad({ id: null, nombre: "" })} disabled={guardandoVariedad} className={BOTON_SECUNDARIO}>Cancelar</button>}
             </div>
             {!especieSeleccionada && <p className="mt-2 text-xs text-slate-500">Selecciona una especie para crear variedades.</p>}
             {especieSeleccionada && !especieSeleccionada.activo && formVariedad.id === null && <p className="mt-2 text-xs text-amber-800">Activa la especie para crear una variedad.</p>}
@@ -368,12 +397,12 @@ export default function EspeciesVariedades() {
                   <thead className="border-b border-slate-200 bg-frigorifico-50 text-frigorifico-950"><tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {variedades.map((variedad) => (
-                      <tr key={variedad.id} className="hover:bg-slate-50">
+                      <tr key={variedad.id} className={claseFila(formVariedad.id === variedad.id)} aria-current={formVariedad.id === variedad.id ? "true" : undefined}>
                         <td className="px-4 py-4 font-medium text-frigorifico-900">{variedad.nombre}</td>
                         <td className="px-4 py-4"><EtiquetaEstado activo={variedad.activo} femenino /></td>
                         <td className="px-4 py-4"><div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => { setMensajeVariedades(""); setErrorOperacionVariedades(""); setFormVariedad({ id: variedad.id, nombre: variedad.nombre }); }} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-frigorifico-900 disabled:opacity-50">Editar</button>
-                          <button type="button" onClick={() => cambiarEstadoVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad || (!variedad.activo && !especieSeleccionada.activo)} title={!variedad.activo && !especieSeleccionada.activo ? "Activa primero la especie" : undefined} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-900 disabled:opacity-50">{cambiandoVariedadId === variedad.id ? "Actualizando…" : variedad.activo ? "Desactivar" : "Activar"}</button>
+                          <button type="button" onClick={() => editarVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad} aria-label={`Editar ${variedad.nombre}`} className={BOTON_EDITAR}>Editar</button>
+                          <button type="button" onClick={() => cambiarEstadoVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad || (!variedad.activo && !especieSeleccionada.activo)} title={!variedad.activo && !especieSeleccionada.activo ? "Activa primero la especie" : undefined} aria-label={`${variedad.activo ? "Desactivar" : "Activar"} ${variedad.nombre}`} className={botonEstado(variedad.activo)}>{cambiandoVariedadId === variedad.id ? "Actualizando…" : variedad.activo ? "Desactivar" : "Activar"}</button>
                         </div></td>
                       </tr>
                     ))}
