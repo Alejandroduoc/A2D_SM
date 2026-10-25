@@ -18,6 +18,11 @@ export const MENU = [
     etiqueta: "Productores", // Nombre visible del mantenimiento.
     roles: ["administrador"], // Solo este perfil puede ver la opción.
   },
+  {
+    ruta: "/especies-variedades", // Comparte la protección administrativa del enrutador.
+    etiqueta: "Especies y variedades", // Identifica los dos catálogos relacionados.
+    roles: ["administrador"], // Las consultas también exigen este rol en la API.
+  },
 ];
 
 // Devuelve las opciones permitidas sin modificar el arreglo compartido.
