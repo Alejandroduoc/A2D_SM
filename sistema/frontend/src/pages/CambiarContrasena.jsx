@@ -4,16 +4,13 @@ import { useState } from "react";
 import { extraerMensajeError } from "../api/client";
 // Llamada a PUT /auth/me/password.
 import { cambiarMiPassword } from "../api/usuarios";
-// Mismos estilos de botón que los catálogos.
-import { BOTON_PRINCIPAL } from "../components/catalogo";
+// Mismos estilos de botón, campos y mensajes que los catálogos.
+import { AYUDA, BOTON_PRINCIPAL, CAMPO, ETIQUETA, MENSAJE_ERROR, MENSAJE_EXITO } from "../components/catalogo";
 
 // Bytes UTF-8 de un texto: bcrypt admite hasta 72 (una tilde ocupa 2).
 function bytesUtf8(texto) {
   return new TextEncoder().encode(texto).length;
 }
-
-// Clases comunes de los campos de contraseña.
-const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-50";
 
 // Permite a cualquier perfil cambiar su propia contraseña.
 export default function CambiarContrasena() {
@@ -65,22 +62,23 @@ export default function CambiarContrasena() {
       <h1 id="titulo-cambiar-contrasena" className="text-2xl font-bold text-frigorifico-900">Cambiar contraseña</h1>
       <p className="mt-2 text-sm text-slate-500">Por seguridad se pide tu contraseña actual.</p>
 
-      <form onSubmit={enviar} className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
-        {exito && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{exito}</p>}
-        {error && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {/* Formulario de un bloque, con el estilo de los formularios de la referencia. */}
+      <form onSubmit={enviar} className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {exito && <p role="status" className={`mb-4 ${MENSAJE_EXITO}`}>{exito}</p>}
+        {error && <p role="alert" className={`mb-4 ${MENSAJE_ERROR}`}>{error}</p>}
 
-        <fieldset disabled={guardando} className="grid gap-5">
+        <fieldset disabled={guardando} className="grid gap-3">
           <div>
-            <label htmlFor="password-actual" className="mb-2 block text-sm font-semibold text-slate-700">Contraseña actual</label>
+            <label htmlFor="password-actual" className={ETIQUETA}>Contraseña actual</label>
             <input id="password-actual" type={ver ? "text" : "password"} autoComplete="current-password" required maxLength={128} value={actual} onChange={(event) => setActual(event.target.value)} className={CAMPO} />
           </div>
           <div>
-            <label htmlFor="password-nueva" className="mb-2 block text-sm font-semibold text-slate-700">Contraseña nueva</label>
+            <label htmlFor="password-nueva" className={ETIQUETA}>Contraseña nueva</label>
             <input id="password-nueva" type={ver ? "text" : "password"} autoComplete="new-password" required minLength={8} value={nueva} onChange={(event) => setNueva(event.target.value)} aria-describedby="ayuda-password-nueva" className={CAMPO} />
-            <p id="ayuda-password-nueva" className="mt-2 text-xs text-slate-500">Mínimo 8 caracteres. Mezcla letras, números y símbolos.</p>
+            <p id="ayuda-password-nueva" className={AYUDA}>Mínimo 8 caracteres. Mezcla letras, números y símbolos.</p>
           </div>
           <div>
-            <label htmlFor="password-confirmacion" className="mb-2 block text-sm font-semibold text-slate-700">Repite la contraseña nueva</label>
+            <label htmlFor="password-confirmacion" className={ETIQUETA}>Repite la contraseña nueva</label>
             <input id="password-confirmacion" type={ver ? "text" : "password"} autoComplete="new-password" required value={confirmacion} onChange={(event) => setConfirmacion(event.target.value)} className={CAMPO} />
           </div>
           {/* Un solo control muestra u oculta los tres campos. */}
