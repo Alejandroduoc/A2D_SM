@@ -7,13 +7,15 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
-# Importa los siete módulos para registrar todas sus tablas en Base.metadata.
+# Importa los nueve módulos para registrar todas sus tablas en Base.metadata.
 from app.models import (  # noqa: F401
     auditoria,
     calidad,
+    embalaje,
     especie,
     productor,
     sistema_productivo,
+    tipo_bandeja,
     usuario,
     variedad,
 )
