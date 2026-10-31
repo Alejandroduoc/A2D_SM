@@ -1,7 +1,7 @@
 from fastapi import FastAPI #Creamos la instancia de la aplicación FastAPI
 from fastapi.middleware.cors import CORSMiddleware #Agregamos el middleware CORS para permitir solicitudes desde diferentes orígenes
 
-from app.api.routers import auth, especies, opciones, productores, variedades # Importamos autenticación, los mantenimientos y las opciones de formularios.
+from app.api.routers import auth, embalajes, especies, opciones, productores, tipos_bandeja, variedades # Importamos autenticación, los mantenimientos y las opciones de formularios.
 from app.api.routers.calidades import router as calidades_router
 from app.api.routers.sistemas_productivos import router as sistemas_productivos_router
 from app.core.config import settings # Importamos la configuración
@@ -52,6 +52,10 @@ app.include_router(
 # Publica los dos mantenimientos administrativos independientes de HU09.
 app.include_router(calidades_router, prefix=settings.api_v1_prefix)
 app.include_router(sistemas_productivos_router, prefix=settings.api_v1_prefix)
+
+# Publica los mantenimientos administrativos de tipos de bandeja y embalajes (HU10).
+app.include_router(tipos_bandeja.router, prefix=settings.api_v1_prefix)
+app.include_router(embalajes.router, prefix=settings.api_v1_prefix)
 
 # Publica las cinco listas de solo lectura para los formularios de recepción (HU11).
 app.include_router(opciones.router, prefix=settings.api_v1_prefix)
