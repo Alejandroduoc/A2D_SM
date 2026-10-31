@@ -47,6 +47,10 @@ export const ENCABEZADO_TABLA = "bg-frigorifico-50 text-left text-xs uppercase t
 // Celda de encabezado o de datos.
 export const CELDA = "px-4 py-2";
 
+// Opción de una lista de resultados (buscador de productores; luego, tarjas en E3).
+// El contorno de foco va hacia adentro (-outline-offset-2): la lista hace scroll y recortaría uno hacia afuera.
+export const OPCION_LISTA = "block w-full px-2.5 py-2 text-left text-sm text-slate-600 transition hover:bg-frigorifico-50 focus-visible:bg-frigorifico-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ambar";
+
 // Celda única que ocupa toda la fila para "Cargando…" o "Sin registros".
 export const CELDA_AVISO = "px-4 py-6 text-center text-slate-400";
 

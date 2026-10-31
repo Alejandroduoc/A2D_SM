@@ -1,5 +1,5 @@
-// Estado y efectos de React.
-import { useEffect, useState } from "react";
+// Estado, efectos y referencias de React.
+import { useEffect, useRef, useState } from "react";
 // Convierte errores de la API en mensajes legibles.
 import { extraerMensajeError } from "../api/client";
 // Búsqueda de productores activos (HU11).
@@ -7,10 +7,12 @@ import { buscarProductores } from "../api/opciones";
 // Muestra el RUT con puntos y guion.
 import { formatearRut } from "../utils/rut";
 // Clases compartidas.
-import { AYUDA, BOTON_EDITAR, CAMPO, ETIQUETA, MENSAJE_ERROR } from "./catalogo";
+import { AYUDA, BOTON_EDITAR, CAMPO, ETIQUETA, MENSAJE_ERROR, OPCION_LISTA } from "./catalogo";
 
 // Caracteres mínimos para buscar; la API devuelve [] con menos.
 const MINIMO = 2;
+// Tope de resultados de la API (MAXIMO_RESULTADOS en services/opciones.py).
+const MAXIMO = 20;
 // Espera tras la última tecla antes de llamar a la API.
 const ESPERA_MS = 300;
 
@@ -28,6 +30,21 @@ export default function SelectorProductor({
   const [buscando, setBuscando] = useState(false);
   // Mensaje de error de la última búsqueda.
   const [error, setError] = useState("");
+  // Campo de búsqueda y botón "Cambiar", para no perder el foco del teclado.
+  const campoRef = useRef(null);
+  const cambiarRef = useRef(null);
+  // Dónde poner el foco cuando cambie el productor elegido: "cambiar", "campo" o null.
+  const focoPendiente = useRef(null);
+
+  // Tras elegir, el foco va a "Cambiar"; tras "Cambiar", vuelve al campo de búsqueda.
+  useEffect(() => {
+    // Elige el elemento según la acción que cambió el productor.
+    const destino = focoPendiente.current === "cambiar" ? cambiarRef : focoPendiente.current === "campo" ? campoRef : null;
+    // Ese elemento ya existe porque React pintó la vista nueva.
+    destino?.current?.focus();
+    // El foco se mueve una sola vez por acción.
+    focoPendiente.current = null;
+  }, [valor]);
 
   // Busca 300 ms después de la última tecla, y no en cada letra.
   useEffect(() => {
@@ -74,9 +91,17 @@ export default function SelectorProductor({
 
   // Entrega el productor al padre y limpia la búsqueda.
   function elegir(productor) {
+    // El botón pulsado desaparece; el foco pasará a "Cambiar".
+    focoPendiente.current = "cambiar";
     onChange(productor);
     setTexto("");
     setResultados([]);
+  }
+
+  // Quita el productor elegido; el foco volverá al campo de búsqueda.
+  function cambiar() {
+    focoPendiente.current = "campo";
+    onChange(null);
   }
 
   // Con un productor elegido se muestra su ficha y la acción para cambiarlo.
@@ -91,7 +116,7 @@ export default function SelectorProductor({
             <span className="font-semibold text-frigorifico-900">{formatearRut(valor.rut)}</span> · {valor.razon_social}
           </span>
           {/* Vuelve al buscador. */}
-          <button type="button" className={BOTON_EDITAR} onClick={() => onChange(null)}>Cambiar</button>
+          <button ref={cambiarRef} type="button" className={BOTON_EDITAR} onClick={cambiar}>Cambiar</button>
         </div>
       </div>
     );
@@ -103,9 +128,11 @@ export default function SelectorProductor({
     ? "Escriba al menos 2 caracteres del RUT o de la razón social."
     : buscando
       ? "Buscando…"
-      : resultados.length === 0
-        ? "Sin productores activos que coincidan."
-        : `${resultados.length} resultado(s)${resultados.length === 20 ? " (máximo 20; afine la búsqueda)" : ""}.`;
+      : error
+        ? "" // Si la búsqueda falló, solo se muestra el error; "sin coincidencias" sería falso.
+        : resultados.length === 0
+          ? "Sin productores activos que coincidan."
+          : `${resultados.length} resultado(s)${resultados.length === MAXIMO ? ` (máximo ${MAXIMO}; afine la búsqueda)` : ""}.`;
 
   return (
     <div>
@@ -113,6 +140,7 @@ export default function SelectorProductor({
       <label htmlFor={id} className={ETIQUETA}>Productor</label>
       {/* Campo de búsqueda; 50 caracteres como en la API. */}
       <input
+        ref={campoRef}
         id={id}
         type="search"
         className={CAMPO}
@@ -134,7 +162,7 @@ export default function SelectorProductor({
             <li key={productor.id}>
               <button
                 type="button"
-                className="block w-full px-2.5 py-2 text-left text-sm text-slate-600 transition hover:bg-frigorifico-50 focus-visible:bg-frigorifico-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar"
+                className={OPCION_LISTA}
                 onClick={() => elegir(productor)}
               >
                 <span className="font-semibold text-frigorifico-900">{formatearRut(productor.rut)}</span> · {productor.razon_social}
