@@ -116,22 +116,25 @@ class ProductorUpdate(BaseModel):
             return None
         return normalizar_nombre_catalogo(valor)
 
-    # Un texto vacío no puede significar "no cambiar" sin avisar: se rechaza.
-    # Quitar la dirección o el teléfono queda pendiente de una decisión del equipo.
+    # None conserva el valor actual; un texto vacío significa quitar el dato
+    # (decisión D3 del 2026-10-31). Se devuelve "" para que el servicio lo distinga de None.
     @field_validator("direccion", "telefono", mode="before")
     @classmethod
     def normalizar_opcionales(cls, valor: object) -> str | None:
         if valor is None:
             return None
         texto = normalizar_texto_opcional(valor)
+        # Vacío o solo espacios: el servicio lo guardará como NULL.
         if texto is None:
-            raise ValueError("No se puede dejar vacío; omite el campo para conservar el valor actual")
+            return ""
         return texto
 
-    # Revisa el formato del teléfono nuevo.
+    # Revisa el formato del teléfono nuevo; "" (quitar el teléfono) no se revisa.
     @field_validator("telefono")
     @classmethod
     def validar_telefono(cls, valor: str | None) -> str | None:
+        if valor == "":
+            return valor
         return _telefono(valor)
 
 

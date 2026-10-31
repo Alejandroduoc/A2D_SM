@@ -135,6 +135,11 @@ def actualizar_productor(
     try:
         # Omite campos ausentes o nulos, conservando explícitamente valores False.
         enviados = datos.model_dump(exclude_unset=True, exclude_none=True)
+        # Dirección o teléfono vacíos quitan el dato: se guardan como NULL (decisión D3 del 2026-10-31).
+        for campo in ("direccion", "telefono"):
+            # El schema solo deja "" en estos dos campos opcionales.
+            if enviados.get(campo) == "":
+                enviados[campo] = None
         # Prepara únicamente diferencias respecto del estado actual del productor.
         cambios = {
             campo: valor  # Conserva el nuevo valor de cada campo admitido por el schema.
