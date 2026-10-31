@@ -17,10 +17,21 @@ import {
   BOTON_PRINCIPAL,
   BOTON_SECUNDARIO,
   botonEstado,
+  CAMPO,
+  CELDA,
+  CELDA_AVISO,
   claseEstado,
   claseFila,
   confirmarCambioEstado,
+  CONTENEDOR_TABLA,
+  ENCABEZADO_TABLA,
   enfocar,
+  ETIQUETA,
+  MENSAJE_ERROR,
+  MENSAJE_EXITO,
+  SELECTOR,
+  SUBTITULO,
+  TARJETA,
 } from "../components/catalogo";
 
 // Traduce el filtro visible a null (todos), true (activos) o false (inactivos).
@@ -136,55 +147,64 @@ function PanelCatalogo({ clave, titulo, singular, femenino, listar, crear, actua
     }
   }
 
-  // Panel: mensajes, formulario, filtro y tabla del catálogo.
+  // Panel apilado como en la referencia: mensajes, formulario, encabezado del listado y tabla.
   return (
-    <section aria-labelledby={`titulo-${clave}`} className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
+    <section aria-labelledby={`titulo-${clave}`} className="min-w-0 space-y-4">
       <h2 id={`titulo-${clave}`} className="text-lg font-bold text-frigorifico-900">{titulo}</h2>
-      {mensaje && <p role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{mensaje}</p>}
-      {errorOperacion && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorOperacion}</p>}
+      {mensaje && <p role="status" className={MENSAJE_EXITO}>{mensaje}</p>}
+      {errorOperacion && <p role="alert" className={MENSAJE_ERROR}>{errorOperacion}</p>}
 
-      {/* Formulario de alta o edición. */}
-      <form onSubmit={guardar} className="mt-5 rounded-lg bg-slate-50 p-4">
-        <label htmlFor={`nombre-${clave}`} className="block text-sm font-semibold text-slate-700">{form.id === null ? `${femenino ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}` : `Editar ${singular.toLowerCase()}`}</label>
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-          <input ref={campoNombre} id={`nombre-${clave}`} type="text" required maxLength={50} value={form.nombre} onChange={(event) => setForm((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardando} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-100" />
+      {/* Tarjeta del formulario: campos en grilla y botones debajo. */}
+      <form onSubmit={guardar} className={TARJETA}>
+        <h3 className={`mb-3 ${SUBTITULO}`}>{form.id === null ? `${femenino ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}` : `Editar ${singular.toLowerCase()}`}</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label htmlFor={`nombre-${clave}`} className={ETIQUETA}>Nombre</label>
+            <input ref={campoNombre} id={`nombre-${clave}`} type="text" required maxLength={50} value={form.nombre} onChange={(event) => setForm((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardando} className={CAMPO} />
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
           <button type="submit" disabled={guardando} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
           {form.id !== null && <button type="button" onClick={() => setForm({ id: null, nombre: "" })} disabled={guardando} className={BOTON_SECUNDARIO}>Cancelar</button>}
         </div>
       </form>
 
-      {/* Filtro por estado y botón para recargar. */}
-      <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
-        <div className="w-full sm:w-auto">
-          <label htmlFor={`filtro-${clave}`} className="mb-2 block text-sm font-semibold text-slate-700">Mostrar {titulo.toLowerCase()}</label>
-          <select id={`filtro-${clave}`} value={filtro} onChange={(event) => setFiltro(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 sm:min-w-48">
-            <option value="todos">Todos</option><option value="activos">Activos</option><option value="inactivos">Inactivos</option>
-          </select>
+      {/* Encabezado del listado: subtítulo a la izquierda; filtro y recarga a la derecha. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className={SUBTITULO}>{femenino ? "Registradas" : "Registrados"}</h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-full sm:w-48">
+            <label htmlFor={`filtro-${clave}`} className={ETIQUETA}>Mostrar</label>
+            <select id={`filtro-${clave}`} value={filtro} onChange={(event) => setFiltro(event.target.value)} className={SELECTOR}>
+              <option value="todos">Todos</option><option value="activos">Activos</option><option value="inactivos">Inactivos</option>
+            </select>
+          </div>
+          <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando} className={BOTON_PRINCIPAL}>Recargar</button>
         </div>
-        <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando} className={BOTON_PRINCIPAL}>Recargar</button>
       </div>
 
-      {/* Tabla con estados de carga, error y vacío. */}
-      <div className="mt-6 min-w-0" aria-busy={cargando}>
-        {cargando ? <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">Cargando {titulo.toLowerCase()}…</p>
-          : errorListado ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">{errorListado}</p>
-            : filas.length === 0 ? <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay registros con este filtro</p>
-              : <div role="region" aria-label={`Listado de ${titulo.toLowerCase()}`} tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
-                {/* Sin ancho mínimo: usa todo el ancho y solo hace scroll si no cabe. */}
-                <table className="w-full text-left text-sm">
-                  <caption className="sr-only">{titulo} según el filtro seleccionado</caption>
-                  <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Estado</th><th scope="col" className="px-4 py-3">Acciones</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{filas.map((fila) => <tr key={fila.id} className={claseFila(form.id === fila.id)} aria-current={form.id === fila.id ? "true" : undefined}>
-                    <td className="px-4 py-4 font-medium text-frigorifico-900">{fila.nombre}</td>
-                    <td className="px-4 py-4"><span className={claseEstado(fila.activo)}>{fila.activo ? (femenino ? "Activa" : "Activo") : (femenino ? "Inactiva" : "Inactivo")}</span></td>
-                    <td className="px-4 py-4"><div className="flex flex-wrap gap-2">
+      {/* El error de consulta se muestra como mensaje; la tabla queda con su aviso. */}
+      {errorListado && <p role="alert" className={MENSAJE_ERROR}>{errorListado}</p>}
+      <div role="region" aria-label={`Listado de ${titulo.toLowerCase()}`} aria-busy={cargando} tabIndex={0} className={CONTENEDOR_TABLA}>
+        <table className="w-full text-sm">
+          <caption className="sr-only">{titulo} según el filtro seleccionado</caption>
+          <thead className={ENCABEZADO_TABLA}><tr><th scope="col" className={CELDA}>Nombre</th><th scope="col" className={CELDA}>Estado</th><th scope="col" className={CELDA}><span className="sr-only">Acciones</span></th></tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {/* Cargando, error y vacío son una fila dentro de la tabla, como en la referencia. */}
+            {cargando ? <tr><td colSpan={3} className={CELDA_AVISO}>Cargando…</td></tr>
+              : errorListado ? <tr><td colSpan={3} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
+                : filas.length === 0 ? <tr><td colSpan={3} className={CELDA_AVISO}>Sin registros con este filtro.</td></tr>
+                  : filas.map((fila) => <tr key={fila.id} className={claseFila(form.id === fila.id)} aria-current={form.id === fila.id ? "true" : undefined}>
+                    <td className={`${CELDA} text-slate-600`}>{fila.nombre}</td>
+                    <td className={CELDA}><span className={claseEstado(fila.activo)}>{fila.activo ? (femenino ? "Activa" : "Activo") : (femenino ? "Inactiva" : "Inactivo")}</span></td>
+                    <td className={`${CELDA} text-right`}><div className="flex flex-wrap justify-end gap-3">
                       {/* aria-label nombra el registro: el lector de pantalla no dice solo "Editar". */}
                       <button type="button" onClick={() => editar(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`Editar ${fila.nombre}`} className={BOTON_EDITAR}>Editar</button>
                       <button type="button" onClick={() => cambiarEstado(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`} className={botonEstado(fila.activo)}>{cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}</button>
                     </div></td>
-                  </tr>)}</tbody>
-                </table>
-              </div>}
+                  </tr>)}
+          </tbody>
+        </table>
       </div>
     </section>
   );
@@ -198,7 +218,7 @@ export default function CalidadesSistemasProductivos() {
       <h2 id="titulo-calidades-sistemas" className="sr-only">Calidades y sistemas productivos</h2>
       <p className="text-sm text-slate-500">Catálogos de clasificación de la fruta y de forma de producción.</p>
       {/* Calidades y Sistemas productivos apilados en una columna, como los mantenedores del proyecto de referencia. */}
-      <div className="mt-6 min-w-0 space-y-6">
+      <div className="mt-6 min-w-0 space-y-10">
         <PanelCatalogo clave="calidades" titulo="Calidades" singular="Calidad" femenino listar={listarCalidades} crear={crearCalidad} actualizar={actualizarCalidad} />
         <PanelCatalogo clave="sistemas-productivos" titulo="Sistemas productivos" singular="Sistema productivo" femenino={false} listar={listarSistemasProductivos} crear={crearSistemaProductivo} actualizar={actualizarSistemaProductivo} />
       </div>

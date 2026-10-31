@@ -7,7 +7,27 @@ import { extraerMensajeError } from "../api/client";
 // Operaciones de usuarios.
 import { actualizarUsuario, crearUsuario, listarUsuarios } from "../api/usuarios";
 // Estilos y reglas compartidas con los catálogos.
-import { BOTON_EDITAR, BOTON_PRINCIPAL, BOTON_SECUNDARIO, botonEstado, claseEstado, claseFila, confirmarCambioEstado, enfocar } from "../components/catalogo";
+import {
+  AYUDA,
+  BOTON_EDITAR,
+  BOTON_PRINCIPAL,
+  BOTON_SECUNDARIO,
+  botonEstado,
+  CAMPO,
+  CELDA,
+  CELDA_AVISO,
+  claseEstado,
+  claseFila,
+  confirmarCambioEstado,
+  CONTENEDOR_TABLA,
+  ENCABEZADO_TABLA,
+  enfocar,
+  ETIQUETA,
+  MENSAJE_ERROR,
+  MENSAJE_EXITO,
+  SUBTITULO,
+  TARJETA,
+} from "../components/catalogo";
 // Nombres legibles de cada rol.
 import { NOMBRE_ROL } from "../components/menu";
 
@@ -15,8 +35,6 @@ import { NOMBRE_ROL } from "../components/menu";
 const ROLES = ["operador_recepcion", "operador_proceso", "gerencia", "administrador"];
 // Formulario vacío para un alta.
 const FORM_VACIO = { id: null, nombre_usuario: "", nombre_completo: "", password: "", roles: [] };
-// Clases comunes de los campos de texto.
-const CAMPO = "w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-ambar focus:ring-2 focus:ring-ambar/20 disabled:bg-slate-100";
 
 // Bytes UTF-8 de un texto: bcrypt admite hasta 72.
 function bytesUtf8(texto) {
@@ -169,46 +187,49 @@ export default function Usuarios() {
         <button type="button" onClick={() => abrir()} disabled={ocupado || form !== null} className={BOTON_PRINCIPAL}>Nuevo usuario</button>
       </div>
 
-      {mensaje && <p role="status" className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{mensaje}</p>}
-      {error && form === null && <p role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+      {mensaje && <p role="status" className={`mt-6 ${MENSAJE_EXITO}`}>{mensaje}</p>}
+      {error && form === null && <p role="alert" className={`mt-6 ${MENSAJE_ERROR}`}>{error}</p>}
 
-      {/* Formulario de alta o edición. */}
+      {/* Tarjeta del formulario de alta o edición: campos en grilla y botones debajo. */}
       {form !== null && (
-        <form onSubmit={guardar} aria-labelledby="titulo-form-usuario" className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
-          <h2 id="titulo-form-usuario" className="text-lg font-bold text-frigorifico-900">{form.id === null ? "Nuevo usuario" : `Editar «${form.nombre_usuario}»`}</h2>
-          {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-          <fieldset disabled={guardando} className="mt-5 grid min-w-0 gap-5 sm:grid-cols-2">
-            <div>
-              <label htmlFor="usuario-nombre-usuario" className="mb-2 block text-sm font-semibold text-slate-700">Nombre de usuario</label>
-              {/* El nombre de login no se cambia después del alta. */}
-              <input id="usuario-nombre-usuario" type="text" autoComplete="off" autoFocus required minLength={3} maxLength={50} value={form.nombre_usuario} onChange={(event) => setForm((actual) => ({ ...actual, nombre_usuario: event.target.value }))} disabled={form.id !== null} className={CAMPO} />
-            </div>
-            <div>
-              <label htmlFor="usuario-nombre-completo" className="mb-2 block text-sm font-semibold text-slate-700">Nombre completo</label>
-              <input ref={primerCampo} id="usuario-nombre-completo" type="text" required minLength={3} maxLength={150} value={form.nombre_completo} onChange={(event) => setForm((actual) => ({ ...actual, nombre_completo: event.target.value }))} className={CAMPO} />
-            </div>
-            <fieldset className="sm:col-span-2">
-              <legend className="mb-2 text-sm font-semibold text-slate-700">Roles</legend>
-              <div className="flex flex-wrap gap-4">
-                {ROLES.map((rol) => (
-                  <label key={rol} className="flex items-center gap-2 text-sm text-slate-700">
-                    {/* El administrador no puede quitarse su propio rol de administrador. */}
-                    <input type="checkbox" checked={form.roles.includes(rol)} onChange={() => alternarRol(rol)} disabled={editandoMiCuenta && rol === "administrador"} className="h-4 w-4" />
-                    {NOMBRE_ROL[rol]}
-                  </label>
-                ))}
+        <form onSubmit={guardar} aria-labelledby="titulo-form-usuario" className={`mt-6 ${TARJETA}`}>
+          <h2 id="titulo-form-usuario" className={`mb-3 ${SUBTITULO}`}>{form.id === null ? "Nuevo usuario" : `Editar «${form.nombre_usuario}»`}</h2>
+          {error && <p role="alert" className={`mb-3 ${MENSAJE_ERROR}`}>{error}</p>}
+          <fieldset disabled={guardando} className="min-w-0">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="usuario-nombre-usuario" className={ETIQUETA}>Nombre de usuario</label>
+                {/* El nombre de login no se cambia después del alta. */}
+                <input id="usuario-nombre-usuario" type="text" autoComplete="off" autoFocus required minLength={3} maxLength={50} value={form.nombre_usuario} onChange={(event) => setForm((actual) => ({ ...actual, nombre_usuario: event.target.value }))} disabled={form.id !== null} className={CAMPO} />
               </div>
-            </fieldset>
-            {editandoMiCuenta ? (
-              <p className="text-sm text-slate-500 sm:col-span-2">Tu propia contraseña se cambia en «Cambiar contraseña».</p>
-            ) : (
-              <div className="sm:col-span-2">
-                <label htmlFor="usuario-password" className="mb-2 block text-sm font-semibold text-slate-700">{form.id === null ? "Contraseña inicial" : "Restablecer contraseña"} {form.id !== null && <span className="font-normal text-slate-500">(opcional)</span>}</label>
-                <input id="usuario-password" type="password" autoComplete="new-password" required={form.id === null} value={form.password} onChange={(event) => setForm((actual) => ({ ...actual, password: event.target.value }))} aria-describedby="ayuda-usuario-password" className={CAMPO} />
-                <p id="ayuda-usuario-password" className="mt-2 text-xs text-slate-500">{form.id === null ? "Mínimo 8 caracteres. Entrégala a la persona por un canal seguro." : "Déjalo vacío para no cambiarla. Úsalo si la persona olvidó su contraseña."}</p>
+              <div>
+                <label htmlFor="usuario-nombre-completo" className={ETIQUETA}>Nombre completo</label>
+                <input ref={primerCampo} id="usuario-nombre-completo" type="text" required minLength={3} maxLength={150} value={form.nombre_completo} onChange={(event) => setForm((actual) => ({ ...actual, nombre_completo: event.target.value }))} className={CAMPO} />
               </div>
-            )}
-            <div className="flex flex-wrap gap-3 sm:col-span-2">
+              <fieldset className="sm:col-span-2">
+                <legend className={ETIQUETA}>Roles</legend>
+                <div className="mt-1 flex flex-wrap gap-4">
+                  {ROLES.map((rol) => (
+                    <label key={rol} className="flex items-center gap-2 text-sm text-slate-700">
+                      {/* El administrador no puede quitarse su propio rol de administrador. */}
+                      <input type="checkbox" checked={form.roles.includes(rol)} onChange={() => alternarRol(rol)} disabled={editandoMiCuenta && rol === "administrador"} className="h-4 w-4" />
+                      {NOMBRE_ROL[rol]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {editandoMiCuenta ? (
+                <p className="text-xs text-slate-500 sm:col-span-2">Tu propia contraseña se cambia en «Cambiar contraseña».</p>
+              ) : (
+                <div className="sm:col-span-2">
+                  <label htmlFor="usuario-password" className={ETIQUETA}>{form.id === null ? "Contraseña inicial" : "Restablecer contraseña"} {form.id !== null && <span className="font-normal text-slate-500">(opcional)</span>}</label>
+                  <input id="usuario-password" type="password" autoComplete="new-password" required={form.id === null} value={form.password} onChange={(event) => setForm((actual) => ({ ...actual, password: event.target.value }))} aria-describedby="ayuda-usuario-password" className={CAMPO} />
+                  <p id="ayuda-usuario-password" className={AYUDA}>{form.id === null ? "Mínimo 8 caracteres. Entrégala a la persona por un canal seguro." : "Déjalo vacío para no cambiarla. Úsalo si la persona olvidó su contraseña."}</p>
+                </div>
+              )}
+            </div>
+            {/* Botones debajo de los campos, como en la referencia. */}
+            <div className="mt-4 flex flex-wrap gap-3">
               <button type="submit" className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
               <button type="button" onClick={() => { setForm(null); setError(""); }} className={BOTON_SECUNDARIO}>Cancelar</button>
             </div>
@@ -216,62 +237,61 @@ export default function Usuarios() {
         </form>
       )}
 
-      {/* Buscador y recarga. */}
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-lg border border-slate-200 bg-white shadow-sm p-5">
-        <div className="w-full min-w-0 flex-1 sm:w-auto">
-          <label htmlFor="buscar-usuarios" className="mb-2 block text-sm font-semibold text-slate-700">Buscar</label>
-          <input id="buscar-usuarios" type="search" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Usuario o nombre" className={CAMPO} />
+      {/* Encabezado del listado: subtítulo a la izquierda; búsqueda y recarga a la derecha. */}
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+        <h2 className={SUBTITULO}>Registrados</h2>
+        <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+          <div className="w-full sm:w-56">
+            <label htmlFor="buscar-usuarios" className={ETIQUETA}>Buscar</label>
+            <input id="buscar-usuarios" type="search" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Usuario o nombre" className={CAMPO} />
+          </div>
+          <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando || ocupado} className={BOTON_PRINCIPAL}>Recargar</button>
         </div>
-        <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando || ocupado} className={BOTON_PRINCIPAL}>Recargar</button>
       </div>
 
-      {/* Tabla con estados de carga, error y vacío. */}
-      <div className="mt-6 min-w-0" aria-busy={cargando}>
-        {cargando ? (
-          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">Cargando usuarios…</p>
-        ) : errorListado ? (
-          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">{errorListado}</p>
-        ) : visibles.length === 0 ? (
-          <p role="status" className="rounded-lg border border-slate-200 bg-white shadow-sm p-6 text-slate-500">No hay usuarios que coincidan</p>
-        ) : (
-          <div role="region" aria-label="Listado de usuarios" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <caption className="sr-only">Usuarios del sistema</caption>
-              <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th scope="col" className="px-5 py-4 font-semibold">Usuario</th>
-                  <th scope="col" className="px-5 py-4 font-semibold">Nombre completo</th>
-                  <th scope="col" className="px-5 py-4 font-semibold">Roles</th>
-                  <th scope="col" className="px-5 py-4 font-semibold">Estado</th>
-                  <th scope="col" className="px-5 py-4 font-semibold">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {visibles.map((cuenta) => (
-                  <tr key={cuenta.id} className={claseFila(form?.id === cuenta.id)} aria-current={form?.id === cuenta.id ? "true" : undefined}>
-                    <td className="whitespace-nowrap px-5 py-4 font-medium text-frigorifico-900">{cuenta.nombre_usuario}{cuenta.id === yo.id && <span className="ml-2 text-xs font-normal text-slate-500">(tú)</span>}</td>
-                    <td className="px-5 py-4 text-slate-800">{cuenta.nombre_completo}</td>
-                    <td className="px-5 py-4 text-slate-600">{cuenta.roles.map((rol) => NOMBRE_ROL[rol] ?? rol).join(" · ")}</td>
-                    <td className="px-5 py-4">
-                      <span className={claseEstado(cuenta.activo)}>{cuenta.activo ? "Activo" : "Inactivo"}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => abrir(cuenta)} disabled={ocupado || form !== null} aria-label={`Editar ${cuenta.nombre_usuario}`} className={BOTON_EDITAR}>Editar</button>
-                        {/* Nadie puede desactivar su propia cuenta. */}
-                        {cuenta.id !== yo.id && (
-                          <button type="button" onClick={() => cambiarEstado(cuenta)} disabled={ocupado || form !== null} aria-label={`${cuenta.activo ? "Desactivar" : "Activar"} ${cuenta.nombre_usuario}`} className={botonEstado(cuenta.activo)}>
-                            {cambiandoId === cuenta.id ? "Actualizando…" : cuenta.activo ? "Desactivar" : "Activar"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* El error de consulta se muestra como mensaje; la tabla queda con su aviso. */}
+      {errorListado && <p role="alert" className={`mt-4 ${MENSAJE_ERROR}`}>{errorListado}</p>}
+      {/* Sin ancho mínimo: si la tabla no cabe, el desplazamiento queda dentro de su contenedor. */}
+      <div role="region" aria-label="Listado de usuarios" aria-busy={cargando} tabIndex={0} className={`mt-4 ${CONTENEDOR_TABLA}`}>
+        <table className="w-full text-sm">
+          <caption className="sr-only">Usuarios del sistema</caption>
+          <thead className={ENCABEZADO_TABLA}>
+            <tr>
+              <th scope="col" className={CELDA}>Usuario</th>
+              <th scope="col" className={CELDA}>Nombre completo</th>
+              <th scope="col" className={CELDA}>Roles</th>
+              <th scope="col" className={CELDA}>Estado</th>
+              <th scope="col" className={CELDA}><span className="sr-only">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {/* Cargando, error y vacío son una fila dentro de la tabla, como en la referencia. */}
+            {cargando ? <tr><td colSpan={5} className={CELDA_AVISO}>Cargando…</td></tr>
+              : errorListado ? <tr><td colSpan={5} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
+                : visibles.length === 0 ? <tr><td colSpan={5} className={CELDA_AVISO}>Sin usuarios que coincidan.</td></tr>
+                  : visibles.map((cuenta) => (
+                    <tr key={cuenta.id} className={claseFila(form?.id === cuenta.id)} aria-current={form?.id === cuenta.id ? "true" : undefined}>
+                      <td className={`whitespace-nowrap ${CELDA} text-slate-600`}>{cuenta.nombre_usuario}{cuenta.id === yo.id && <span className="ml-2 text-xs text-slate-400">(tú)</span>}</td>
+                      <td className={`${CELDA} text-slate-600`}>{cuenta.nombre_completo}</td>
+                      <td className={`${CELDA} text-slate-600`}>{cuenta.roles.map((rol) => NOMBRE_ROL[rol] ?? rol).join(" · ")}</td>
+                      <td className={CELDA}>
+                        <span className={claseEstado(cuenta.activo)}>{cuenta.activo ? "Activo" : "Inactivo"}</span>
+                      </td>
+                      <td className={`${CELDA} text-right`}>
+                        <div className="flex flex-wrap justify-end gap-3">
+                          <button type="button" onClick={() => abrir(cuenta)} disabled={ocupado || form !== null} aria-label={`Editar ${cuenta.nombre_usuario}`} className={BOTON_EDITAR}>Editar</button>
+                          {/* Nadie puede desactivar su propia cuenta. */}
+                          {cuenta.id !== yo.id && (
+                            <button type="button" onClick={() => cambiarEstado(cuenta)} disabled={ocupado || form !== null} aria-label={`${cuenta.activo ? "Desactivar" : "Activar"} ${cuenta.nombre_usuario}`} className={botonEstado(cuenta.activo)}>
+                              {cambiandoId === cuenta.id ? "Actualizando…" : cuenta.activo ? "Desactivar" : "Activar"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );
