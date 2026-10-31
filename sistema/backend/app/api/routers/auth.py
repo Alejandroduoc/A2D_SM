@@ -13,12 +13,19 @@ Las altas y ediciones de usuarios se auditan en ``app/services/usuario.py``.
 # Response permite responder 204 sin cuerpo.
 # status contiene constantes legibles para los codigos HTTP.
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+# Formulario OAuth2 (username, password) que envía el botón Authorize de /docs.
+from fastapi.security import OAuth2PasswordRequestForm
+# Error de validación al convertir el formulario en LoginRequest.
+from pydantic import ValidationError
 
 # Session representa una sesion activa de SQLAlchemy.
 from sqlalchemy.orm import Session
 
 # Dependencias de autenticacion y autorizacion de E1.
 from app.api.deps import get_current_user, require_rol
+
+# Indica si /docs esta publicado (MOSTRAR_DOCS); en produccion no lo esta.
+from app.core.config import settings
 
 # Dependencia que abre y cierra una sesion por peticion.
 from app.core.database import get_db
@@ -105,6 +112,39 @@ def iniciar_sesion(
     nombre de usuario esta registrado. Tras varios fallos seguidos responde
     429 hasta que termine el bloqueo.
     """
+
+    # Toda la logica esta en autenticar(), compartida con /auth/token.
+    return autenticar(datos, request, db)
+
+
+@router.post("/token", response_model=TokenResponse, include_in_schema=False)
+def iniciar_sesion_docs(
+    request: Request,
+    formulario: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Login en formato de formulario, solo para el boton Authorize de /docs.
+
+    Usa exactamente las mismas reglas que /auth/login (401 unico, bcrypt
+    siempre y 429 tras varios fallos). No aparece en /docs y responde 404
+    cuando /docs no esta publicado (produccion).
+    """
+
+    # Sin /docs publicado esta ruta no tiene uso: no se expone en produccion.
+    if not settings.mostrar_docs:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    # Aplica los mismos limites de largo que el login en JSON.
+    try:
+        datos = LoginRequest(nombre_usuario=formulario.username, password=formulario.password)
+    # Un largo invalido se rechaza igual que en /auth/login, sin comparar la contrasena.
+    except ValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Datos de inicio de sesión inválidos") from error
+    # Comparte la logica de autenticacion con /auth/login.
+    return autenticar(datos, request, db)
+
+
+def autenticar(datos: LoginRequest, request: Request, db: Session) -> TokenResponse:
+    """Valida las credenciales y entrega los tokens (usado por /login y /token)."""
 
     # IP del cliente (sin proxy delante es la IP real).
     ip = request.client.host if request.client else "desconocida"

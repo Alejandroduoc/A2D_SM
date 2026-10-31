@@ -13,6 +13,7 @@ from app.models.calidad import Calidad
 from app.models.especie import Especie
 from app.models.productor import Productor
 from app.models.sistema_productivo import SistemaProductivo
+from app.models.tipo_bandeja import TipoBandeja
 from app.models.variedad import Variedad
 
 # Menos caracteres devolverían casi toda la tabla en cada tecla.
@@ -65,6 +66,18 @@ def sistemas_productivos_activos(db: Session) -> list[SistemaProductivo]:
         .order_by(SistemaProductivo.nombre)  # Orden alfabético para el selector.
     )  # Finaliza la consulta.
     # Devuelve los objetos SistemaProductivo encontrados.
+    return list(db.scalars(consulta).all())
+
+
+# Tipos de bandeja activos con su tara, ordenados por nombre (HU11 paso 8, criterio 2 de HU10).
+def tipos_bandeja_activos(db: Session) -> list[TipoBandeja]:
+    # Una bandeja desactivada no se ofrece en recepción.
+    consulta = (
+        select(TipoBandeja)  # Devuelve tipos de bandeja.
+        .where(TipoBandeja.activo == True)  # noqa: E712  Solo activos.
+        .order_by(TipoBandeja.nombre)  # Orden alfabético para el selector.
+    )  # Finaliza la consulta.
+    # Devuelve los objetos TipoBandeja encontrados.
     return list(db.scalars(consulta).all())
 
 

@@ -30,8 +30,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 # Cuenta las llamadas a verify_password sin cambiar su resultado.
 from unittest.mock import patch
-# Separa la ruta y la query string al armar la solicitud ASGI.
-from urllib.parse import urlsplit
+# Separa la ruta y la query string al armar la solicitud ASGI; urlencode arma el formulario de /docs.
+from urllib.parse import urlencode, urlsplit
 
 # Firma tokens de prueba con otra clave o ya vencidos.
 import jwt
@@ -186,6 +186,57 @@ def login(nombre, password, ip="10.0.0.1"):
     return solicitar("POST", "/api/v1/auth/login", datos={"nombre_usuario": nombre, "password": password}, ip=ip)
 
 
+# Login como lo envía el botón Authorize de /docs: formulario (username, password) a /auth/token.
+async def _login_formulario(nombre, password, ip):
+    # Cuerpo application/x-www-form-urlencoded, igual que Swagger UI.
+    cuerpo = urlencode({"grant_type": "password", "username": nombre, "password": password}).encode()
+    # Cabeceras de un formulario HTTP normal.
+    cabeceras = [(b"host", b"qa-seguridad"), (b"content-type", b"application/x-www-form-urlencoded"), (b"content-length", str(len(cuerpo)).encode())]
+    # Descripción ASGI de la solicitud.
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1",  # Interfaz utilizada.
+        "method": "POST", "scheme": "http", "path": "/api/v1/auth/token",  # Ruta que usa /docs.
+        "raw_path": b"/api/v1/auth/token", "query_string": b"", "root_path": "",  # Sin parámetros en la URL.
+        "headers": cabeceras, "client": (ip, 1), "server": ("qa-seguridad", 80),  # Contexto HTTP.
+    }  # Finaliza la descripción de la solicitud.
+    # Mensajes que devuelve la aplicación.
+    mensajes = []
+    # Controla que el cuerpo se entregue una sola vez.
+    entregado = False
+
+    # Entrega el formulario una sola vez.
+    async def receive():
+        nonlocal entregado
+        # La segunda lectura indica que el cliente terminó.
+        if entregado:
+            return {"type": "http.disconnect"}
+        # Marca la única entrega.
+        entregado = True
+        # Entrega el formulario completo.
+        return {"type": "http.request", "body": cuerpo, "more_body": False}
+
+    # Guarda cada mensaje de respuesta.
+    async def send(mensaje):
+        mensajes.append(mensaje)
+
+    # Ejecuta la aplicación real.
+    await app(scope, receive, send)
+    # Extrae el código HTTP.
+    estado = next(m["status"] for m in mensajes if m["type"] == "http.response.start")
+    # Une el cuerpo de la respuesta.
+    texto = b"".join(m.get("body", b"") for m in mensajes if m["type"] == "http.response.body").decode("utf-8")
+    # Devuelve JSON cuando la respuesta lo es.
+    try:
+        return estado, json.loads(texto)
+    except ValueError:
+        return estado, texto
+
+
+# Versión síncrona del login por formulario.
+def login_formulario(nombre, password, ip="10.0.0.1"):
+    return asyncio.run(_login_formulario(nombre, password, ip))
+
+
 # Eventos de auditoría de un registro, en orden.
 def eventos(db: Session, tabla: str, registro_id) -> list[Auditoria]:
     consulta = select(Auditoria).where(Auditoria.tabla == tabla, Auditoria.registro_id == str(registro_id)).order_by(Auditoria.id)
@@ -261,6 +312,39 @@ def probar_limite():
             login(f"qa_ip_{indice}_{uuid.uuid4().hex[:6]}", "mala", ip="10.9.9.9")
         comprobar("S05 — IP bloqueada", login(otro.nombre_usuario, CLAVE, ip="10.9.9.9")[0] == 429)
         comprobar("S05 — otra IP sigue funcionando", login(otro.nombre_usuario, CLAVE, ip="10.9.9.8")[0] == 200)
+
+
+# S16: el botón Authorize de /docs usa /auth/token (formulario) con las mismas reglas que /auth/login.
+def probar_login_docs():
+    with aislado() as db:
+        # Actores temporales: uno activo y uno desactivado.
+        actor = crear_actor(db, RolUsuario.ADMINISTRADOR)
+        inactivo = crear_actor(db, RolUsuario.ADMINISTRADOR, activo=False)
+        # El esquema de seguridad de /docs apunta a /auth/token, y esa ruta no se lista en /docs.
+        esquema = app.openapi()["components"]["securitySchemes"]["OAuth2PasswordBearer"]
+        comprobar("S16 — Authorize de /docs apunta a /auth/token", esquema["flows"]["password"]["tokenUrl"] == "/api/v1/auth/token")
+        comprobar("S16 — /auth/token no aparece en /docs", "/api/v1/auth/token" not in app.openapi()["paths"])
+        # Credenciales correctas: entrega tokens de tipo bearer, como espera Swagger UI.
+        estado, cuerpo = login_formulario(actor.nombre_usuario, CLAVE)
+        comprobar("S16 — formulario correcto 200 con token bearer", estado == 200 and cuerpo.get("token_type") == "bearer" and "access_token" in cuerpo)
+        # El token entregado sirve para una ruta protegida.
+        comprobar("S16 — el token del formulario sirve en /auth/me", solicitar("GET", "/api/v1/auth/me", token=cuerpo.get("access_token"))[0] == 200)
+        # Clave incorrecta, usuario inexistente o desactivado: 401 con el mismo mensaje que /auth/login.
+        respuestas = [login_formulario(actor.nombre_usuario, "incorrecta"), login_formulario("qa_no_existe_" + uuid.uuid4().hex[:10], CLAVE), login_formulario(inactivo.nombre_usuario, CLAVE)]
+        mensaje_json = login(actor.nombre_usuario, "incorrecta")[1]["detail"]
+        comprobar("S16 — 401 con el mismo mensaje que /auth/login", all(r[0] == 401 and r[1]["detail"] == mensaje_json for r in respuestas))
+        # Un nombre vacío se rechaza sin comparar contraseñas.
+        comprobar("S16 — nombre vacío 422", login_formulario("", CLAVE)[0] == 422)
+        # El límite de intentos es el mismo: los fallos por formulario bloquean también el login en JSON.
+        limite_login.reiniciar()
+        for _ in range(settings.login_max_intentos):
+            login_formulario(actor.nombre_usuario, "mala")
+        comprobar("S16 — 5 fallos por formulario bloquean (429)", login_formulario(actor.nombre_usuario, CLAVE)[0] == 429)
+        comprobar("S16 — el bloqueo también aplica a /auth/login", login(actor.nombre_usuario, CLAVE)[0] == 429)
+        limite_login.reiniciar()
+        # Sin /docs publicado (producción), la ruta no existe para el cliente.
+        with patch.object(router_auth.settings, "mostrar_docs", False):
+            comprobar("S16 — sin /docs responde 404", login_formulario(actor.nombre_usuario, CLAVE)[0] == 404)
 
 
 # S06: largos de contraseña y campos extra.
@@ -414,7 +498,7 @@ def main() -> int:
     with engine.connect() as conexion:
         inicial = huellas(conexion)
     dependencias = dict(app.dependency_overrides)
-    for escenario in (probar_login, probar_limite, probar_largos, probar_refresh, probar_auditoria_usuarios, probar_cambio_password, probar_productores, probar_configuracion):
+    for escenario in (probar_login, probar_limite, probar_login_docs, probar_largos, probar_refresh, probar_auditoria_usuarios, probar_cambio_password, probar_productores, probar_configuracion):
         try:
             escenario()
         except Exception:

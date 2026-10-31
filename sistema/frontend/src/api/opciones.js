@@ -33,6 +33,14 @@ export async function listarSistemasProductivos() {
   return respuesta.data;
 }
 
+// Tipos de bandeja activos con su tara (HU11 paso 8).
+export async function listarTiposBandeja() {
+  // GET /opciones/tipos-bandeja; peso_tara_kg llega como texto decimal ("0.80").
+  const respuesta = await client.get("/opciones/tipos-bandeja");
+  // Devuelve la lista de { id, nombre, peso_tara_kg }.
+  return respuesta.data;
+}
+
 // Productores activos cuyo RUT empieza con el texto o cuya razón social lo contiene.
 export async function buscarProductores(texto) {
   // GET /opciones/productores?buscar=texto; la API devuelve como máximo 20.

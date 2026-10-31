@@ -34,6 +34,11 @@ import {
 // Estado inicial común de los formularios de peso.
 const FORMULARIO_VACIO = { id: null, nombre: "", peso: "", granel: false };
 
+// Cifras enteras admitidas: tipos_bandeja.peso_tara_kg es Numeric(6,2), es decir, 4 enteros y 2 decimales.
+const ENTEROS_TARA = 4;
+// embalajes.kg_por_caja es Numeric(8,2): 6 enteros y 2 decimales (mismo límite que max_digits del schema).
+const ENTEROS_KG_CAJA = 6;
+
 // Traduce el filtro visible al valor esperado por la API.
 function activoDesdeFiltro(filtro) {
   // Todos omite el parámetro; los otros valores se convierten en booleano.
@@ -246,38 +251,103 @@ function PanelPeso({
     }
   }
 
+  // Cambia entre kilos fijos y granel; en granel el peso queda vacío.
+  function cambiarModalidad(granel) {
+    // Conserva el peso escrito solo si se vuelve a kilos fijos.
+    setForm((actual) => ({ ...actual, granel, peso: granel ? "" : actual.peso }));
+    // Granel no exige peso, así que se quita el aviso.
+    setErrorPeso("");
+  }
+
+  // Actualiza el peso escrito y quita el aviso anterior mientras se corrige.
+  function cambiarPeso(valor) {
+    // Guarda el texto tal como se escribe; se valida al salir del campo.
+    setForm((actual) => ({ ...actual, peso: valor }));
+    // El aviso vuelve a calcularse en onBlur o al guardar.
+    if (errorPeso) setErrorPeso("");
+  }
+
   // Renderiza el mantenedor apilado: formulario, filtro y tabla.
   return (
     <section aria-labelledby={`titulo-${clave}`} className="min-w-0 space-y-4">
+      {/* Título del catálogo, enlazado con la sección para lectores de pantalla. */}
       <h2 id={`titulo-${clave}`} className="text-lg font-bold text-frigorifico-900">{titulo}</h2>
+      {/* Resultado de la última escritura. */}
       {mensaje && <p role="status" className={MENSAJE_EXITO}>{mensaje}</p>}
       {errorOperacion && <p role="alert" className={MENSAJE_ERROR}>{errorOperacion}</p>}
 
       {/* Formulario de alta y edición conforme al patrón de catálogos. */}
       <form onSubmit={guardar} className={TARJETA} noValidate>
-        <h3 className={`mb-3 ${SUBTITULO}`}>{form.id === null ? `${femenino ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}` : `Editar ${singular.toLowerCase()}`}</h3>
+        {/* Subtítulo según se crea o se edita. */}
+        <h3 className={`mb-3 ${SUBTITULO}`}>
+          {form.id === null ? `${femenino ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}` : `Editar ${singular.toLowerCase()}`}
+        </h3>
+        {/* Campos en grilla de tres columnas desde pantallas medianas. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Nombre del registro; la API lo normaliza y valida que no se repita. */}
           <div>
             <label htmlFor={`nombre-${clave}`} className={ETIQUETA}>Nombre</label>
-            <input ref={campoNombre} id={`nombre-${clave}`} type="text" required maxLength={50} value={form.nombre} onChange={(event) => setForm((actual) => ({ ...actual, nombre: event.target.value }))} disabled={guardando} className={CAMPO} />
+            <input
+              ref={campoNombre}
+              id={`nombre-${clave}`}
+              type="text"
+              required
+              maxLength={50}
+              value={form.nombre}
+              onChange={(event) => setForm((actual) => ({ ...actual, nombre: event.target.value }))}
+              disabled={guardando}
+              className={CAMPO}
+            />
           </div>
-          {permiteGranel && <div>
-            <label htmlFor={`modalidad-${clave}`} className={ETIQUETA}>Modalidad</label>
-            <select id={`modalidad-${clave}`} value={form.granel ? "granel" : "fijo"} onChange={(event) => { const granel = event.target.value === "granel"; setForm((actual) => ({ ...actual, granel, peso: granel ? "" : actual.peso })); setErrorPeso(""); }} disabled={guardando} className={SELECTOR}>
-              <option value="fijo">Kilos fijos por caja</option>
-              <option value="granel">A granel</option>
-            </select>
-          </div>}
+          {/* Solo los embalajes eligen entre kilos fijos por caja y granel. */}
+          {permiteGranel && (
+            <div>
+              <label htmlFor={`modalidad-${clave}`} className={ETIQUETA}>Modalidad</label>
+              <select
+                id={`modalidad-${clave}`}
+                value={form.granel ? "granel" : "fijo"}
+                onChange={(event) => cambiarModalidad(event.target.value === "granel")}
+                disabled={guardando}
+                className={SELECTOR}
+              >
+                <option value="fijo">Kilos fijos por caja</option>
+                <option value="granel">A granel</option>
+              </select>
+            </div>
+          )}
+          {/* Peso: tara de la bandeja o kilos por caja del embalaje. */}
           <div>
             <label htmlFor={`peso-${clave}`} className={ETIQUETA}>{etiquetaPeso}</label>
-            <input id={`peso-${clave}`} type="text" inputMode="decimal" value={form.peso} onChange={(event) => { setForm((actual) => ({ ...actual, peso: event.target.value })); if (errorPeso) setErrorPeso(""); }} onBlur={validarPesoVisible} disabled={guardando || (permiteGranel && form.granel)} aria-invalid={Boolean(errorPeso)} aria-describedby={`ayuda-${clave}${errorPeso ? ` error-${clave}` : ""}`} className={errorPeso ? CAMPO_ERROR : CAMPO} placeholder="0,00" />
-            <p id={`ayuda-${clave}`} className={AYUDA}>{permiteGranel && form.granel ? "En granel los kilos se informarán durante el proceso." : ayudaPeso}</p>
+            <input
+              id={`peso-${clave}`}
+              type="text"
+              inputMode="decimal"
+              value={form.peso}
+              onChange={(event) => cambiarPeso(event.target.value)}
+              onBlur={validarPesoVisible}
+              disabled={guardando || (permiteGranel && form.granel)}
+              aria-invalid={Boolean(errorPeso)}
+              aria-describedby={`ayuda-${clave}${errorPeso ? ` error-${clave}` : ""}`}
+              className={errorPeso ? CAMPO_ERROR : CAMPO}
+              placeholder="0,00"
+            />
+            {/* Ayuda distinta cuando el embalaje es a granel. */}
+            <p id={`ayuda-${clave}`} className={AYUDA}>
+              {permiteGranel && form.granel ? "En granel los kilos se informarán durante el proceso." : ayudaPeso}
+            </p>
+            {/* Error en línea del peso, sin ventana emergente. */}
             {errorPeso && <p id={`error-${clave}`} role="alert" className="mt-1 text-xs text-red-600">{errorPeso}</p>}
           </div>
         </div>
+        {/* Botones debajo de los campos, como en los demás mantenedores. */}
         <div className="mt-4 flex flex-wrap gap-3">
-          <button type="submit" disabled={guardando || Boolean(errorPeso)} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
-          {form.id !== null && <button type="button" onClick={limpiarFormulario} disabled={guardando} className={BOTON_SECUNDARIO}>Cancelar</button>}
+          <button type="submit" disabled={guardando || Boolean(errorPeso)} className={BOTON_PRINCIPAL}>
+            {guardando ? "Guardando…" : "Guardar"}
+          </button>
+          {/* Cancelar solo aparece al editar. */}
+          {form.id !== null && (
+            <button type="button" onClick={limpiarFormulario} disabled={guardando} className={BOTON_SECUNDARIO}>Cancelar</button>
+          )}
         </div>
       </form>
 
@@ -285,6 +355,7 @@ function PanelPeso({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h3 className={SUBTITULO}>{femenino ? "Registradas" : "Registrados"}</h3>
         <div className="flex flex-wrap items-end gap-3">
+          {/* Filtro Todos/Activos/Inactivos. */}
           <div className="w-full sm:w-48">
             <label htmlFor={`filtro-${clave}`} className={ETIQUETA}>Mostrar</label>
             <select id={`filtro-${clave}`} value={filtro} onChange={(event) => setFiltro(event.target.value)} className={SELECTOR}>
@@ -293,31 +364,86 @@ function PanelPeso({
               <option value="inactivos">Inactivos</option>
             </select>
           </div>
-          <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando} className={BOTON_PRINCIPAL}>Recargar</button>
+          {/* Vuelve a consultar la API sin cambiar el filtro. */}
+          <button type="button" onClick={() => setRecarga((valor) => valor + 1)} disabled={cargando} className={BOTON_PRINCIPAL}>
+            Recargar
+          </button>
         </div>
       </div>
 
-      {/* Tabla accesible; los estados de carga y vacío ocupan una fila. */}
+      {/* Error de carga del listado. */}
       {errorListado && <p role="alert" className={MENSAJE_ERROR}>{errorListado}</p>}
-      <div role="region" aria-label={`Listado de ${titulo.toLowerCase()}`} aria-busy={cargando} tabIndex={0} className={CONTENEDOR_TABLA}>
+      {/* Tabla accesible; si no cabe, hace scroll dentro de su contenedor. */}
+      <div
+        role="region"
+        aria-label={`Listado de ${titulo.toLowerCase()}`}
+        aria-busy={cargando}
+        tabIndex={0}
+        className={CONTENEDOR_TABLA}
+      >
         <table className="w-full text-sm">
           <caption className="sr-only">{titulo} según el filtro seleccionado</caption>
+          {/* Encabezados; la columna de acciones solo tiene texto para lectores de pantalla. */}
           <thead className={ENCABEZADO_TABLA}>
-            <tr><th scope="col" className={CELDA}>Nombre</th><th scope="col" className={`${CELDA} text-right`}>{etiquetaPeso}</th><th scope="col" className={CELDA}>Estado</th><th scope="col" className={CELDA}><span className="sr-only">Acciones</span></th></tr>
+            <tr>
+              <th scope="col" className={CELDA}>Nombre</th>
+              <th scope="col" className={`${CELDA} text-right`}>{etiquetaPeso}</th>
+              <th scope="col" className={CELDA}>Estado</th>
+              <th scope="col" className={CELDA}><span className="sr-only">Acciones</span></th>
+            </tr>
           </thead>
+          {/* Cargando, error y vacío ocupan una fila dentro de la tabla. */}
           <tbody className="divide-y divide-slate-100">
-            {cargando ? <tr><td colSpan={4} className={CELDA_AVISO}>Cargando…</td></tr>
-              : errorListado ? <tr><td colSpan={4} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
-                : filas.length === 0 ? <tr><td colSpan={4} className={CELDA_AVISO}>Sin registros con este filtro.</td></tr>
-                  : filas.map((fila) => <tr key={fila.id} className={claseFila(form.id === fila.id)} aria-current={form.id === fila.id ? "true" : undefined}>
-                    <td className={`${CELDA} text-slate-600`}>{fila.nombre}</td>
-                    <td className={`${CELDA} text-right text-slate-600`}>{permiteGranel && fila[campoPeso] === null ? "Granel" : mostrarPeso(fila[campoPeso])}</td>
-                    <td className={CELDA}><span className={claseEstado(fila.activo)}>{fila.activo ? (femenino ? "Activa" : "Activo") : (femenino ? "Inactiva" : "Inactivo")}</span></td>
-                    <td className={`${CELDA} text-right`}><div className="flex flex-wrap justify-end gap-3">
-                      <button type="button" onClick={() => editar(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`Editar ${fila.nombre}`} className={BOTON_EDITAR}>Editar</button>
-                      <button type="button" onClick={() => cambiarEstado(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`} className={botonEstado(fila.activo)}>{cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}</button>
-                    </div></td>
-                  </tr>)}
+            {cargando ? (
+              <tr><td colSpan={4} className={CELDA_AVISO}>Cargando…</td></tr>
+            ) : errorListado ? (
+              <tr><td colSpan={4} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
+            ) : filas.length === 0 ? (
+              <tr><td colSpan={4} className={CELDA_AVISO}>Sin registros con este filtro.</td></tr>
+            ) : (
+              filas.map((fila) => (
+                // La fila en edición queda resaltada.
+                <tr
+                  key={fila.id}
+                  className={claseFila(form.id === fila.id)}
+                  aria-current={form.id === fila.id ? "true" : undefined}
+                >
+                  <td className={`${CELDA} text-slate-600`}>{fila.nombre}</td>
+                  {/* Un embalaje sin kilos por caja se muestra como granel. */}
+                  <td className={`${CELDA} text-right text-slate-600`}>
+                    {permiteGranel && fila[campoPeso] === null ? "Granel" : mostrarPeso(fila[campoPeso])}
+                  </td>
+                  <td className={CELDA}>
+                    <span className={claseEstado(fila.activo)}>
+                      {fila.activo ? (femenino ? "Activa" : "Activo") : (femenino ? "Inactiva" : "Inactivo")}
+                    </span>
+                  </td>
+                  {/* Acciones de la fila: editar y cambiar estado (no hay borrado). */}
+                  <td className={`${CELDA} text-right`}>
+                    <div className="flex flex-wrap justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => editar(fila)}
+                        disabled={guardando || cambiandoId === fila.id}
+                        aria-label={`Editar ${fila.nombre}`}
+                        className={BOTON_EDITAR}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => cambiarEstado(fila)}
+                        disabled={guardando || cambiandoId === fila.id}
+                        aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`}
+                        className={botonEstado(fila.activo)}
+                      >
+                        {cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -330,11 +456,40 @@ export default function BandejasEmbalajes() {
   // Conserva una sola columna y separación uniforme entre los catálogos.
   return (
     <section aria-labelledby="titulo-bandejas-embalajes" className="min-w-0">
+      {/* Título oculto: la pestaña ya lo muestra. */}
       <h2 id="titulo-bandejas-embalajes" className="sr-only">Bandejas y embalajes</h2>
       <p className="text-sm text-slate-500">Catálogos de tara de bandejas y peso de embalajes utilizados en recepción y proceso.</p>
       <div className="mt-6 min-w-0 space-y-10">
-        <PanelPeso clave="tipos-bandeja" titulo="Tipos de bandeja" singular="Tipo de bandeja" femenino={false} campoPeso="peso_tara_kg" etiquetaPeso="Tara (kg)" ayudaPeso="Peso propio de una bandeja, mayor que cero." maximoEnteros={4} permiteGranel={false} listar={listarTiposBandeja} crear={crearTipoBandeja} actualizar={actualizarTipoBandeja} />
-        <PanelPeso clave="embalajes" titulo="Embalajes" singular="Embalaje" femenino={false} campoPeso="kg_por_caja" etiquetaPeso="Kilos por caja" ayudaPeso="Peso fijo por caja, mayor que cero." maximoEnteros={6} permiteGranel listar={listarEmbalajes} crear={crearEmbalaje} actualizar={actualizarEmbalaje} />
+        {/* Tipos de bandeja: la tara se descontará de los kilos brutos en E3. */}
+        <PanelPeso
+          clave="tipos-bandeja"
+          titulo="Tipos de bandeja"
+          singular="Tipo de bandeja"
+          femenino={false}
+          campoPeso="peso_tara_kg"
+          etiquetaPeso="Tara (kg)"
+          ayudaPeso="Peso propio de una bandeja, mayor que cero."
+          maximoEnteros={ENTEROS_TARA}
+          permiteGranel={false}
+          listar={listarTiposBandeja}
+          crear={crearTipoBandeja}
+          actualizar={actualizarTipoBandeja}
+        />
+        {/* Embalajes: kilos fijos por caja o granel (se usarán en E4). */}
+        <PanelPeso
+          clave="embalajes"
+          titulo="Embalajes"
+          singular="Embalaje"
+          femenino={false}
+          campoPeso="kg_por_caja"
+          etiquetaPeso="Kilos por caja"
+          ayudaPeso="Peso fijo por caja, mayor que cero."
+          maximoEnteros={ENTEROS_KG_CAJA}
+          permiteGranel
+          listar={listarEmbalajes}
+          crear={crearEmbalaje}
+          actualizar={actualizarEmbalaje}
+        />
       </div>
     </section>
   );

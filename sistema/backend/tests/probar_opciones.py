@@ -1,4 +1,4 @@
-"""HU11 — Pruebas reproducibles de las opciones de formularios para recepción (casos O1–O19).
+"""HU11 — Pruebas reproducibles de las opciones de formularios para recepción (casos O1–O20).
 
 Ejecutar desde sistema/: docker compose exec backend python -m tests.probar_opciones
 Todo corre dentro de una transacción externa que siempre se revierte: los datos
@@ -40,15 +40,18 @@ from app.models.calidad import Calidad
 from app.models.especie import Especie
 from app.models.productor import Productor
 from app.models.sistema_productivo import SistemaProductivo
+from app.models.tipo_bandeja import TipoBandeja
 from app.models.usuario import RolUsuario, Usuario, UsuarioRol
 from app.models.variedad import Variedad
 
 # Tablas cuyo contenido debe quedar idéntico al terminar (O19).
-TABLAS = ("usuarios", "usuario_roles", "auditoria", "especies", "variedades", "calidades", "sistemas_productivos", "productores")
-# Prefijo común de las cinco rutas de HU11.
+TABLAS = ("usuarios", "usuario_roles", "auditoria", "especies", "variedades", "calidades", "sistemas_productivos", "productores", "tipos_bandeja")
+# Prefijo común de las seis rutas de HU11.
 BASE = "/api/v1/opciones"
 # Campos que debe devolver cada lista de catálogo (O13).
 CAMPOS_OPCION = {"id", "nombre"}
+# Campos que debe devolver la lista de tipos de bandeja (O20).
+CAMPOS_BANDEJA = {"id", "nombre", "peso_tara_kg"}
 # Campos que debe devolver el buscador de productores (O13).
 CAMPOS_PRODUCTOR = {"id", "rut", "razon_social"}
 
@@ -272,6 +275,10 @@ def probar_opciones() -> None:
         sistemas = [SistemaProductivo(nombre=f"QA Sistema B {sufijo}", activo=True), SistemaProductivo(nombre=f"QA Sistema A {sufijo}", activo=True), SistemaProductivo(nombre=f"QA Sistema C {sufijo}", activo=False)]
         db.add_all(calidades + sistemas)
 
+        # Tipos de bandeja (HU10): dos activos (en orden inverso al alfabético) y uno inactivo.
+        bandejas = [TipoBandeja(nombre=f"QA Bandeja B {sufijo}", peso_tara_kg="1.25", activo=True), TipoBandeja(nombre=f"QA Bandeja A {sufijo}", peso_tara_kg="0.80", activo=True), TipoBandeja(nombre=f"QA Bandeja C {sufijo}", peso_tara_kg="2.00", activo=False)]
+        db.add_all(bandejas)
+
         # Productores: uno activo y uno inactivo con la misma marca en la razón social.
         marca = "qaopc" + sufijo
         usados: set[str] = set()
@@ -378,8 +385,21 @@ def probar_opciones() -> None:
             _, lista = solicitar("GET", f"{BASE}/productores?buscar={marca}", recepcion)
             comprobar("O13 — productores: solo id, rut y razon_social (sin activo, dirección ni teléfono)", bool(lista) and all(set(p) == CAMPOS_PRODUCTOR for p in lista))
 
+            # O20: tipos de bandeja activos, ordenados por nombre y con su tara exacta (HU11 paso 8).
+            estado, lista = solicitar("GET", f"{BASE}/tipos-bandeja", recepcion)
+            recibidos = ids(lista)
+            comprobar("O20 — tipos de bandeja 200", estado == 200)
+            comprobar("O20 — aparecen las bandejas activas", {bandejas[0].id, bandejas[1].id} <= set(recibidos))
+            comprobar("O20 — no aparece la bandeja inactiva (criterio 2 de HU10)", bandejas[2].id not in recibidos)
+            comprobar("O20 — todas las devueltas están activas", todos_activos(db, TipoBandeja, lista))
+            comprobar("O20 — orden por nombre (A antes que B)", recibidos.index(bandejas[1].id) < recibidos.index(bandejas[0].id))
+            comprobar("O20 — solo id, nombre y peso_tara_kg", bool(lista) and all(set(b) == CAMPOS_BANDEJA for b in lista))
+            # La tara viaja como texto decimal para no perder precisión en el cálculo de kilos netos.
+            tara = next(b["peso_tara_kg"] for b in lista if b["id"] == bandejas[1].id)
+            comprobar("O20 — tara exacta como texto decimal ('0.80')", tara == "0.80")
+
             # Rutas válidas de HU11 para los casos de permisos.
-            rutas = [f"{BASE}/especies", f"{BASE}/variedades?especie_id={especie_a.id}", f"{BASE}/calidades", f"{BASE}/sistemas-productivos", f"{BASE}/productores?buscar={marca}"]
+            rutas = [f"{BASE}/especies", f"{BASE}/variedades?especie_id={especie_a.id}", f"{BASE}/calidades", f"{BASE}/sistemas-productivos", f"{BASE}/productores?buscar={marca}", f"{BASE}/tipos-bandeja"]
 
             # O14: sin token, o con un token inválido → 401.
             for ruta in rutas:
