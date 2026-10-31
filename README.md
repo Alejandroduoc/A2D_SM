@@ -56,7 +56,7 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Lenguajes | Python (backend), JavaScript (frontend) |
 | Frameworks | FastAPI, SQLAlchemy 2.0 + Alembic, React (Vite) + Tailwind |
 | Base de datos | Microsoft SQL Server 2022 |
-| Autenticación | JWT (token de acceso de 30 minutos; renovación con *refresh token* planificada) |
+| Autenticación | JWT (token de acceso de 30 minutos y *refresh token* de 7 días) |
 | Infraestructura | Docker + Docker Compose |
 
 
@@ -133,7 +133,7 @@ ceremonias de planificación, revisión y retrospectiva.
 | ORM / Migraciones | SQLAlchemy 2.0 + Alembic | Estándar de facto en el ecosistema FastAPI. |
 | Base de datos | **SQL Server** (se mantiene) | Es el motor que ya usa la planta y que el equipo conoce. La migración de los datos del sistema legado está fuera del alcance del PMV; el modelo nuevo se diseñó desde cero, con claves foráneas y transacciones que el legado no tenía. |
 | Frontend | **React (Vite) + Tailwind** | SPA desacoplada, consistente con el backend REST. |
-| Autenticación | JWT (token de acceso de 30 minutos) | Sin sesiones server-side acopladas a un solo servidor. La renovación con *refresh token* (`POST /auth/refresh`) queda para una etapa posterior: al vencer el token se vuelve a iniciar sesión. |
+| Autenticación | JWT (token de acceso de 30 minutos y *refresh token* de 7 días) | Sin sesiones server-side acopladas a un solo servidor. Al vencer el token de acceso, el frontend lo renueva en `POST /auth/refresh`, que entrega también un *refresh token* nuevo (rotación); solo si este vence o el usuario fue desactivado se vuelve a iniciar sesión. |
 | Infraestructura | Docker + docker-compose | Portable y reproducible entre miembros del equipo. |
 
 **Principio no negociable:** ningún cliente (browser) accede directo a la base
