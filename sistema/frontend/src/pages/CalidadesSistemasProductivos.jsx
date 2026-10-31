@@ -170,7 +170,8 @@ function PanelCatalogo({ clave, titulo, singular, femenino, listar, crear, actua
           : errorListado ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-700">{errorListado}</p>
             : filas.length === 0 ? <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay registros con este filtro</p>
               : <div role="region" aria-label={`Listado de ${titulo.toLowerCase()}`} tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
-                <table className="w-full min-w-[520px] text-left text-sm">
+                {/* Sin ancho mínimo: usa todo el ancho y solo hace scroll si no cabe. */}
+                <table className="w-full text-left text-sm">
                   <caption className="sr-only">{titulo} según el filtro seleccionado</caption>
                   <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Estado</th><th scope="col" className="px-4 py-3">Acciones</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">{filas.map((fila) => <tr key={fila.id} className={claseFila(form.id === fila.id)} aria-current={form.id === fila.id ? "true" : undefined}>
@@ -196,7 +197,8 @@ export default function CalidadesSistemasProductivos() {
       {/* Se muestra dentro de la pestaña de Mantenedores: el título visible es el de la pestaña. */}
       <h2 id="titulo-calidades-sistemas" className="sr-only">Calidades y sistemas productivos</h2>
       <p className="text-sm text-slate-500">Catálogos de clasificación de la fruta y de forma de producción.</p>
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2 lg:items-start">
+      {/* Calidades y Sistemas productivos apilados en una columna, como los mantenedores del proyecto de referencia. */}
+      <div className="mt-6 min-w-0 space-y-6">
         <PanelCatalogo clave="calidades" titulo="Calidades" singular="Calidad" femenino listar={listarCalidades} crear={crearCalidad} actualizar={actualizarCalidad} />
         <PanelCatalogo clave="sistemas-productivos" titulo="Sistemas productivos" singular="Sistema productivo" femenino={false} listar={listarSistemasProductivos} crear={crearSistemaProductivo} actualizar={actualizarSistemaProductivo} />
       </div>
