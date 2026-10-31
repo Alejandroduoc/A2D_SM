@@ -340,6 +340,11 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
             antes = huellas(db.connection())  # Conserva el estado persistido del productor y de su historial.
             estado, salida = await solicitar("PUT", ruta_primero, admin, datos)  # No debe confirmar ni agregar eventos.
             comprobar("P8 — edición sin efecto N" + str(indice), estado == 200 and salida == primero and huellas(db.connection()) == antes)  # Nulos no limpian el contacto.
+        primero = await escribir(db, "D3 — quitar dirección y teléfono", "PUT", ruta_primero, admin, {"direccion": "", "telefono": "   "}, admin_id, primero)  # Vacío o solo espacios quitan el dato (decisión D3).
+        comprobar("D3 — contacto quitado queda NULL", primero["direccion"] is None and primero["telefono"] is None)  # Guarda NULL, no texto vacío.
+        antes = huellas(db.connection())  # Conserva el estado para repetir la misma petición.
+        estado, salida = await solicitar("PUT", ruta_primero, admin, {"direccion": "", "telefono": ""})  # El contacto ya está vacío.
+        comprobar("D3 — quitar un contacto ya vacío no cambia nada", estado == 200 and salida == primero and huellas(db.connection()) == antes)  # Sin commit ni evento.
         nuevo_rut = rut_disponible(db)  # Corrige hacia una identidad que no pertenece a otro productor.
         primero = await escribir(db, "Corrección de RUT conserva id e historial", "PUT", ruta_primero, admin, {"rut": "0" + nuevo_rut}, admin_id, primero)  # Valida normalización y auditoría anterior/posterior.
         comprobar("Corrección guarda el nuevo RUT canónico", primero["rut"] == nuevo_rut)  # No confunde la identidad con el id interno.
@@ -385,7 +390,8 @@ def probar_contratos() -> None:
         edicion = ProductorUpdate(rut=rut)  # La corrección debe usar las mismas reglas.
         comprobar("Schemas — normalización " + rut, alta.rut == edicion.rut == esperado)  # Detecta regresiones del helper compartido.
     modelo = Productor(id=1, rut="12345678-5", razon_social="Prueba HU07", direccion="Camino", telefono=None, activo=True)  # Objeto solo en memoria.
-    for indice, datos in enumerate(({}, {"rut": "0012345678-5"}, {"direccion": None}, {"activo": True}), 1):  # Ninguno modifica este objeto.
+    comprobar("Schemas — contacto vacío se marca para quitar", ProductorUpdate(direccion="  ", telefono="").model_dump(exclude_unset=True) == {"direccion": "", "telefono": ""})  # Distingue quitar ("") de conservar (None).
+    for indice, datos in enumerate(({}, {"rut": "0012345678-5"}, {"direccion": None}, {"activo": True}, {"telefono": ""}), 1):  # Ninguno modifica este objeto (su teléfono ya es NULL).
         db = Mock(spec=Session)  # Hace observable cualquier consulta, commit o auditoría indebidos.
         salida = servicio.actualizar_productor(db, modelo, ProductorUpdate(**datos), Usuario(id="actor_simulado"))  # No requiere conexión real.
         comprobar("Sin cambios S" + str(indice) + " — sin commit ni auditoría", salida is modelo and not db.mock_calls)  # Exige retorno directo.

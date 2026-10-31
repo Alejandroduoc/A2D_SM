@@ -206,14 +206,8 @@ export default function Productores() {
       for (const campo of Object.keys(FORM_VACIO)) {
         // Compara la misma preparación textual aplicada al nuevo valor.
         const anterior = campo === "rut" ? normalizarRut(editando.rut) : (editando[campo] ?? "").trim();
-        // Este formulario permite reemplazar contactos, pero aún no quitarlos.
-        if ((campo === "direccion" || campo === "telefono") && anterior && !datos[campo]) {
-          const etiqueta = campo === "direccion" ? "la dirección" : "el teléfono";
-          const accion = campo === "direccion" ? "quitarla" : "quitarlo";
-          setErrorForm(`Este formulario permite reemplazar ${etiqueta}, pero todavía no ${accion}.`);
-          return;
-        }
-        // No envía campos idénticos, incluidos contactos originalmente nulos o vacíos.
+        // No envía campos idénticos. Un contacto borrado viaja como "" y la API lo
+        // guarda como NULL (decisión D3 del 2026-10-31).
         if (datos[campo] !== anterior) cuerpo[campo] = datos[campo];
       }
       // Una edición sin diferencias cierra sin PUT ni evento de auditoría.
@@ -313,12 +307,10 @@ export default function Productores() {
               <div className="min-w-0">
                 <label htmlFor="productor-direccion" className={ETIQUETA}>Dirección <span className="font-normal text-slate-500">(opcional)</span></label>
                 <input id="productor-direccion" name="direccion" type="text" value={form.direccion} onChange={cambiarCampo} maxLength={200} className={CAMPO} />
-                {editando.direccion?.trim() && <p className={AYUDA}>Puedes reemplazar la dirección, pero todavía no quitarla.</p>}
               </div>
               <div className="min-w-0">
                 <label htmlFor="productor-telefono" className={ETIQUETA}>Teléfono <span className="font-normal text-slate-500">(opcional)</span></label>
                 <input id="productor-telefono" name="telefono" type="tel" value={form.telefono} onChange={cambiarCampo} maxLength={20} className={CAMPO} />
-                {editando.telefono?.trim() && <p className={AYUDA}>Puedes reemplazar el teléfono, pero todavía no quitarlo.</p>}
               </div>
             </div>
             {/* Botones debajo de los campos, como en la referencia. */}

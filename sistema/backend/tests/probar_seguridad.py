@@ -472,7 +472,9 @@ def probar_productores():
         comprobar("S12 — alta normaliza espacios", estado == 201 and creado["razon_social"] == "QA Agrícola Sur" and creado["telefono"] == "+56 9 1234-5678")
         comprobar("S12 — dirección vacía queda NULL", creado["direccion"] is None)
         ruta_uno = ruta + "/" + str(creado["id"])
-        comprobar("S12 — edición con dirección vacía 422", solicitar("PUT", ruta_uno, t, {"direccion": "  "})[0] == 422)
+        # Desde la decisión D3 (2026-10-31), un teléfono vacío al editar lo quita (NULL) en vez de responder 422.
+        estado, sin_telefono, _ = solicitar("PUT", ruta_uno, t, {"telefono": "  "})
+        comprobar("S12 — edición con teléfono vacío lo quita", estado == 200 and sin_telefono["telefono"] is None)
         comprobar("S12 — edición con campo extra 422", solicitar("PUT", ruta_uno, t, {"id": 1})[0] == 422)
         estado, editado, _ = solicitar("PUT", ruta_uno, t, {"razon_social": "QA  Agrícola Norte"})
         comprobar("S12 — edición normaliza y guarda", estado == 200 and editado["razon_social"] == "QA Agrícola Norte")
