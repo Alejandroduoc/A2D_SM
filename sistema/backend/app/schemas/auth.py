@@ -64,13 +64,13 @@ class CambioPasswordRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """Lo que devuelve un login exitoso."""
+    """Lo que devuelve un login exitoso o una renovación en POST /auth/refresh."""
 
     # Token de corta duración: se manda en cada request como
     # "Authorization: Bearer <access_token>".
     access_token: str
-    # Token de mayor duración, para pedir un access_token nuevo sin volver a
-    # escribir la contraseña (el endpoint de refresh no es parte de E1 todavía).
+    # Token de mayor duración, para pedir un access_token nuevo en
+    # POST /auth/refresh sin volver a escribir la contraseña.
     refresh_token: str
     # Le dice al cliente qué tipo de token es. "bearer" es el estándar OAuth2 y
     # no cambia nunca, por eso tiene un valor por defecto.
