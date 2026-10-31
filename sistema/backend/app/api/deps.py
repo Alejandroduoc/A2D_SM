@@ -14,7 +14,9 @@ from app.core.security import decode_token
 from app.models.usuario import RolUsuario, Usuario 
 
 # Configura OAuth2 indicando la ruta donde los clientes obtienen el token.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# El botón Authorize de /docs envía un formulario (username, password) a esta ruta;
+# /auth/login recibe JSON, por eso /docs usa /auth/token (mismo login, decisión del 2026-10-31).
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 # Jerarquía simple de roles para el PMV (de menor a mayor privilegio). Los dos
 # operador_* están al mismo rango — son especialidades, no niveles entre sí; lo

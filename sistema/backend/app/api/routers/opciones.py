@@ -14,17 +14,19 @@ from app.models.calidad import Calidad
 from app.models.especie import Especie
 from app.models.productor import Productor
 from app.models.sistema_productivo import SistemaProductivo
+from app.models.tipo_bandeja import TipoBandeja
 # Roles que pueden leer las opciones.
 from app.models.usuario import RolUsuario
 from app.models.variedad import Variedad
-# Limitan la salida a id y nombre (o id, RUT y razón social).
-from app.schemas.opciones import OpcionOut, ProductorOpcionOut
+# Limitan la salida a id y nombre (más la tara en bandejas, o id, RUT y razón social en productores).
+from app.schemas.opciones import OpcionBandejaOut, OpcionOut, ProductorOpcionOut
 # Delega las consultas de solo lectura al servicio.
 from app.services.opciones import (
     buscar_productores,  # Productores activos por RUT o razón social.
     calidades_activas,  # Calidades activas.
     especies_activas,  # Especies activas.
     sistemas_productivos_activos,  # Sistemas productivos activos.
+    tipos_bandeja_activos,  # Tipos de bandeja activos con su tara.
     variedades_activas,  # Variedades activas de una especie activa.
 )  # Finaliza las importaciones del servicio.
 
@@ -36,7 +38,7 @@ router = APIRouter(
     # Solo recepción y administración leen opciones; gerencia y proceso no las usan.
     # require_roles (lista exacta) y no require_rol: el jerárquico dejaría pasar a gerencia.
     dependencies=[Depends(require_roles(RolUsuario.OPERADOR_RECEPCION, RolUsuario.ADMINISTRADOR))],
-)  # La dependencia protege las cinco rutas; ninguna queda abierta por olvido.
+)  # La dependencia protege las seis rutas; ninguna queda abierta por olvido.
 
 
 # Especies activas para el selector de especie.
@@ -76,6 +78,15 @@ def listar_sistemas_productivos(db: Session = Depends(get_db)) -> list[SistemaPr
     """Lista los sistemas productivos activos ordenados por nombre."""
     # Delega la consulta al servicio.
     return sistemas_productivos_activos(db)
+
+
+# Tipos de bandeja activos con su tara, para el cálculo de kilos netos de la tarja (E3).
+@router.get("/tipos-bandeja", response_model=list[OpcionBandejaOut])
+# Solo recibe la sesión de la petición.
+def listar_tipos_bandeja(db: Session = Depends(get_db)) -> list[TipoBandeja]:
+    """Lista los tipos de bandeja activos ordenados por nombre, con su tara."""
+    # Delega la consulta al servicio; una bandeja desactivada no aparece.
+    return tipos_bandeja_activos(db)
 
 
 # Buscador de productores activos por RUT o razón social.

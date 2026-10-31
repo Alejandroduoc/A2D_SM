@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 // Convierte errores de la API en mensajes legibles.
 import { extraerMensajeError } from "../api/client";
 // Listas de solo lectura para formularios (HU11).
-import { listarCalidades, listarEspecies, listarSistemasProductivos, listarVariedades } from "../api/opciones";
+import { listarCalidades, listarEspecies, listarSistemasProductivos, listarTiposBandeja, listarVariedades } from "../api/opciones";
 // Lista desplegable genérica y buscador de productores.
 import SelectorCatalogo from "../components/SelectorCatalogo";
 import SelectorProductor from "../components/SelectorProductor";
@@ -17,12 +17,19 @@ function nombreDe(opciones, id) {
   return opciones.find((opcion) => String(opcion.id) === id)?.nombre ?? "—";
 }
 
+// Tara con coma decimal y unidad, solo para mostrarla ("0.80" → "0,80 kg").
+function formatearTara(tara) {
+  return `${String(tara).replace(".", ",")} kg`;
+}
+
 // Vista previa de los selectores que usará el registro de tarjas (HU12, E3).
 export default function RecepcionVistaPrevia() {
   // Catálogos que no dependen de otro dato.
   const [especies, setEspecies] = useState([]);
   const [calidades, setCalidades] = useState([]);
   const [sistemas, setSistemas] = useState([]);
+  // Tipos de bandeja activos, con su tara (HU10).
+  const [bandejas, setBandejas] = useState([]);
   // Carga y error de esos catálogos.
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -36,24 +43,27 @@ export default function RecepcionVistaPrevia() {
   const [especieId, setEspecieId] = useState("");
   const [variedadId, setVariedadId] = useState("");
   const [calidadId, setCalidadId] = useState("");
+  const [bandejaId, setBandejaId] = useState("");
 
-  // Carga especies, calidades y sistemas productivos al abrir la página.
+  // Carga especies, calidades, sistemas productivos y tipos de bandeja al abrir la página.
   useEffect(() => {
     // Ignora la respuesta si el usuario salió de la página.
     let vigente = true;
     async function cargar() {
       try {
-        // Las tres consultas van en paralelo.
-        const [listaEspecies, listaCalidades, listaSistemas] = await Promise.all([
+        // Las cuatro consultas van en paralelo.
+        const [listaEspecies, listaCalidades, listaSistemas, listaBandejas] = await Promise.all([
           listarEspecies(),
           listarCalidades(),
           listarSistemasProductivos(),
+          listarTiposBandeja(),
         ]);
         // Guarda las listas.
         if (vigente) {
           setEspecies(listaEspecies);
           setCalidades(listaCalidades);
           setSistemas(listaSistemas);
+          setBandejas(listaBandejas);
         }
       } catch (errorRecibido) {
         // Muestra el error de carga.
@@ -118,6 +128,9 @@ export default function RecepcionVistaPrevia() {
   // Primera opción de las demás listas mientras cargan.
   const textoVacio = cargando ? "Cargando…" : "Seleccione…";
 
+  // El selector muestra la tara junto al nombre: "Bandeja 10 kg (0,80 kg)".
+  const opcionesBandeja = bandejas.map((bandeja) => ({ id: bandeja.id, nombre: `${bandeja.nombre} (${formatearTara(bandeja.peso_tara_kg)})` }));
+
   // Filas del resumen de lo elegido.
   const resumen = [
     ["Productor", productor ? `${formatearRut(productor.rut)} · ${productor.razon_social}` : "—"],
@@ -125,6 +138,7 @@ export default function RecepcionVistaPrevia() {
     ["Especie", nombreDe(especies, especieId)],
     ["Variedad", nombreDe(variedades, variedadId)],
     ["Calidad", nombreDe(calidades, calidadId)],
+    ["Tipo de bandeja", nombreDe(opcionesBandeja, bandejaId)],
   ];
 
   return (
@@ -187,6 +201,17 @@ export default function RecepcionVistaPrevia() {
             onChange={setVariedadId}
             deshabilitado={!especieId || cargandoVariedades}
             textoVacio={textoVariedad}
+          />
+          {/* La tara se usará en HU14 para descontar las bandejas de los kilos brutos. */}
+          <SelectorCatalogo
+            id="recepcion-bandeja"
+            etiqueta="Tipo de bandeja"
+            opciones={opcionesBandeja}
+            valor={bandejaId}
+            onChange={setBandejaId}
+            deshabilitado={cargando}
+            textoVacio={textoVacio}
+            ayuda="Solo bandejas activas; entre paréntesis, su tara."
           />
         </div>
         {/* Error al cargar las variedades de la especie elegida. */}

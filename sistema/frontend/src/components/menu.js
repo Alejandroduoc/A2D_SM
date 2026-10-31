@@ -19,7 +19,7 @@ export const MENU = [
   {
     ruta: "/recepcion", // Vista previa de los selectores de HU11; la ruta también se protege en App.jsx.
     etiqueta: "Recepción (vista previa)", // Nombre visible.
-    descripcion: "Listas de productores, especies, variedades, calidades y sistemas productivos activos (E2).",
+    descripcion: "Listas de productores, especies, variedades, calidades, sistemas productivos y tipos de bandeja activos (E2).",
     roles: ["operador_recepcion", "administrador"], // Los mismos roles que exige /opciones en la API.
   },
   {
