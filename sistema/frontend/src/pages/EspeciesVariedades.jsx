@@ -59,6 +59,8 @@ export default function EspeciesVariedades() {
   // Campos de nombre, para llevar el foco ahí al pulsar "Editar".
   const campoEspecie = useRef(null);
   const campoVariedad = useRef(null);
+  // Título de la sección Variedades: recibe el foco al elegir una especie para que la vista baje hasta él.
+  const tituloVariedades = useRef(null);
 
   // Carga la especie en el formulario y enfoca el campo.
   function editarEspecie(especie) {
@@ -169,6 +171,9 @@ export default function EspeciesVariedades() {
     setCargandoVariedades(false);
     setFiltroVariedades("todos");
     setEspecieId(id);
+    // Con las secciones apiladas, Variedades queda más abajo: espera a que React pinte
+    // "Variedades de …" y le da el foco; el navegador hace scroll hasta ese título.
+    requestAnimationFrame(() => tituloVariedades.current?.focus());
   }
 
   // Crea o renombra una especie y deja que la recarga determine su estado final.
@@ -287,7 +292,8 @@ export default function EspeciesVariedades() {
       <h2 id="titulo-especies-variedades" className="sr-only">Especies y variedades</h2>
       <p className="text-sm text-slate-500">Especie de fruta (ej. Cereza, Uva). Elige una especie para ver y mantener sus variedades.</p>
 
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2 lg:items-start">
+      {/* Especies y Variedades apiladas en una columna, como los mantenedores del proyecto de referencia. */}
+      <div className="mt-6 min-w-0 space-y-6">
         <section aria-labelledby="titulo-especies" className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
           <h2 id="titulo-especies" className="text-lg font-bold text-frigorifico-900">Especies</h2>
           {mensajeEspecies && <p role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{mensajeEspecies}</p>}
@@ -309,7 +315,8 @@ export default function EspeciesVariedades() {
                 <option value="inactivos">Inactivos</option>
               </select>
             </div>
-            <button type="button" onClick={() => setRecargaEspecies((valor) => valor + 1)} disabled={cargandoEspecies} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ambar disabled:cursor-not-allowed disabled:opacity-50">Recargar especies</button>
+            {/* Usa el botón principal compartido de catalogo.js, igual que "Guardar". */}
+            <button type="button" onClick={() => setRecargaEspecies((valor) => valor + 1)} disabled={cargandoEspecies} className={BOTON_PRINCIPAL}>Recargar especies</button>
           </div>
 
           <div className="mt-6 min-w-0" aria-busy={cargandoEspecies}>
@@ -321,7 +328,8 @@ export default function EspeciesVariedades() {
               <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay especies con este filtro</p>
             ) : (
               <div role="region" aria-label="Listado de especies" tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
-                <table className="w-full min-w-[520px] text-left text-sm">
+                {/* Sin ancho mínimo: usa todo el ancho y solo hace scroll si no cabe. */}
+                <table className="w-full text-left text-sm">
                   <caption className="sr-only">Especies según el filtro seleccionado</caption>
                   <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr>
@@ -352,7 +360,8 @@ export default function EspeciesVariedades() {
 
         <section aria-labelledby="titulo-variedades" className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
           <div className="flex min-h-14 flex-wrap items-center justify-between gap-3">
-            <h2 id="titulo-variedades" className="text-lg font-bold text-frigorifico-900">{especieSeleccionada ? `Variedades de ${especieSeleccionada.nombre}` : "Variedades"}</h2>
+            {/* ref y tabIndex={-1}: se puede enfocar por código sin sumarse al recorrido con Tab; sin contorno porque no es un control. */}
+            <h2 ref={tituloVariedades} tabIndex={-1} id="titulo-variedades" className="text-lg font-bold text-frigorifico-900 focus:outline-none">{especieSeleccionada ? `Variedades de ${especieSeleccionada.nombre}` : "Variedades"}</h2>
             {especieSeleccionada && <EtiquetaEstado activo={especieSeleccionada.activo} femenino />}
           </div>
           {mensajeVariedades && <p role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{mensajeVariedades}</p>}
@@ -376,7 +385,8 @@ export default function EspeciesVariedades() {
                 <option value="inactivos">Inactivos</option>
               </select>
             </div>
-            <button type="button" onClick={() => setRecargaVariedades((valor) => valor + 1)} disabled={!puedeConsultarVariedades || cargandoVariedades} className="rounded-lg bg-frigorifico-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-frigorifico-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ambar disabled:cursor-not-allowed disabled:opacity-50">Recargar variedades</button>
+            {/* Usa el botón principal compartido de catalogo.js, igual que "Guardar". */}
+            <button type="button" onClick={() => setRecargaVariedades((valor) => valor + 1)} disabled={!puedeConsultarVariedades || cargandoVariedades} className={BOTON_PRINCIPAL}>Recargar variedades</button>
           </div>
 
           <div className="mt-6 min-w-0" aria-busy={cargandoVariedades}>
@@ -394,7 +404,8 @@ export default function EspeciesVariedades() {
               <p role="status" className="rounded-lg bg-slate-50 p-5 text-slate-500">No hay variedades de esta especie con este filtro</p>
             ) : (
               <div role="region" aria-label={`Variedades de ${especieSeleccionada.nombre}`} tabIndex={0} className="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ambar">
-                <table className="w-full min-w-[520px] text-left text-sm">
+                {/* Sin ancho mínimo: usa todo el ancho y solo hace scroll si no cabe. */}
+                <table className="w-full text-left text-sm">
                   <caption className="sr-only">Variedades de la especie seleccionada</caption>
                   <thead className="border-b border-slate-200 bg-frigorifico-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" className="px-4 py-3 font-semibold">Nombre</th><th scope="col" className="px-4 py-3 font-semibold">Estado</th><th scope="col" className="px-4 py-3 font-semibold">Acciones</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
