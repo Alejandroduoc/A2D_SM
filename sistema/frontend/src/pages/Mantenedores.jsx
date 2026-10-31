@@ -2,12 +2,14 @@
 import { useSearchParams } from "react-router-dom";
 // Pantallas de cada grupo de catálogos.
 import CalidadesSistemasProductivos from "./CalidadesSistemasProductivos";
+import BandejasEmbalajes from "./BandejasEmbalajes";
 import EspeciesVariedades from "./EspeciesVariedades";
 
 // Pestañas disponibles, en el orden en que se muestran.
 const PESTANAS = [
   { clave: "especies-variedades", etiqueta: "Especies y variedades", Componente: EspeciesVariedades },
   { clave: "calidades-sistemas", etiqueta: "Calidades y sistemas productivos", Componente: CalidadesSistemasProductivos },
+  { clave: "bandejas-embalajes", etiqueta: "Bandejas y embalajes", Componente: BandejasEmbalajes },
 ];
 
 // Agrupa los catálogos de E2 en pestañas, como el mantenedor del proyecto de referencia.
