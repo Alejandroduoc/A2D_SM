@@ -21,6 +21,7 @@ export default function SelectorProductor({
   id, // Id del campo de búsqueda.
   valor, // Productor elegido ({ id, rut, razon_social }) o null.
   onChange, // Recibe el productor elegido, o null al cambiarlo.
+  elegirPrimeroConEnter = false, // En recepción, Enter elige el primer resultado disponible.
 }) {
   // Texto que escribe el operador.
   const [texto, setTexto] = useState("");
@@ -105,6 +106,14 @@ export default function SelectorProductor({
     onChange(null);
   }
 
+  // Permite completar el selector con teclado sin enviar el formulario contenedor.
+  function alPresionarTecla(evento) {
+    if (evento.key !== "Enter" || !elegirPrimeroConEnter || buscando || resultados.length === 0) return;
+    evento.preventDefault();
+    evento.stopPropagation();
+    elegir(resultados[0]);
+  }
+
   // Con un productor elegido se muestra su ficha y la acción para cambiarlo.
   if (valor) {
     return (
@@ -148,6 +157,7 @@ export default function SelectorProductor({
         className={CAMPO}
         value={texto}
         onChange={(evento) => setTexto(evento.target.value)}
+        onKeyDown={alPresionarTecla}
         maxLength={50}
         autoComplete="off"
         placeholder="Código, RUT o razón social"

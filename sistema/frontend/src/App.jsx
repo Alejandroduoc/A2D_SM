@@ -16,8 +16,8 @@ import Mantenedores from "./pages/Mantenedores";
 // Administración de cuentas (solo administrador) y cambio de la propia contraseña (todos).
 import Usuarios from "./pages/Usuarios";
 import CambiarContrasena from "./pages/CambiarContrasena";
-// Vista previa de los selectores de recepción (HU11).
-import RecepcionVistaPrevia from "./pages/RecepcionVistaPrevia";
+// Formulario real de recepción de tarjas (HU12-HU14).
+import Recepcion from "./pages/Recepcion";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -35,7 +35,7 @@ export default function App() {
             <Route path="cambiar-contrasena" element={<CambiarContrasena />} />
             {/* Recepción y administrador, los mismos roles que exige /opciones en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
-              <Route path="recepcion" element={<RecepcionVistaPrevia />} />
+              <Route path="recepcion" element={<Recepcion />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
