@@ -1,7 +1,7 @@
 """Productores con RUT único y estado para conservar su historial."""
 
-# Tipos de las seis columnas previstas para el catálogo de productores.
-from sqlalchemy import Boolean, Integer, String
+# Tipos de las siete columnas previstas para el catálogo de productores.
+from sqlalchemy import Boolean, Integer, String, text
 
 # Declaran atributos tipados con el estilo SQLAlchemy 2 del proyecto.
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,6 +21,14 @@ class Productor(Base):
         primary_key=True,  # Identifica de forma única cada productor.
         autoincrement=True,  # La base asigna el id al insertar el registro.
     )  # Finaliza la declaración del identificador interno.
+
+    # Código correlativo que la base asigna y que la planta usa para buscar.
+    codigo: Mapped[int] = mapped_column(
+        Integer,  # Conserva el código como un número operativo simple.
+        unique=True,  # Evita que dos productores compartan el mismo código.
+        nullable=False,  # Todo productor debe disponer de un código.
+        server_default=text("NEXT VALUE FOR seq_codigo_productor"),
+    )  # SQL Server obtiene el valor desde una secuencia no reutilizable.
 
     # Guarda el RUT normalizado y respalda su unicidad en SQL Server.
     rut: Mapped[str] = mapped_column(
