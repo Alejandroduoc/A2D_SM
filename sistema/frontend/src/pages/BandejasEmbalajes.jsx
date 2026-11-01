@@ -173,6 +173,15 @@ function PanelPeso({
     return valido;
   }
 
+  // Al salir del campo solo se revisa un peso escrito; vacío se avisa al guardar.
+  // Así el error no aparece al pulsar "Editar" con el campo vacío y el clic no se pierde.
+  function alSalirDelPeso() {
+    // Sin texto no hay nada que corregir todavía.
+    if (!form.peso.trim()) return;
+    // Con texto, muestra el aviso de inmediato como antes.
+    validarPesoVisible();
+  }
+
   // Crea o edita el registro según el id del formulario.
   async function guardar(event) {
     // Evita la navegación nativa del formulario.
@@ -324,7 +333,7 @@ function PanelPeso({
               inputMode="decimal"
               value={form.peso}
               onChange={(event) => cambiarPeso(event.target.value)}
-              onBlur={validarPesoVisible}
+              onBlur={alSalirDelPeso}
               disabled={guardando || (permiteGranel && form.granel)}
               aria-invalid={Boolean(errorPeso)}
               aria-describedby={`ayuda-${clave}${errorPeso ? ` error-${clave}` : ""}`}
