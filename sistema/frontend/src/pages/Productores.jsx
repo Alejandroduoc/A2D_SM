@@ -353,6 +353,7 @@ export default function Productores() {
           <caption className="sr-only">Listado de productores según el filtro seleccionado</caption>
           <thead className={ENCABEZADO_TABLA}>
             <tr>
+              <th scope="col" className={CELDA}>Código</th>
               <th scope="col" className={CELDA}>RUT</th>
               <th scope="col" className={CELDA}>Razón social</th>
               <th scope="col" className={CELDA}>Dirección</th>
@@ -363,13 +364,14 @@ export default function Productores() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {/* Cargando, error, vacío y búsqueda sin resultados son una fila dentro de la tabla. */}
-            {cargando ? <tr><td colSpan={6} className={CELDA_AVISO}>Cargando…</td></tr>
-              : error ? <tr><td colSpan={6} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
-                : productores.length === 0 ? <tr><td colSpan={6} className={CELDA_AVISO}>Sin productores con este filtro.</td></tr>
-                  : visibles.length === 0 ? <tr><td colSpan={6} className={CELDA_AVISO}>Ningún productor coincide con «{busqueda.trim()}».</td></tr>
+            {cargando ? <tr><td colSpan={7} className={CELDA_AVISO}>Cargando…</td></tr>
+              : error ? <tr><td colSpan={7} className={CELDA_AVISO}>No se pudo cargar el listado.</td></tr>
+                : productores.length === 0 ? <tr><td colSpan={7} className={CELDA_AVISO}>Sin productores con este filtro.</td></tr>
+                  : visibles.length === 0 ? <tr><td colSpan={7} className={CELDA_AVISO}>Ningún productor coincide con «{busqueda.trim()}».</td></tr>
                     // Usa el id estable y conserva los textos recibidos sin interpretar HTML.
                     : visibles.map((productor) => (
                       <tr key={productor.id} className="hover:bg-slate-50">
+                        <td className={`whitespace-nowrap ${CELDA} font-medium text-slate-700`}>{productor.codigo}</td>
                         <td className={`whitespace-nowrap ${CELDA} text-slate-600`}>{formatearRut(productor.rut)}</td>
                         <td className={`${CELDA} text-slate-600`}>{productor.razon_social}</td>
                         <td className={`${CELDA} text-slate-600`}>{productor.direccion || "—"}</td>

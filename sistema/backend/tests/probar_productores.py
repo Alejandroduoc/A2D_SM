@@ -61,7 +61,7 @@ from app.services import productor as servicio
 # Tablas cuyas filas deben quedar exactamente como estaban antes de las pruebas.
 TABLAS = (Usuario.__table__, UsuarioRol.__table__, Productor.__table__, Auditoria.__table__)
 # Campos públicos que debe devolver cada productor sin información de autenticación.
-CAMPOS_PRODUCTOR = {"id", "rut", "razon_social", "direccion", "telefono", "activo"}
+CAMPOS_PRODUCTOR = {"id", "codigo", "rut", "razon_social", "direccion", "telefono", "activo"}
 # Contador de comprobaciones fallidas, incluido cualquier error inesperado.
 fallas = 0
 # Contador de comprobaciones ejecutadas para el resumen de la terminal.
@@ -227,7 +227,7 @@ async def escribir(
     cantidad = len(eventos(db, anterior["id"])) if anterior else 0  # Cuenta el historial anterior del productor temporal.
     estado, salida = await solicitar(metodo, ruta, token, datos)  # Usa el servicio real y su commit dentro del aislamiento.
     comprobar(nombre + " — respuesta HTTP", estado == (201 if metodo == "POST" else 200))  # Comprueba alta o edición.
-    comprobar(nombre + " — seis campos públicos", set(salida) == CAMPOS_PRODUCTOR)  # Excluye hashes y campos internos.
+    comprobar(nombre + " — siete campos públicos", set(salida) == CAMPOS_PRODUCTOR)  # Incluye el código asignado por la base.
     comprobar(nombre + " — identidad interna", isinstance(salida["id"], int) and (anterior is None or salida["id"] == anterior["id"]))  # Conserva el id.
     historial = eventos(db, salida["id"])  # Expira el ORM y lee eventos realmente insertados.
     comprobar(nombre + " — un evento nuevo", len(historial) == cantidad + 1)  # No acepta eventos perdidos ni duplicados.
@@ -237,7 +237,7 @@ async def escribir(
     comprobar(nombre + " — tabla y registro auditados", evento.tabla == "productores" and evento.registro_id == str(salida["id"]))  # Vincula el evento.
     antes = json.loads(evento.valores_antes) if evento.valores_antes is not None else None  # Recupera NULL o la instantánea previa.
     comprobar(nombre + " — instantánea anterior", antes == anterior)  # La creación requiere NULL; la edición conserva el estado previo.
-    comprobar(nombre + " — instantánea posterior", json.loads(evento.valores_despues) == salida)  # Verifica las seis columnas persistidas.
+    comprobar(nombre + " — instantánea posterior", json.loads(evento.valores_despues) == salida)  # Verifica las siete columnas persistidas.
     return salida  # Permite que el siguiente cambio utilice el estado escalar ya comprobado.
 
 
@@ -302,6 +302,8 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
         cuerpo, dv = rut_base.split("-")  # Prepara una presentación con puntos para comprobar normalización real.
         presentado = f"{int(cuerpo):,}".replace(",", ".") + "-" + dv.lower()  # Permite también comprobar K minúscula si corresponde.
         primero = await escribir(db, "P1/P2 — alta y auditoría", "POST", "/api/v1/productores", admin, dict(alta_base, rut=presentado), admin_id)  # Inserta usando el servicio real.
+        comprobar("A6 — alta recibe código correlativo", isinstance(primero["codigo"], int) and primero["codigo"] > 0)
+        codigo_primero = primero["codigo"]
         comprobar("P1 — RUT canónico y estado activo", primero["rut"] == rut_base and primero["activo"] is True)  # Revisa valores generados y normalizados.
         ruta_primero = "/api/v1/productores/" + str(primero["id"])  # Conserva solo la identidad interna de prueba.
         dv_invalido = "0" if dv != "0" else "1"  # Garantiza un dígito distinto al correcto.
@@ -317,10 +319,11 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
             dict(alta_base, razon_social="a" * 151),  # Respeta el máximo de razón social.
             dict(alta_base, direccion="a" * 201),  # Evita desbordar el largo de dirección.
             dict(alta_base, telefono="1" * 21),  # Evita desbordar el largo de teléfono.
+            dict(alta_base, codigo=999),  # El código solo puede asignarlo SQL Server.
         ]  # Finaliza las entradas inválidas que no deben tocar SQL Server.
         for indice, datos in enumerate(invalidas_alta, 1):  # Identifica cada caso de forma reproducible.
             await rechazar(db, "P3/P6 — alta inválida V" + str(indice), "POST", "/api/v1/productores", 422, admin, datos)  # Compara estado y eventos.
-        invalidas_edicion = [{"rut": rut_invalido}, {"rut": rut_largo}, {"rut": 123456785}, {"razon_social": "ab"}, {"razon_social": "a" * 151}, {"direccion": "a" * 201}, {"telefono": "1" * 21}]  # Mantiene límites al editar.
+        invalidas_edicion = [{"rut": rut_invalido}, {"rut": rut_largo}, {"rut": 123456785}, {"razon_social": "ab"}, {"razon_social": "a" * 151}, {"direccion": "a" * 201}, {"telefono": "1" * 21}, {"codigo": 999}]  # Mantiene límites y rechaza editar el código.
         for indice, datos in enumerate(invalidas_edicion, 1):  # Comprueba que no se altere el productor existente.
             await rechazar(db, "Edición inválida V" + str(indice), "PUT", ruta_primero, 422, admin, datos)  # El 422 no debe dejar auditoría.
         variantes = [rut_base, presentado, rut_base.replace("-", ""), "0" + rut_base, "00" + rut_base]  # Incluye el ajuste de ceros iniciales.
@@ -329,6 +332,7 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
             await rechazar(db, "P4 — alta equivalente D" + str(indice), "POST", "/api/v1/productores", 409, admin, dict(alta_base, rut=variante))  # Verifica unicidad canónica.
         segundo_rut = rut_disponible(db)  # Reserva otra identidad que está libre en este escenario.
         segundo = await escribir(db, "P5 — alta opcional con administrador multirrol", "POST", "/api/v1/productores", multi, {"rut": segundo_rut, "razon_social": "Prueba HU07 segundo"}, multi_id)  # Comprueba el actor multirrol real.
+        comprobar("A6 — dos altas reciben códigos distintos", segundo["codigo"] != codigo_primero)
         comprobar("P5 — contactos omitidos son NULL", segundo["direccion"] is None and segundo["telefono"] is None)  # Comprueba los campos opcionales.
         ruta_segundo = "/api/v1/productores/" + str(segundo["id"])  # Mantiene el id para consultas y conflictos.
         segundo = await escribir(db, "Edición multirrol", "PUT", ruta_segundo, multi, {"telefono": "123456789"}, multi_id, segundo)  # Audita al actor real de la edición.
@@ -336,6 +340,7 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
             estado, _ = await solicitar("GET", ruta, multi)  # No sustituye la dependencia require_rol.
             comprobar("Administrador multirrol consulta " + ruta, estado == 200)  # Sus cuatro operaciones quedan ejercitadas.
         primero = await escribir(db, "P7 — cambio de contacto", "PUT", ruta_primero, admin, {"direccion": "Camino de prueba HU07", "telefono": "987654321"}, admin_id, primero)  # Revisa ambos estados completos.
+        comprobar("A6 — editar no cambia el código", primero["codigo"] == codigo_primero)
         for indice, datos in enumerate([{}, {"rut": None, "direccion": None, "telefono": None, "activo": None}, {"rut": "00" + rut_base}, {"razon_social": primero["razon_social"]}], 1):  # Define cambios sin efecto.
             antes = huellas(db.connection())  # Conserva el estado persistido del productor y de su historial.
             estado, salida = await solicitar("PUT", ruta_primero, admin, datos)  # No debe confirmar ni agregar eventos.

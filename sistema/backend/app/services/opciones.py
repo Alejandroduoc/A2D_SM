@@ -85,12 +85,17 @@ def tipos_bandeja_activos(db: Session) -> list[TipoBandeja]:
 def buscar_productores(db: Session, texto: str) -> list[Productor]:
     # Quita espacios al inicio y al final.
     texto = texto.strip()
-    # Con menos de 2 caracteres no se consulta la base.
-    if len(texto) < MINIMO_BUSQUEDA:
+    # Un código numérico puede tener un solo dígito; los textos conservan el mínimo.
+    es_codigo = texto.isascii() and texto.isdigit()
+    if len(texto) < MINIMO_BUSQUEDA and not es_codigo:
         return []
 
     # La razón social se busca siempre; autoescape evita que % o _ del operador funcionen como comodines.
     condicion = Productor.razon_social.contains(texto, autoescape=True)
+
+    # Los dígitos también identifican el código exacto, sin quitar la búsqueda por RUT.
+    if es_codigo:
+        condicion = or_(condicion, Productor.codigo == int(texto))
 
     # Deja el texto como el RUT guardado pero sin guion: "12.345.678-5" pasa a "123456785".
     rut_limpio = re.sub(r"[.\-\s]", "", texto).upper().lstrip("0")

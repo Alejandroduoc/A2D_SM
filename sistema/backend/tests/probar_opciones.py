@@ -53,7 +53,7 @@ CAMPOS_OPCION = {"id", "nombre"}
 # Campos que debe devolver la lista de tipos de bandeja (O20).
 CAMPOS_BANDEJA = {"id", "nombre", "peso_tara_kg"}
 # Campos que debe devolver el buscador de productores (O13).
-CAMPOS_PRODUCTOR = {"id", "rut", "razon_social"}
+CAMPOS_PRODUCTOR = {"id", "codigo", "rut", "razon_social"}
 
 # Contadores globales de la ejecución.
 comprobaciones = 0
@@ -346,6 +346,10 @@ def probar_opciones() -> None:
                 estado, lista = solicitar("GET", f"{BASE}/productores?buscar={quote(texto)}", recepcion)
                 comprobar(f"O7 — RUT '{texto}' encuentra al productor", estado == 200 and productor.id in ids(lista))
 
+            # A6: el código exacto asignado por la secuencia encuentra al productor.
+            estado, lista = solicitar("GET", f"{BASE}/productores?buscar={productor.codigo}", recepcion)
+            comprobar("A6 — código exacto encuentra al productor", estado == 200 and productor.id in ids(lista))
+
             # O8: buscar por parte de la razón social; el inactivo no aparece.
             estado, lista = solicitar("GET", f"{BASE}/productores?buscar={marca}", recepcion)
             comprobar("O8 — razón social parcial encuentra al activo", estado == 200 and ids(lista) == [productor.id])
@@ -383,7 +387,7 @@ def probar_opciones() -> None:
                 _, lista = solicitar("GET", f"{BASE}/{ruta}", recepcion)
                 comprobar(f"O13 — {ruta.split('?')[0]}: solo id y nombre", bool(lista) and all(set(e) == CAMPOS_OPCION for e in lista))
             _, lista = solicitar("GET", f"{BASE}/productores?buscar={marca}", recepcion)
-            comprobar("O13 — productores: solo id, rut y razon_social (sin activo, dirección ni teléfono)", bool(lista) and all(set(p) == CAMPOS_PRODUCTOR for p in lista))
+            comprobar("O13 — productores: código, id, RUT y razón social", bool(lista) and all(set(p) == CAMPOS_PRODUCTOR for p in lista))
 
             # O20: tipos de bandeja activos, ordenados por nombre y con su tara exacta (HU11 paso 8).
             estado, lista = solicitar("GET", f"{BASE}/tipos-bandeja", recepcion)

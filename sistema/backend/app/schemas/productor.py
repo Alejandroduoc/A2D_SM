@@ -138,10 +138,12 @@ class ProductorUpdate(BaseModel):
         return _telefono(valor)
 
 
-# Expone únicamente los seis campos del diseño de productores.
+# Expone los datos persistidos del productor, incluido su código operativo.
 class ProductorOut(BaseModel):
     # Identidad interna que se mantiene al corregir el RUT o desactivar el registro.
     id: int
+    # Código correlativo asignado por SQL Server y no editable por el cliente.
+    codigo: int
     # RUT almacenado con su representación normalizada.
     rut: str
     # Nombre o razón social actual del productor.

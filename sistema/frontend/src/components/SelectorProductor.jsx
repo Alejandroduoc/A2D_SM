@@ -50,8 +50,9 @@ export default function SelectorProductor({
   useEffect(() => {
     // Quita espacios al inicio y al final, igual que la API.
     const consulta = texto.trim();
-    // Con menos de 2 caracteres no se consulta la API.
-    if (consulta.length < MINIMO) {
+    // Los códigos numéricos pueden tener un dígito; los textos requieren dos.
+    const esCodigo = /^\d+$/.test(consulta);
+    if (consulta.length < MINIMO && !esCodigo) {
       setResultados([]);
       setBuscando(false);
       setError("");
@@ -110,10 +111,10 @@ export default function SelectorProductor({
       <div>
         {/* Etiqueta del dato elegido. */}
         <p className={ETIQUETA}>Productor</p>
-        {/* Ficha con RUT y razón social. */}
+        {/* Ficha con código, RUT y razón social. */}
         <div className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded border border-slate-300 bg-slate-50 px-2.5 py-2 text-sm">
           <span className="break-words text-slate-700">
-            <span className="font-semibold text-frigorifico-900">{formatearRut(valor.rut)}</span> · {valor.razon_social}
+            <span className="font-semibold text-frigorifico-900">{valor.codigo}</span> · {formatearRut(valor.rut)} · {valor.razon_social}
           </span>
           {/* Vuelve al buscador. */}
           <button ref={cambiarRef} type="button" className={BOTON_EDITAR} onClick={cambiar}>Cambiar</button>
@@ -124,8 +125,9 @@ export default function SelectorProductor({
 
   // Texto de estado bajo el campo.
   const consulta = texto.trim();
-  const estado = consulta.length < MINIMO
-    ? "Escriba al menos 2 caracteres del RUT o de la razón social."
+  const consultaEsCodigo = /^\d+$/.test(consulta);
+  const estado = consulta.length < MINIMO && !consultaEsCodigo
+    ? "Escriba el código, el RUT o al menos 2 caracteres de la razón social."
     : buscando
       ? "Buscando…"
       : error
@@ -148,7 +150,7 @@ export default function SelectorProductor({
         onChange={(evento) => setTexto(evento.target.value)}
         maxLength={50}
         autoComplete="off"
-        placeholder="RUT o razón social"
+        placeholder="Código, RUT o razón social"
         aria-describedby={`${id}-estado`}
       />
       {/* Estado de la búsqueda, anunciado por los lectores de pantalla. */}
@@ -165,7 +167,7 @@ export default function SelectorProductor({
                 className={OPCION_LISTA}
                 onClick={() => elegir(productor)}
               >
-                <span className="font-semibold text-frigorifico-900">{formatearRut(productor.rut)}</span> · {productor.razon_social}
+                <span className="font-semibold text-frigorifico-900">{productor.codigo}</span> · {formatearRut(productor.rut)} · {productor.razon_social}
               </button>
             </li>
           ))}

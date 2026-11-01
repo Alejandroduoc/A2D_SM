@@ -38,6 +38,8 @@ class ProductorOpcionOut(BaseModel):
 
     # Identificador que el formulario enviará al guardar la recepción.
     id: int
+    # Código corto que el personal de planta utiliza para buscar al productor.
+    codigo: int
     # RUT normalizado (cuerpo-DV sin puntos), para distinguir productores con nombres parecidos.
     rut: str
     # Nombre o razón social que ve el operador en la lista.
