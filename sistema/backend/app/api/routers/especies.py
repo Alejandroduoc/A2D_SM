@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 # Comprueba el rol actual del usuario consultando la base de datos.
-from app.api.deps import require_rol
+from app.api.deps import IdRuta, require_rol
 # Proporciona una sesión por solicitud, también utilizada por autenticación.
 from app.core.database import get_db
 # Modelos que representan el recurso y el actor autenticado.
@@ -47,7 +47,7 @@ def listar(
 # El schema de salida limita la respuesta a id, nombre y activo.
 @router.get("/{especie_id}", response_model=EspecieOut)
 def obtener(
-    especie_id: int,  # FastAPI rechaza ids de ruta no enteros.
+    especie_id: IdRuta,  # FastAPI rechaza ids de ruta no enteros.
     db: Session = Depends(get_db),  # Mantiene la sesión común de la solicitud.
     usuario_administrador: Usuario = Depends(
         require_rol(RolUsuario.ADMINISTRADOR),  # Protege también detalles inactivos.
@@ -87,7 +87,7 @@ def crear(
 # PUT permite renombrar, activar y desactivar sin borrar registros.
 @router.put("/{especie_id}", response_model=EspecieOut)
 def actualizar(
-    especie_id: int,  # Conserva la identidad interna del recurso.
+    especie_id: IdRuta,  # Conserva la identidad interna del recurso.
     datos: EspecieUpdate,  # Admite vacío o None; False solicita desactivación.
     db: Session = Depends(get_db),  # Comparte sesión para reglas y auditoría.
     usuario_administrador: Usuario = Depends(

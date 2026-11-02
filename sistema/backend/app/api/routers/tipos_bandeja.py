@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 # Revalida el rol del usuario consultando la base.
-from app.api.deps import require_rol
+from app.api.deps import IdRuta, require_rol
 # Proporciona una sesión por petición.
 from app.core.database import get_db
 # Modelo devuelto por el servicio antes de serializarlo.
@@ -45,7 +45,7 @@ def listar(
 # Obtiene el detalle de una bandeja activa o inactiva.
 @router.get("/{tipo_bandeja_id}", response_model=TipoBandejaOut)
 def obtener(
-    tipo_bandeja_id: int,
+    tipo_bandeja_id: IdRuta,
     db: Session = Depends(get_db),
     usuario_administrador: Usuario = Depends(require_rol(RolUsuario.ADMINISTRADOR)),
 ) -> TipoBandeja:
@@ -84,7 +84,7 @@ def crear(
 # PUT permite editar o cambiar estado sin borrado físico.
 @router.put("/{tipo_bandeja_id}", response_model=TipoBandejaOut)
 def actualizar(
-    tipo_bandeja_id: int,
+    tipo_bandeja_id: IdRuta,
     datos: TipoBandejaUpdate,
     db: Session = Depends(get_db),
     usuario_administrador: Usuario = Depends(require_rol(RolUsuario.ADMINISTRADOR)),

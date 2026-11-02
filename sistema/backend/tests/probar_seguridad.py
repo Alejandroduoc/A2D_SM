@@ -481,6 +481,22 @@ def probar_productores():
         comprobar("S12 — fila guardada normalizada", db.get(Productor, creado["id"]).razon_social == "QA Agrícola Norte")
 
 
+# S17: un id fuera de rango responde 422 en todas las rutas de mantenimiento, no un error interno.
+def probar_ids_fuera_de_rango():
+    with aislado() as db:
+        t = token_de(crear_actor(db, RolUsuario.ADMINISTRADOR))
+        # Las siete rutas de mantenimiento con un id entero en la URL.
+        for recurso in ("productores", "especies", "variedades", "calidades", "sistemas-productivos", "tipos-bandeja", "embalajes"):
+            # Mayor que un INT, cero y negativo.
+            for valor in ("9" * 19, "0", "-1"):
+                ruta = f"/api/v1/{recurso}/{valor}"
+                comprobar(f"S17 — GET {ruta} 422", solicitar("GET", ruta, t)[0] == 422)
+                comprobar(f"S17 — PUT {ruta} 422", solicitar("PUT", ruta, t, {"activo": False})[0] == 422)
+        # El filtro y el alta de variedades reciben el id de la especie.
+        comprobar("S17 — filtro especie_id mayor que un INT 422", solicitar("GET", f"/api/v1/variedades?especie_id={'9' * 19}", t)[0] == 422)
+        comprobar("S17 — alta con especie_id mayor que un INT 422", solicitar("POST", "/api/v1/variedades", t, {"especie_id": 10**19, "nombre": "QA S17"})[0] == 422)
+
+
 # S13–S14: /docs desactivable y CORS sin credenciales.
 def probar_configuracion():
     comprobar("S13 — /docs publicado en desarrollo", solicitar("GET", "/docs")[0] == 200)
@@ -500,7 +516,7 @@ def main() -> int:
     with engine.connect() as conexion:
         inicial = huellas(conexion)
     dependencias = dict(app.dependency_overrides)
-    for escenario in (probar_login, probar_limite, probar_login_docs, probar_largos, probar_refresh, probar_auditoria_usuarios, probar_cambio_password, probar_productores, probar_configuracion):
+    for escenario in (probar_login, probar_limite, probar_login_docs, probar_largos, probar_refresh, probar_auditoria_usuarios, probar_cambio_password, probar_productores, probar_ids_fuera_de_rango, probar_configuracion):
         try:
             escenario()
         except Exception:

@@ -4,7 +4,7 @@
 from pydantic import BaseModel, Field, field_validator
 
 # Comparte la misma preparación de nombres utilizada para especies.
-from app.core.validators import normalizar_nombre_catalogo
+from app.core.validators import MAX_INT_SQL_SERVER, normalizar_nombre_catalogo
 
 
 # Recibe la clasificación inicial sin aceptar identidad ni estado del cliente.
@@ -13,7 +13,7 @@ class VariedadCreate(BaseModel):
     model_config = {"extra": "forbid"}
 
     # Exige un entero positivo, sin convertir textos, booleanos o decimales.
-    especie_id: int = Field(gt=0, strict=True)
+    especie_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Aplica los límites después de normalizar el nombre.
     nombre: str = Field(min_length=1, max_length=50)
 

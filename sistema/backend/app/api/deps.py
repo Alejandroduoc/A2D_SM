@@ -1,7 +1,9 @@
 # Importa Callable para describir el tipo de las funciones de dependencia que se devuelven.
 from collections.abc import Callable
-# Importa las herramientas de FastAPI para inyectar dependencias y lanzar errores HTTP.
-from fastapi import Depends,HTTPException, status
+# Permite adjuntar a un tipo la validación de un parámetro de la ruta.
+from typing import Annotated
+# Importa las herramientas de FastAPI para inyectar dependencias, validar la ruta y lanzar errores HTTP.
+from fastapi import Depends, HTTPException, Path, status
 # Importa el esquema OAuth2 que extrae el token Bearer de cada solicitud.
 from fastapi.security import OAuth2PasswordBearer
 # Importa el tipo de sesión utilizado para consultar la base de datos.
@@ -10,8 +12,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 # Importa la función que valida y decodifica el token JWT.
 from app.core.security import decode_token
+# Importa el mayor valor que cabe en una columna INT de SQL Server.
+from app.core.validators import MAX_INT_SQL_SERVER
 # Importa el modelo de usuario y el enum con los roles disponibles.
 from app.models.usuario import RolUsuario, Usuario 
+
+# Id entero de una ruta: fuera de rango responde 422; sin este tope, un número enorme daba un error interno.
+IdRuta = Annotated[int, Path(gt=0, le=MAX_INT_SQL_SERVER)]
 
 # Configura OAuth2 indicando la ruta donde los clientes obtienen el token.
 # El botón Authorize de /docs envía un formulario (username, password) a esta ruta;

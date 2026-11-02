@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 # Autorización jerárquica que consulta el usuario y sus roles en la base.
-from app.api.deps import require_rol
+from app.api.deps import IdRuta, require_rol
 # Proporciona una sesión por petición.
 from app.core.database import get_db
 # Modelo que devuelve el servicio antes de serializarlo.
@@ -56,7 +56,7 @@ def listar(
 @router.get("/{sistema_productivo_id}", response_model=SistemaProductivoOut)
 # Recibe el id y la sesión de la petición.
 def obtener(
-    sistema_productivo_id: int,  # Id interno solicitado.
+    sistema_productivo_id: IdRuta,  # Id interno solicitado.
     db: Session = Depends(get_db),  # Sesión de la petición.
     usuario_administrador: Usuario = Depends(
         require_rol(RolUsuario.ADMINISTRADOR),  # Restringe la lectura al administrador.
@@ -108,7 +108,7 @@ def crear(
 @router.put("/{sistema_productivo_id}", response_model=SistemaProductivoOut)
 # Recibe el id, los cambios parciales y la sesión.
 def actualizar(
-    sistema_productivo_id: int,  # Id interno que se edita.
+    sistema_productivo_id: IdRuta,  # Id interno que se edita.
     datos: SistemaProductivoUpdate,  # Cambios validados; activo=False desactiva.
     db: Session = Depends(get_db),  # Sesión de la petición.
     usuario_administrador: Usuario = Depends(

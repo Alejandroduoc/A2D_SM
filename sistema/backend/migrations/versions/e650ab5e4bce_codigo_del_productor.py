@@ -12,10 +12,10 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'e650ab5e4bce'
-down_revision: Union[str, None] = '30d78ce03230'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = 'e650ab5e4bce'  # Identificador de esta migración.
+down_revision: Union[str, None] = '30d78ce03230'  # Migración anterior: tipos de bandeja y embalajes (HU10).
+branch_labels: Union[str, Sequence[str], None] = None  # Sin ramas de migraciones.
+depends_on: Union[str, Sequence[str], None] = None  # Sin dependencias adicionales.
 
 
 def upgrade() -> None:
@@ -27,8 +27,8 @@ def upgrade() -> None:
 
     # Primero admite nulos para poder actualizar los registros existentes.
     op.add_column(
-        "productores",
-        sa.Column("codigo", sa.Integer(), nullable=True),
+        "productores",  # Tabla del catálogo de productores.
+        sa.Column("codigo", sa.Integer(), nullable=True),  # Nullable: las filas existentes aún no tienen código.
     )
     op.execute(
         "UPDATE productores "
@@ -37,15 +37,15 @@ def upgrade() -> None:
 
     # Después del relleno, el código queda obligatorio y único.
     op.alter_column(
-        "productores",
-        "codigo",
-        existing_type=sa.Integer(),
-        nullable=False,
+        "productores",  # Tabla del catálogo de productores.
+        "codigo",  # Columna del código.
+        existing_type=sa.Integer(),  # Alembic necesita el tipo actual en SQL Server.
+        nullable=False,  # Desde aquí todo productor debe tener código.
     )
     op.create_unique_constraint(
-        "uq_productores_codigo",
-        "productores",
-        ["codigo"],
+        "uq_productores_codigo",  # Nombre explícito para poder quitarla en el downgrade.
+        "productores",  # Tabla del catálogo de productores.
+        ["codigo"],  # Dos productores no pueden compartir código.
     )
 
     # Las altas futuras reciben el siguiente valor directamente en SQL Server.
@@ -61,9 +61,9 @@ def downgrade() -> None:
         "ALTER TABLE productores DROP CONSTRAINT df_productores_codigo"
     )
     op.drop_constraint(
-        "uq_productores_codigo",
-        "productores",
-        type_="unique",
+        "uq_productores_codigo",  # Nombre explícito para poder quitarla en el downgrade.
+        "productores",  # Tabla del catálogo de productores.
+        type_="unique",  # Indica que es una restricción única.
     )
     op.drop_column("productores", "codigo")
     op.execute("DROP SEQUENCE seq_codigo_productor")

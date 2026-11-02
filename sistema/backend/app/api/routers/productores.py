@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 # Reutiliza la autorización que consulta el usuario y sus roles en la base.
-from app.api.deps import require_rol
+from app.api.deps import IdRuta, require_rol
 
 # Proporciona la misma sesión a la autenticación y al mantenimiento de productores.
 from app.core.database import get_db
@@ -58,7 +58,7 @@ def listar(
 @router.get("/{productor_id}", response_model=ProductorOut)
 # Recibe un id entero y deja que el servicio realice la búsqueda.
 def obtener(
-    productor_id: int,  # Identidad interna del productor solicitado.
+    productor_id: IdRuta,  # Identidad interna del productor solicitado.
     db: Session = Depends(get_db),  # Sesión proporcionada para esta solicitud.
     usuario_administrador: Usuario = Depends(
         require_rol(RolUsuario.ADMINISTRADOR),  # Restringe la lectura al administrador.
@@ -110,7 +110,7 @@ def crear(
 @router.put("/{productor_id}", response_model=ProductorOut)
 # El schema admite cambios parciales y el servicio calcula cuáles son efectivos.
 def actualizar(
-    productor_id: int,  # Conserva la identidad interna incluso al corregir el RUT.
+    productor_id: IdRuta,  # Conserva la identidad interna incluso al corregir el RUT.
     datos: ProductorUpdate,  # Valida los cambios; activo=False representa desactivación.
     db: Session = Depends(get_db),  # Comparte la sesión del cambio y su auditoría.
     usuario_administrador: Usuario = Depends(

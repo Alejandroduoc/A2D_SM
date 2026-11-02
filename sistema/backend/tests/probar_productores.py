@@ -274,8 +274,8 @@ async def casos_http(db: Session, actores: dict[str, Usuario]) -> None:
         admin_id, multi_id = actores["admin"].id, actores["multi"].id  # Guarda ids escalares antes de provocar rollbacks.
         nombres = {clave: actor.nombre_usuario for clave, actor in actores.items()}  # Evita depender de instancias expiradas para los tokens.
         tokens = {clave: create_access_token(nombre, []) for clave, nombre in nombres.items()}  # La autorización debe leer roles desde la base.
-        inexistente = -1  # Utiliza un id que no requiera suponer el estado del contador IDENTITY.
-        while db.get(Productor, inexistente) is not None:  # Comprueba la precondición si el entorno contiene ids negativos.
+        inexistente = 2_147_483_647  # Parte del mayor id válido, sin suponer el estado del contador IDENTITY.
+        while db.get(Productor, inexistente) is not None:  # Comprueba la precondición si ese id ya existiera.
             inexistente -= 1  # Busca otro id ausente sin modificar registros existentes.
         ruta_ausente = "/api/v1/productores/" + str(inexistente)  # Reutiliza el id validado para GET y PUT.
         rut_base = rut_disponible(db)  # Elige un RUT válido que nunca modifique un productor preexistente.

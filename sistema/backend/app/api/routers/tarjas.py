@@ -1,12 +1,12 @@
 """Rutas de registro y consulta de tarjas de recepción."""
 
 # Agrupa rutas, inyecta dependencias, valida la URL y responde errores HTTP.
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 # Anota la sesión que FastAPI entrega a cada solicitud.
 from sqlalchemy.orm import Session
 
 # Autorización contra la base: usuario actual y lista exacta de roles.
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import IdRuta, get_current_user, require_roles
 # Proporciona una sesión por petición.
 from app.core.database import get_db
 # Mayor id posible; un número mayor responde 422 en vez de un error interno.
@@ -82,7 +82,7 @@ def pendientes(
 # Obtiene el detalle persistido de una tarja.
 @router.get("/{tarja_id}", response_model=TarjaOut)
 def obtener(
-    tarja_id: int = Path(gt=0, le=MAX_INT_SQL_SERVER),  # Id en rango; si no, 422.
+    tarja_id: IdRuta,  # Id en rango; si no, 422.
     db: Session = Depends(get_db),  # Sesión de la petición.
 ) -> Tarja:
     # Busca la tarja por su identidad interna.

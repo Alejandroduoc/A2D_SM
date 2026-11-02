@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 # Exige permisos a partir de los roles vigentes en la base de datos.
-from app.api.deps import require_rol
+from app.api.deps import IdRuta, require_rol
 # Proporciona la misma dependencia de sesión usada por autenticación.
 from app.core.database import get_db
+# Mayor id posible; un número mayor responde 422 en vez de un error interno.
+from app.core.validators import MAX_INT_SQL_SERVER
 # Recurso de salida y actor autenticado de las escrituras.
 from app.models.variedad import Variedad
 from app.models.usuario import RolUsuario, Usuario
@@ -35,7 +37,7 @@ router = APIRouter(prefix="/variedades", tags=["Variedades"])
 @router.get("", response_model=list[VariedadOut])
 def listar(
     activo: bool | None = None,  # No pierde False al filtrar registros inactivos.
-    especie_id: int | None = Query(default=None, gt=0),  # Convierte el texto de URL a entero positivo.
+    especie_id: int | None = Query(default=None, gt=0, le=MAX_INT_SQL_SERVER),  # Convierte el texto de URL a entero positivo.
     db: Session = Depends(get_db),  # Comparte la sesión de la solicitud.
     usuario_administrador: Usuario = Depends(
         require_rol(RolUsuario.ADMINISTRADOR),  # No confía en roles declarados solo en JWT.
@@ -49,7 +51,7 @@ def listar(
 # La respuesta expone exclusivamente id, especie_id, nombre y activo.
 @router.get("/{variedad_id}", response_model=VariedadOut)
 def obtener(
-    variedad_id: int,  # Rechaza valores de ruta no enteros mediante FastAPI.
+    variedad_id: IdRuta,  # Rechaza valores de ruta no enteros mediante FastAPI.
     db: Session = Depends(get_db),  # Usa la sesión compartida con autorización.
     usuario_administrador: Usuario = Depends(
         require_rol(RolUsuario.ADMINISTRADOR),  # Protege también los detalles inactivos.
@@ -97,7 +99,7 @@ def crear(
 # Activa, desactiva o renombra sin cambiar la especie ni borrar registros.
 @router.put("/{variedad_id}", response_model=VariedadOut)
 def actualizar(
-    variedad_id: int,  # Identidad estable que se conserva en la respuesta y auditoría.
+    variedad_id: IdRuta,  # Identidad estable que se conserva en la respuesta y auditoría.
     datos: VariedadUpdate,  # especie_id se rechaza como campo extra con 422.
     db: Session = Depends(get_db),  # Comparte la sesión con el actor autenticado.
     usuario_administrador: Usuario = Depends(
