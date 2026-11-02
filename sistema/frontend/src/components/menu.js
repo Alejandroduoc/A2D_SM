@@ -23,6 +23,12 @@ export const MENU = [
     roles: ["operador_recepcion", "administrador"], // Coincide con /opciones y /tarjas.
   },
   {
+    ruta: "/bandejas", // Saldo de bandejas (HU15); la ruta también se protege en App.jsx.
+    etiqueta: "Bandejas", // Nombre visible.
+    descripcion: "Saldo de bandejas de cada productor, por tipo de bandeja (E3).",
+    roles: ["operador_recepcion", "administrador"], // Los mismos roles que exige /tarjas en la API.
+  },
+  {
     ruta: "/tarjas", // Consulta de tarjas (HU17); la ruta también se protege en App.jsx.
     etiqueta: "Tarjas", // Nombre visible.
     descripcion: "Búsqueda de tarjas por número, productor, fecha y estado, con su detalle y sus kilos (E3).",

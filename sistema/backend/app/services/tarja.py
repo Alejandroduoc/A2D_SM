@@ -5,8 +5,8 @@ from datetime import date, datetime, timezone
 # Pesos exactos y redondeo bancario.
 from decimal import ROUND_HALF_EVEN, Decimal
 
-# Consultas agregadas y acceso directo a la secuencia de SQL Server.
-from sqlalchemy import func, select, text
+# Consultas agregadas, sumas condicionales y acceso directo a la secuencia de SQL Server.
+from sqlalchemy import case, func, select, text
 # Sesión compartida por la tarja, el movimiento y sus auditorías.
 from sqlalchemy.orm import Session
 
@@ -192,6 +192,41 @@ def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
     cantidad, kilos = db.execute(consulta).one()
     # En E4, las tarjas PARCIAL descontarán los kilos ya procesados.
     return int(cantidad), int(kilos)
+
+
+# Calcula el saldo de bandejas de un productor, por tipo de bandeja (HU15 criterio 3).
+def saldo_bandejas_productor(db: Session, productor_id: int) -> list[dict]:
+    # No se guarda: se calcula con los movimientos, igual que el legado (Form4.vb).
+    entradas = func.sum(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.ENTRADA, MovimientoBandeja.cantidad), else_=0))
+    # Las salidas llegan con la guía; se restan para que la regla no cambie entonces (criterio 5).
+    salidas = func.sum(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.SALIDA, MovimientoBandeja.cantidad), else_=0))
+    # Una fila por tipo de bandeja con movimientos.
+    consulta = (
+        select(
+            MovimientoBandeja.tipo_bandeja_id,  # Tipo de bandeja.
+            TipoBandeja.nombre.label("tipo_bandeja"),  # Se muestra aunque el tipo esté desactivado.
+            entradas.label("entradas"),  # Bandejas recibidas.
+            salidas.label("salidas"),  # Bandejas devueltas.
+        )  # Finaliza las columnas.
+        .join(TipoBandeja, MovimientoBandeja.tipo_bandeja_id == TipoBandeja.id)  # Trae el nombre.
+        .where(
+            MovimientoBandeja.productor_id == productor_id,  # Solo el productor pedido.
+            MovimientoBandeja.anulado == False,  # noqa: E712  Una tarja anulada deja de sumar (criterio 1).
+        )  # Finaliza los filtros.
+        .group_by(MovimientoBandeja.tipo_bandeja_id, TipoBandeja.nombre)  # Agrupa por tipo.
+        .order_by(TipoBandeja.nombre)  # Orden alfabético para la tabla.
+    )  # Finaliza la consulta.
+    # El saldo no se limita: puede quedar negativo cuando exista la guía (criterio 5).
+    return [
+        {
+            "tipo_bandeja_id": fila.tipo_bandeja_id,  # Tipo de bandeja.
+            "tipo_bandeja": fila.tipo_bandeja,  # Nombre.
+            "entradas": int(fila.entradas),  # Bandejas recibidas.
+            "salidas": int(fila.salidas),  # Bandejas devueltas.
+            "saldo": int(fila.entradas) - int(fila.salidas),  # Diferencia.
+        }  # Finaliza la fila.
+        for fila in db.execute(consulta).all()
+    ]
 
 
 # Consulta común del listado y del detalle: la tarja con los nombres de sus catálogos.

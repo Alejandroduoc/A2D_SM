@@ -7,10 +7,12 @@ import { extraerMensajeError } from "../api/client";
 // Catálogos activos usados por la recepción.
 import { listarCalidades, listarEspecies, listarSistemasProductivos, listarTiposBandeja, listarVariedades } from "../api/opciones";
 // Escritura de tarjas y acumulados del productor.
-import { pendientesProductor, registrarTarja } from "../api/tarjas";
+import { pendientesProductor, registrarTarja, saldoBandejasProductor } from "../api/tarjas";
 // Selectores compartidos de HU11.
 import SelectorCatalogo from "../components/SelectorCatalogo";
 import SelectorProductor from "../components/SelectorProductor";
+// Semáforo del saldo de bandejas, igual que el del legado.
+import { situacionBandejas } from "../components/saldoBandejas";
 // Clases comunes de formularios y mensajes.
 import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SUBTITULO } from "../components/catalogo";
 
@@ -122,6 +124,9 @@ export default function Recepcion() {
   const [pendientes, setPendientes] = useState(null);
   const [cargandoPendientes, setCargandoPendientes] = useState(false);
   const [errorPendientes, setErrorPendientes] = useState("");
+  // Saldo de bandejas del productor, por tipo (HU15).
+  const [saldos, setSaldos] = useState([]);
+  const [errorSaldos, setErrorSaldos] = useState("");
   // Estado de escritura y mensaje de error; el éxito se avisa en la hoja de impresión.
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -241,6 +246,38 @@ export default function Recepcion() {
     return () => { vigente = false; };
   }, [productor]);
 
+  // Consulta el saldo de bandejas del productor elegido (HU15).
+  useEffect(() => {
+    // Sin productor no hay saldo.
+    if (!productor) {
+      setSaldos([]);
+      setErrorSaldos("");
+      return undefined;
+    }
+    // Descarta la respuesta si el productor cambió mientras llegaba.
+    let vigente = true;
+    // Encapsula la consulta asíncrona del efecto.
+    async function cargarSaldos() {
+      setErrorSaldos("");
+      try {
+        // Pide el saldo por tipo de bandeja.
+        const lista = await saldoBandejasProductor(productor.id);
+        // Guarda el resultado si sigue vigente.
+        if (vigente) setSaldos(lista);
+      } catch (errorRecibido) {
+        // Un error aquí no impide registrar la tarja.
+        if (vigente) {
+          setSaldos([]);
+          setErrorSaldos(extraerMensajeError(errorRecibido, "No se pudo consultar el saldo de bandejas"));
+        }
+      }
+    }
+    // Inicia la consulta.
+    cargarSaldos();
+    // Marca como obsoleta la respuesta anterior.
+    return () => { vigente = false; };
+  }, [productor]);
+
   // Selecciona la bandeja completa para leer su tara sin usar float.
   const bandeja = bandejas.find((opcion) => String(opcion.id) === bandejaId);
   // Pesos en centésimos enteros, igual de exactos que los Decimal del backend.
@@ -287,6 +324,11 @@ export default function Recepcion() {
     && fechaValida
     && netoValido,
   );
+
+  // Saldo actual del productor en la bandeja elegida; sin movimientos, está al día.
+  const saldoActual = saldos.find((fila) => String(fila.tipo_bandeja_id) === bandejaId)?.saldo ?? 0;
+  // Semáforo del saldo, igual que el Form4 del legado.
+  const situacionSaldo = situacionBandejas(saldoActual);
 
   // Etiquetas de bandeja con la tara visible para anticipar el cálculo.
   const opcionesBandeja = bandejas.map((opcion) => ({
@@ -609,6 +651,23 @@ export default function Recepcion() {
               </div>
             </div>
           </section>
+
+          {/* Saldo de bandejas del productor en el tipo elegido, como el semáforo del legado (HU15). */}
+          {productor && bandejaId && (
+            <section className="mt-6 border-t border-slate-200 pt-5" aria-live="polite">
+              <h3 className={SUBTITULO}>Bandejas del productor</h3>
+              {errorSaldos ? (
+                <p className={`mt-3 ${MENSAJE_ERROR}`} role="alert">{errorSaldos}</p>
+              ) : (
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-slate-200 bg-frigorifico-50 px-4 py-3 text-sm text-slate-600">
+                  <span className={situacionSaldo.clase}>{situacionSaldo.texto}</span>
+                  <span>Saldo actual: <strong className="text-frigorifico-900">{saldoActual}</strong></span>
+                  {/* Con esta tarja, el saldo sube según la cantidad escrita. */}
+                  {cantidadValida && <span>Con esta tarja: <strong className="text-frigorifico-900">{saldoActual + cantidad}</strong></span>}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Vista previa calculada con el mismo redondeo bancario del backend (HU14 criterio 3). */}
           <section className="mt-6 border-t border-slate-200 pt-5" aria-live="polite">

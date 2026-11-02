@@ -33,6 +33,16 @@ export async function registrarImpresion(id) {
   return respuesta.data;
 }
 
+// Consulta el saldo de bandejas del productor, por tipo de bandeja (HU15).
+export async function saldoBandejasProductor(productorId) {
+  // El identificador viaja como query param validado por FastAPI.
+  const respuesta = await client.get("/tarjas/saldo-bandejas", {
+    params: { productor_id: productorId },
+  });
+  // Devuelve una fila por tipo de bandeja con movimientos.
+  return respuesta.data;
+}
+
 // Consulta los acumulados sin procesar del productor seleccionado.
 export async function pendientesProductor(productorId) {
   // El identificador viaja como query param validado por FastAPI.

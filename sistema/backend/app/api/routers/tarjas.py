@@ -19,7 +19,7 @@ from app.models.tarja import EstadoTarja, Tarja
 # Roles permitidos y usuario autenticado.
 from app.models.usuario import RolUsuario, Usuario
 # Contratos de entrada y salida de la API.
-from app.schemas.tarja import PendientesProductorOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut
+from app.schemas.tarja import PendientesProductorOut, SaldoBandejaOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut
 # Delega las reglas de negocio al servicio.
 from app.services.tarja import (
     CatalogoNoValidoError,  # Productor o catálogo inexistente o inactivo.
@@ -29,6 +29,7 @@ from app.services.tarja import (
     pendientes_productor,  # Acumulados del productor.
     registrar_impresion,  # Impresión o reimpresión (HU16).
     registrar_tarja,  # Alta en una sola transacción.
+    saldo_bandejas_productor,  # Saldo de bandejas (HU15).
     TarjaAnuladaError,  # Una tarja anulada no se imprime.
     TarjaNoEncontradaError,  # La tarja no existe.
 )  # Finaliza las importaciones del servicio.
@@ -105,6 +106,17 @@ def pendientes(
         tarjas_sin_procesar=cantidad,  # Tarjas RECEPCIONADA o PARCIAL.
         kilos_sin_procesar=kilos,  # Suma de sus kilos netos.
     )  # Finaliza la respuesta.
+
+
+# Saldo de bandejas de un productor, por tipo de bandeja (HU15 criterio 3).
+# Debe declararse antes de /{tarja_id} para no interpretar "saldo-bandejas" como id.
+@router.get("/saldo-bandejas", response_model=list[SaldoBandejaOut])
+def saldo_bandejas(
+    productor_id: int = Query(gt=0, le=MAX_INT_SQL_SERVER),  # Obligatorio y en rango; si no, 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+) -> list[dict]:
+    # Delega el cálculo de solo lectura al servicio.
+    return saldo_bandejas_productor(db, productor_id)
 
 
 # Obtiene el detalle completo de una tarja (HU17 criterio 2).

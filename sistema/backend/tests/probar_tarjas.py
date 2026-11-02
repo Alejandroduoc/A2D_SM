@@ -469,7 +469,7 @@ def probar_api() -> None:
             comprobar(
                 "A3 - rutas publicadas",
                 {ruta for ruta in rutas if ruta.startswith(BASE)}
-                == {BASE, BASE + "/pendientes", BASE + "/{tarja_id}", BASE + "/{tarja_id}/imprimir"},
+                == {BASE, BASE + "/pendientes", BASE + "/saldo-bandejas", BASE + "/{tarja_id}", BASE + "/{tarja_id}/imprimir"},
             )
 
             # Cantidades antes de los rechazos de permisos.
@@ -966,6 +966,88 @@ def probar_impresion() -> None:
             comprobar("HU16 - transacción externa conservada", externa.is_active and conexion.in_transaction())
 
 
+# HU15: saldo de bandejas por productor y tipo de bandeja.
+def probar_saldo_bandejas() -> None:
+    # Todo lo que se crea aquí se revierte.
+    with aislado() as (db, conexion, externa):
+        # Crea los datos de prueba.
+        datos = preparar(db)
+        # Operador de recepción, autorizado.
+        _, token = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        # Roles sin acceso.
+        _, token_gerencia = datos["actores"][RolUsuario.GERENCIA]
+        _, token_proceso = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+        # Segundo tipo de bandeja y segundo productor.
+        bandeja_2 = TipoBandeja(nombre="QA Bandeja saldo", peso_tara_kg=Decimal("1.00"), activo=True)
+        otro = Productor(rut=uuid.uuid4().hex[:8] + "-2", razon_social="QA Otro saldo", activo=True)
+        db.add_all([bandeja_2, otro])
+        db.commit()
+        # Cuerpo base y rutas.
+        cuerpo = cuerpo_valido(datos)
+        productor_id = datos["productor"].id
+        ruta = f"{BASE}/saldo-bandejas?productor_id={productor_id}"
+        tipo_1 = datos["bandeja"].id
+
+        # La API usa la sesión del escenario.
+        with api_con_sesion(db):
+            # Sin movimientos: lista vacía.
+            comprobar("HU15 - sin movimientos []", solicitar("GET", ruta, token) == (200, []))
+            # Dos tarjas del mismo tipo, una de otro tipo y una de otro productor.
+            solicitar("POST", BASE, token, cuerpo)
+            _, segunda = solicitar("POST", BASE, token, dict(cuerpo, cantidad_bandejas=30))
+            solicitar("POST", BASE, token, dict(cuerpo, tipo_bandeja_id=bandeja_2.id, cantidad_bandejas=10))
+            solicitar("POST", BASE, token, dict(cuerpo, productor_id=otro.id, cantidad_bandejas=7))
+            # Cantidades antes de las lecturas.
+            antes = cantidades(db)
+
+            # Ayuda: saldo del productor, por tipo.
+            def saldos() -> dict:
+                _, lista = solicitar("GET", ruta, token)
+                return {fila["tipo_bandeja_id"]: fila for fila in lista}
+
+            # Suma por tipo; no mezcla tipos ni productores (criterios 1 y 3).
+            actual = saldos()
+            comprobar("HU15 - una fila por tipo", set(actual) == {tipo_1, bandeja_2.id})
+            comprobar("HU15 - suma las entradas del tipo", actual[tipo_1]["entradas"] == 80 and actual[tipo_1]["salidas"] == 0 and actual[tipo_1]["saldo"] == 80)
+            comprobar("HU15 - no mezcla tipos", actual[bandeja_2.id]["saldo"] == 10)
+            comprobar("HU15 - nombre del tipo", actual[tipo_1]["tipo_bandeja"] == datos["bandeja"].nombre)
+            comprobar("HU15 - campos exactos", set(actual[tipo_1]) == {"tipo_bandeja_id", "tipo_bandeja", "entradas", "salidas", "saldo"})
+            comprobar(
+                "HU15 - no mezcla productores",
+                [f["saldo"] for f in solicitar("GET", f"{BASE}/saldo-bandejas?productor_id={otro.id}", token)[1]] == [7],
+            )
+            # Consultar no escribe.
+            comprobar("HU15 - consulta sin escrituras", cantidades(db) == antes)
+
+            # Una entrada anulada deja de sumar, y la fila se conserva (criterio 1 y HU24).
+            movimiento = db.scalar(select(MovimientoBandeja).where(MovimientoBandeja.tarja_id == segunda["id"]))
+            movimiento.anulado = True
+            db.commit()
+            comprobar("HU15 - entrada anulada no suma", saldos()[tipo_1]["saldo"] == 50)
+            comprobar("HU15 - la fila anulada se conserva", db.get(MovimientoBandeja, movimiento.id) is not None)
+
+            # La regla para cuando exista la guía: una salida resta y el saldo puede ser negativo (criterio 5).
+            db.add(MovimientoBandeja(productor_id=productor_id, tipo_bandeja_id=bandeja_2.id, tipo=TipoMovimientoBandeja.SALIDA, cantidad=25))
+            db.commit()
+            fila = saldos()[bandeja_2.id]
+            comprobar("HU15 - salida resta y deja saldo negativo", fila["entradas"] == 10 and fila["salidas"] == 25 and fila["saldo"] == -15)
+
+            # Un tipo desactivado se sigue mostrando: el productor conserva esas bandejas.
+            db.get(TipoBandeja, tipo_1).activo = False
+            db.commit()
+            comprobar("HU15 - tipo desactivado se sigue mostrando", tipo_1 in saldos())
+
+            # Validación y permisos.
+            comprobar("HU15 - sin productor_id 422", solicitar("GET", f"{BASE}/saldo-bandejas", token)[0] == 422)
+            comprobar("HU15 - productor_id cero 422", solicitar("GET", f"{BASE}/saldo-bandejas?productor_id=0", token)[0] == 422)
+            comprobar("HU15 - id mayor que un INT 422", solicitar("GET", f"{BASE}/saldo-bandejas?productor_id={'9' * 19}", token)[0] == 422)
+            comprobar("HU15 - sin token 401", solicitar("GET", ruta)[0] == 401)
+            comprobar("HU15 - gerencia 403", solicitar("GET", ruta, token_gerencia)[0] == 403)
+            comprobar("HU15 - proceso 403", solicitar("GET", ruta, token_proceso)[0] == 403)
+            # La ruta no se confunde con el detalle.
+            comprobar("HU15 - ruta distinta del detalle", solicitar("GET", ruta, token)[0] == 200)
+
+
 # Ejecuta todo y compara el estado final con el inicial.
 def main() -> None:
     # Un error inesperado suma una falla.
@@ -988,6 +1070,8 @@ def main() -> None:
         probar_consulta()
         # Impresión de tarjas (HU16).
         probar_impresion()
+        # Saldo de bandejas (HU15).
+        probar_saldo_bandejas()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

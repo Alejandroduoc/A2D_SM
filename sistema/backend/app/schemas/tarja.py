@@ -200,6 +200,22 @@ class TarjaDetalleOut(TarjaOut):
     kilos_pendientes: Decimal
 
 
+# Saldo de bandejas de un productor en un tipo de bandeja (HU15 criterio 3).
+class SaldoBandejaOut(BaseModel):
+    """Entradas, salidas y saldo; el saldo puede ser negativo."""
+
+    # Tipo de bandeja del saldo.
+    tipo_bandeja_id: int
+    # Nombre del tipo de bandeja.
+    tipo_bandeja: str
+    # Bandejas recibidas, sin las de tarjas anuladas.
+    entradas: int
+    # Bandejas devueltas; en el PMV siempre 0, porque llegan con la guía.
+    salidas: int
+    # Entradas menos salidas.
+    saldo: int
+
+
 # Acumulados del productor que ve el operador al elegirlo (decisión D).
 class PendientesProductorOut(BaseModel):
     """Tarjas y kilos del productor que todavía no se procesan."""

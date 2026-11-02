@@ -20,6 +20,8 @@ import CambiarContrasena from "./pages/CambiarContrasena";
 import Recepcion from "./pages/Recepcion";
 // Consulta de tarjas (HU17).
 import Tarjas from "./pages/Tarjas";
+// Saldo de bandejas por productor (HU15).
+import Bandejas from "./pages/Bandejas";
 // Hoja de impresión de la tarja (HU16).
 import ImprimirTarja from "./pages/ImprimirTarja";
 
@@ -45,6 +47,7 @@ export default function App() {
             <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
               <Route path="recepcion" element={<Recepcion />} />
               <Route path="tarjas" element={<Tarjas />} />
+              <Route path="bandejas" element={<Bandejas />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
