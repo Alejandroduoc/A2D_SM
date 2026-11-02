@@ -52,6 +52,11 @@ class TarjaAnuladaError(Exception):
     """Una tarja anulada no se imprime: no debe identificar fruta en la planta."""
 
 
+# El router traduce este error a HTTP 409.
+class TarjaNoAnulableError(Exception):
+    """La tarja ya está anulada o tiene kilos en procesos (HU24 criterio 2)."""
+
+
 # Calcula los kilos netos de una tarja (HU14 criterio 1).
 def calcular_kilos_netos(kilos_brutos: Decimal, cantidad: int, tara: Decimal, pallet: Decimal) -> int:
     """Neto = brutos − bandejas × tara − pallet, redondeado a entero.
@@ -361,4 +366,73 @@ def registrar_impresion(db: Session, tarja_id: int, usuario: Usuario) -> dict:
         # Deja que el router decida la respuesta.
         raise
     # Devuelve la tarja actualizada, con los nombres que necesita la hoja.
+    return obtener_tarja(db, tarja_id)
+
+
+# Anula una tarja de recepción y su entrada de bandejas, sin borrar nada (HU24).
+def anular_tarja(db: Session, tarja_id: int, usuario: Usuario) -> dict:
+    # Protege toda la escritura hasta el único commit (criterio 6).
+    try:
+        # Bloquea la fila: dos anulaciones a la vez no pueden auditarse dos veces.
+        tarja = db.execute(
+            select(Tarja)  # Relee la tarja completa.
+            .where(Tarja.id == tarja_id)  # Solo la fila pedida.
+            .with_hint(Tarja, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")  # Bloqueo de actualización.
+            .execution_options(populate_existing=True)  # Reemplaza los valores antiguos en memoria.
+        ).scalars().first()  # Devuelve la tarja o None.
+        # Una tarja inexistente responde 404.
+        if tarja is None:
+            raise TarjaNoEncontradaError("Tarja no encontrada")
+        # Anularla dos veces no tiene sentido y dejaría un evento falso.
+        if tarja.estado == EstadoTarja.ANULADA:
+            raise TarjaNoAnulableError("La tarja ya está anulada")
+        # Criterio 2: con kilos procesados, primero se anulan sus procesos (HU25).
+        if tarja.estado != EstadoTarja.RECEPCIONADA:
+            raise TarjaNoAnulableError("La tarja tiene kilos en procesos: primero se deben anular esos procesos")
+        # Captura el estado antes de modificarlo.
+        antes = instantanea(tarja)
+        # Queda anulada y no se borra; su número no se reutiliza (criterio 3).
+        tarja.estado = EstadoTarja.ANULADA
+        # Busca las entradas de bandejas que generó la tarja.
+        movimientos = list(db.scalars(select(MovimientoBandeja).where(
+            MovimientoBandeja.tarja_id == tarja.id,  # Solo los de esta tarja.
+            MovimientoBandeja.anulado == False,  # noqa: E712  Solo los vigentes.
+        )))  # Finaliza la consulta.
+        # Captura cada movimiento y lo saca del saldo del productor (criterio 4).
+        cambios = []
+        for movimiento in movimientos:
+            cambios.append((movimiento, instantanea(movimiento)))
+            movimiento.anulado = True
+        # Comprueba las restricciones antes de auditar.
+        db.flush()
+        # Audita la tarja: quién y cuándo, sin motivo (criterio 1).
+        registrar_auditoria(
+            db,  # Comparte la sesión que contiene el cambio.
+            usuario.id,  # Administrador autenticado.
+            "tarjas",  # Tabla afectada.
+            tarja.id,  # Registro afectado.
+            AccionAuditoria.UPDATE,  # No se borra: cambia su estado.
+            antes=antes,  # Estado anterior.
+            despues=instantanea(tarja),  # Estado posterior.
+        )  # Finaliza el evento de la tarja.
+        # Audita cada movimiento en la misma transacción.
+        for movimiento, antes_movimiento in cambios:
+            registrar_auditoria(
+                db,  # Comparte la sesión.
+                usuario.id,  # Administrador autenticado.
+                "movimientos_bandeja",  # Tabla afectada.
+                movimiento.id,  # Registro afectado.
+                AccionAuditoria.UPDATE,  # No se borra: se marca anulado.
+                antes=antes_movimiento,  # Estado anterior.
+                despues=instantanea(movimiento),  # Estado posterior.
+            )  # Finaliza el evento del movimiento.
+        # Confirma la tarja, las bandejas y la auditoría juntas (criterio 6).
+        db.commit()
+    # Cualquier error revierte la operación completa.
+    except Exception:
+        # No queda una tarja anulada con sus bandejas sumando.
+        db.rollback()
+        # Deja que el router decida la respuesta.
+        raise
+    # Devuelve la tarja actualizada, con los nombres que muestra la pantalla.
     return obtener_tarja(db, tarja_id)

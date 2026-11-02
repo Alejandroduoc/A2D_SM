@@ -22,6 +22,7 @@ from app.models.usuario import RolUsuario, Usuario
 from app.schemas.tarja import PendientesProductorOut, SaldoBandejaOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut
 # Delega las reglas de negocio al servicio.
 from app.services.tarja import (
+    anular_tarja,  # Anulación sin borrar (HU24).
     CatalogoNoValidoError,  # Productor o catálogo inexistente o inactivo.
     KilosNetosNoValidosError,  # Kilos netos cero o negativos.
     listar_tarjas,  # Listado con filtros (HU17).
@@ -31,6 +32,7 @@ from app.services.tarja import (
     registrar_tarja,  # Alta en una sola transacción.
     saldo_bandejas_productor,  # Saldo de bandejas (HU15).
     TarjaAnuladaError,  # Una tarja anulada no se imprime.
+    TarjaNoAnulableError,  # Ya anulada o con kilos en procesos.
     TarjaNoEncontradaError,  # La tarja no existe.
 )  # Finaliza las importaciones del servicio.
 
@@ -155,5 +157,30 @@ def imprimir(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     # La tarja está anulada.
     except TarjaAnuladaError as error:
+        # Responde 409: la petición es válida, pero el estado de la tarja no lo permite.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+
+# Anula una tarja de recepción, solo el administrador (HU24 criterio 1).
+@router.post(
+    "/{tarja_id}/anular",  # POST y no DELETE: la tarja no se borra.
+    response_model=TarjaDetalleOut,  # Devuelve la tarja anulada.
+    dependencies=[Depends(require_roles(RolUsuario.ADMINISTRADOR))],  # Más estricto que el resto del router.
+)  # Finaliza la declaración de la ruta.
+def anular(
+    tarja_id: IdRuta,  # Id en rango; si no, 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+    usuario: Usuario = Depends(get_current_user),  # Responsable leído de la base.
+) -> dict:
+    # El servicio controla la transacción.
+    try:
+        # Devuelve la tarja ya anulada.
+        return anular_tarja(db, tarja_id, usuario)
+    # La tarja no existe.
+    except TarjaNoEncontradaError as error:
+        # Responde 404 con el mensaje del servicio.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    # Ya estaba anulada o tiene kilos en procesos.
+    except TarjaNoAnulableError as error:
         # Responde 409: la petición es válida, pero el estado de la tarja no lo permite.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error

@@ -4,14 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 // Traduce errores HTTP a mensajes legibles.
 import { extraerMensajeError } from "../api/client";
+// Usuario de la sesión: solo el administrador ve Anular.
+import { useAuth } from "../api/AuthContext";
 // Listado con filtros y detalle de una tarja.
-import { listarTarjas, obtenerTarja } from "../api/tarjas";
+import { anularTarja, listarTarjas, obtenerTarja } from "../api/tarjas";
 // Buscador compartido de productores (HU11).
 import SelectorProductor from "../components/SelectorProductor";
 // Clases comunes de formularios, tablas y mensajes.
 import {
   AYUDA,
   BOTON_EDITAR,
+  BOTON_PELIGRO,
   BOTON_PRINCIPAL,
   BOTON_SECUNDARIO,
   CAMPO,
@@ -21,6 +24,7 @@ import {
   ENCABEZADO_TABLA,
   ETIQUETA,
   MENSAJE_ERROR,
+  MENSAJE_EXITO,
   SELECTOR,
   SUBTITULO,
   TARJETA,
@@ -82,6 +86,9 @@ function formatearKilos(valor) {
 
 // Consulta de tarjas por número, productor, fechas y estado (HU17).
 export default function Tarjas() {
+  // La API sigue siendo la autoridad; esto solo evita mostrar una acción que respondería 403.
+  const { usuario } = useAuth();
+  const esAdministrador = usuario.roles.includes("administrador");
   // Filtros que escribe el operador.
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   // Productor elegido en el filtro.
@@ -95,6 +102,9 @@ export default function Tarjas() {
   const [detalle, setDetalle] = useState(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(null);
   const [errorDetalle, setErrorDetalle] = useState("");
+  // Tarja que se está anulando y resultado de la anulación.
+  const [anulandoId, setAnulandoId] = useState(null);
+  const [mensaje, setMensaje] = useState("");
   // Número de la última búsqueda: una respuesta antigua se descarta.
   const ultimaBusqueda = useRef(0);
   // Título del detalle, para llevar el foco al abrirlo.
@@ -185,6 +195,32 @@ export default function Tarjas() {
     }
   }
 
+  // Anula una tarja, previa confirmación (HU24).
+  async function anular(tarja) {
+    // Es irreversible: se pide confirmar. No se exige motivo.
+    if (!window.confirm(`¿Anular la tarja N° ${tarja.numero_tarja}? Sus bandejas dejarán de sumar al saldo del productor. Esta acción no se puede deshacer.`)) return;
+    // Bloquea la fila y limpia los mensajes anteriores.
+    setAnulandoId(tarja.id);
+    setMensaje("");
+    setErrorDetalle("");
+    try {
+      // La API anula la tarja y su entrada de bandejas en una sola transacción.
+      const anulada = await anularTarja(tarja.id);
+      // Informa el resultado.
+      setMensaje(`Tarja N° ${anulada.numero_tarja} anulada.`);
+      // Si su detalle estaba abierto, lo actualiza.
+      setDetalle((actual) => (actual?.id === anulada.id ? anulada : actual));
+      // Recarga el listado con los filtros que están escritos.
+      await buscar(filtros, productor);
+    } catch (errorRecibido) {
+      // Muestra el error sobre la tabla, por ejemplo si tiene kilos en procesos.
+      setErrorDetalle(extraerMensajeError(errorRecibido, "No se pudo anular la tarja"));
+    } finally {
+      // Libera la fila.
+      setAnulandoId(null);
+    }
+  }
+
   // Datos del detalle como pares de etiqueta y valor.
   const filasDetalle = detalle
     ? [
@@ -269,6 +305,8 @@ export default function Tarjas() {
       {/* Errores del listado y del detalle. */}
       {error && <p className={MENSAJE_ERROR} role="alert">{error}</p>}
       {errorDetalle && <p className={MENSAJE_ERROR} role="alert">{errorDetalle}</p>}
+      {/* Resultado de la anulación. */}
+      {mensaje && <p className={MENSAJE_EXITO} role="status">{mensaje}</p>}
 
       {/* Detalle completo de la tarja elegida (HU17 criterio 2). */}
       {detalle && (
@@ -345,6 +383,18 @@ export default function Tarjas() {
                           <Link to={`/tarjas/${tarja.id}/imprimir`} aria-label={`${tarja.veces_impresa > 0 ? "Reimprimir" : "Imprimir"} la tarja ${tarja.numero_tarja}`} className={`whitespace-nowrap ${BOTON_EDITAR}`}>
                             {tarja.veces_impresa > 0 ? "Reimprimir" : "Imprimir"}
                           </Link>
+                        )}
+                        {/* Solo el administrador, y solo sin kilos en procesos (HU24 criterios 1 y 2). */}
+                        {esAdministrador && tarja.estado === "RECEPCIONADA" && (
+                          <button
+                            type="button"
+                            onClick={() => anular(tarja)}
+                            disabled={anulandoId === tarja.id}
+                            aria-label={`Anular la tarja ${tarja.numero_tarja}`}
+                            className={`whitespace-nowrap ${BOTON_PELIGRO}`}
+                          >
+                            {anulandoId === tarja.id ? "Anulando…" : "Anular"}
+                          </button>
                         )}
                       </div>
                     </td>

@@ -80,6 +80,9 @@ export function confirmarCambioEstado(activo, descripcion) {
   return window.confirm(`¿Desactivar ${descripcion}? Se conservarán sus datos y su historial.`);
 }
 
+// Acción destructiva de una fila, como anular: enlace rojo.
+export const BOTON_PELIGRO = `rounded text-sm text-red-600 underline underline-offset-2 transition hover:text-red-800 ${FOCO} disabled:cursor-not-allowed disabled:opacity-50`;
+
 // Lleva el foco al campo del formulario después de pulsar "Editar".
 export function enfocar(ref) {
   // Espera a que React pinte el formulario con el nombre cargado.

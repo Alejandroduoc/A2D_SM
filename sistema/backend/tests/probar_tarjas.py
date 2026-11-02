@@ -54,7 +54,7 @@ from app.schemas.tarja import TarjaCreate, hoy_en_chile
 # Misma instantánea que guarda la auditoría.
 from app.services.auditoria import instantanea
 # Funciones del service que se prueban directamente.
-from app.services.tarja import calcular_kilos_netos, registrar_impresion, registrar_tarja
+from app.services.tarja import anular_tarja, calcular_kilos_netos, registrar_impresion, registrar_tarja
 
 
 # Tablas cuyas huellas no deben cambiar al terminar.
@@ -469,7 +469,7 @@ def probar_api() -> None:
             comprobar(
                 "A3 - rutas publicadas",
                 {ruta for ruta in rutas if ruta.startswith(BASE)}
-                == {BASE, BASE + "/pendientes", BASE + "/saldo-bandejas", BASE + "/{tarja_id}", BASE + "/{tarja_id}/imprimir"},
+                == {BASE, BASE + "/pendientes", BASE + "/saldo-bandejas", BASE + "/{tarja_id}", BASE + "/{tarja_id}/imprimir", BASE + "/{tarja_id}/anular"},
             )
 
             # Cantidades antes de los rechazos de permisos.
@@ -1048,6 +1048,147 @@ def probar_saldo_bandejas() -> None:
             comprobar("HU15 - ruta distinta del detalle", solicitar("GET", ruta, token)[0] == 200)
 
 
+# HU24: anulación de una tarja, sus bandejas, su auditoría y sus permisos.
+def probar_anulacion() -> None:
+    # Todo lo que se crea aquí se revierte.
+    with aislado() as (db, conexion, externa):
+        # Crea los datos de prueba.
+        datos = preparar(db)
+        # Administrador, el único que anula.
+        admin, token_admin = datos["actores"][RolUsuario.ADMINISTRADOR]
+        # Operador de recepción, que registra y no anula.
+        recepcion, token = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        # Otros roles sin acceso.
+        _, token_gerencia = datos["actores"][RolUsuario.GERENCIA]
+        _, token_proceso = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+        # Cuerpo base y productor.
+        cuerpo = cuerpo_valido(datos)
+        productor_id = datos["productor"].id
+        tipo = datos["bandeja"].id
+
+        # La API usa la sesión del escenario.
+        with api_con_sesion(db):
+            # Dos tarjas del mismo productor.
+            _, tarja = solicitar("POST", BASE, token, cuerpo)
+            _, otra = solicitar("POST", BASE, token, cuerpo)
+            ruta = f"{BASE}/{tarja['id']}/anular"
+
+            # Ayuda: saldo del productor en el tipo de bandeja.
+            def saldo() -> int:
+                _, lista = solicitar("GET", f"{BASE}/saldo-bandejas?productor_id={productor_id}", token)
+                return next(f["saldo"] for f in lista if f["tipo_bandeja_id"] == tipo)
+
+            # Ayuda: tarjas y kilos pendientes del productor.
+            def pendientes() -> tuple[int, int]:
+                _, datos_p = solicitar("GET", f"{BASE}/pendientes?productor_id={productor_id}", token)
+                return datos_p["tarjas_sin_procesar"], datos_p["kilos_sin_procesar"]
+
+            # Estado inicial: dos tarjas suman.
+            comprobar("HU24 - antes: saldo y pendientes", saldo() == 100 and pendientes() == (2, 1840))
+
+            # Criterio 1: solo el administrador.
+            antes = cantidades(db)
+            comprobar("HU24 - sin token 401", solicitar("POST", ruta)[0] == 401)
+            comprobar("HU24 - operador de recepción 403", solicitar("POST", ruta, token)[0] == 403)
+            comprobar("HU24 - gerencia 403", solicitar("POST", ruta, token_gerencia)[0] == 403)
+            comprobar("HU24 - proceso 403", solicitar("POST", ruta, token_proceso)[0] == 403)
+            # El rol que cuenta es el de la base, no el del JWT.
+            token_obsoleto = create_access_token(recepcion.nombre_usuario, [RolUsuario.ADMINISTRADOR.value])
+            comprobar("HU24 - rol obsoleto del JWT 403", solicitar("POST", ruta, token_obsoleto)[0] == 403)
+            comprobar("HU24 - rechazos sin escrituras", cantidades(db) == antes and db.get(Tarja, tarja["id"]).estado == EstadoTarja.RECEPCIONADA)
+
+            # Un fallo al auditar revierte todo (criterio 6).
+            with patch("app.services.tarja.registrar_auditoria", side_effect=RuntimeError("fallo simulado de auditoría")):
+                try:
+                    anular_tarja(db, tarja["id"], admin)
+                except RuntimeError:
+                    pass
+                else:
+                    comprobar("HU24 - el fallo fue propagado", False)
+            db.expire_all()
+            movimiento = db.scalar(select(MovimientoBandeja).where(MovimientoBandeja.tarja_id == tarja["id"]))
+            comprobar(
+                "HU24 - fallo no deja nada a medias",
+                db.get(Tarja, tarja["id"]).estado == EstadoTarja.RECEPCIONADA and movimiento.anulado is False and cantidades(db) == antes,
+            )
+
+            # Una tarja ya impresa también se anula: su número no se reutiliza.
+            solicitar("POST", f"{BASE}/{tarja['id']}/imprimir", token)
+            eventos_antes = len(list(db.scalars(select(Auditoria).where(Auditoria.tabla == "tarjas", Auditoria.registro_id == str(tarja["id"])))))
+            filas_antes = cantidades(db)
+            # Anulación válida, sin cuerpo: no se exige motivo.
+            estado, anulada = solicitar("POST", ruta, token_admin)
+            comprobar("HU24 - anular 200", estado == 200 and anulada["estado"] == "ANULADA")
+            # Criterio 3: queda anulada y no se borra.
+            comprobar(
+                "HU24 - no se borra nada",
+                db.get(Tarja, tarja["id"]) is not None
+                and cantidades(db)[0] == filas_antes[0]
+                and cantidades(db)[1] == filas_antes[1],
+            )
+            comprobar("HU24 - conserva su número", anulada["numero_tarja"] == tarja["numero_tarja"])
+            # Criterio 4: la entrada de bandejas deja de sumar y la fila se conserva.
+            db.expire_all()
+            movimiento = db.scalar(select(MovimientoBandeja).where(MovimientoBandeja.tarja_id == tarja["id"]))
+            comprobar("HU24 - entrada anulada", movimiento.anulado is True)
+            comprobar("HU24 - el saldo baja", saldo() == 50)
+            comprobar("HU24 - los pendientes bajan", pendientes() == (1, 920))
+            comprobar("HU24 - sin kilos pendientes", Decimal(anulada["kilos_pendientes"]) == 0)
+            # Criterio 1: la auditoría registra quién, sin motivo.
+            eventos_tarja = list(db.scalars(select(Auditoria).where(Auditoria.tabla == "tarjas", Auditoria.registro_id == str(tarja["id"])).order_by(Auditoria.id)))
+            evento = eventos_tarja[-1]
+            comprobar(
+                "HU24 - auditoría de la tarja",
+                len(eventos_tarja) == eventos_antes + 1
+                and evento.accion == AccionAuditoria.UPDATE
+                and evento.usuario_id == admin.id
+                and evento.motivo is None
+                and json.loads(evento.valores_antes)["estado"] == "RECEPCIONADA"
+                and json.loads(evento.valores_despues)["estado"] == "ANULADA",
+            )
+            evento_mov = list(db.scalars(select(Auditoria).where(Auditoria.tabla == "movimientos_bandeja", Auditoria.registro_id == str(movimiento.id)).order_by(Auditoria.id)))[-1]
+            comprobar(
+                "HU24 - auditoría del movimiento",
+                evento_mov.accion == AccionAuditoria.UPDATE
+                and evento_mov.usuario_id == admin.id
+                and json.loads(evento_mov.valores_antes)["anulado"] is False
+                and json.loads(evento_mov.valores_despues)["anulado"] is True,
+            )
+            # La otra tarja no cambia.
+            comprobar("HU24 - no toca otras tarjas", db.get(Tarja, otra["id"]).estado == EstadoTarja.RECEPCIONADA)
+
+            # Criterio 5: no se reprocesa, pero sigue en las consultas por estado.
+            _, lista = solicitar("GET", f"{BASE}?productor_id={productor_id}&estado=ANULADA", token)
+            comprobar("HU24 - aparece filtrando por estado", [f["id"] for f in lista] == [tarja["id"]])
+            comprobar("HU24 - el detalle sigue disponible", solicitar("GET", f"{BASE}/{tarja['id']}", token)[0] == 200)
+            comprobar("HU24 - no se imprime", solicitar("POST", f"{BASE}/{tarja['id']}/imprimir", token)[0] == 409)
+            # Anular dos veces no agrega eventos.
+            filas_antes = cantidades(db)
+            comprobar("HU24 - anular de nuevo 409", solicitar("POST", ruta, token_admin)[0] == 409)
+            comprobar("HU24 - segundo intento sin escrituras", cantidades(db) == filas_antes)
+
+            # Criterio 2: con kilos en procesos no se anula.
+            for estado_tarja in (EstadoTarja.PARCIAL, EstadoTarja.PROCESADA):
+                db.get(Tarja, otra["id"]).estado = estado_tarja
+                db.commit()
+                estado_http, salida = solicitar("POST", f"{BASE}/{otra['id']}/anular", token_admin)
+                db.expire_all()
+                comprobar(f"HU24 - {estado_tarja.value} 409", estado_http == 409 and "procesos" in salida["detail"])
+                comprobar(f"HU24 - {estado_tarja.value} sin cambios", db.get(Tarja, otra["id"]).estado == estado_tarja)
+
+            # Criterio 3 de HU24 y criterio 3 de HU13 (R13): el número no se reutiliza.
+            _, nueva = solicitar("POST", BASE, token, cuerpo)
+            comprobar("HU13 - número no reutilizado tras anular", nueva["numero_tarja"] > otra["numero_tarja"] and nueva["numero_tarja"] != tarja["numero_tarja"])
+
+            # Tarja inexistente e id fuera de rango.
+            comprobar("HU24 - inexistente 404", solicitar("POST", f"{BASE}/2147483647/anular", token_admin)[0] == 404)
+            comprobar("HU24 - id cero 422", solicitar("POST", f"{BASE}/0/anular", token_admin)[0] == 422)
+            # DELETE no existe: nada se borra.
+            comprobar("HU24 - DELETE no publicado 405", solicitar("DELETE", f"{BASE}/{tarja['id']}", token_admin)[0] == 405)
+            # La transacción de la prueba sigue viva.
+            comprobar("HU24 - transacción externa conservada", externa.is_active and conexion.in_transaction())
+
+
 # Ejecuta todo y compara el estado final con el inicial.
 def main() -> None:
     # Un error inesperado suma una falla.
@@ -1072,6 +1213,8 @@ def main() -> None:
         probar_impresion()
         # Saldo de bandejas (HU15).
         probar_saldo_bandejas()
+        # Anulación de tarjas (HU24).
+        probar_anulacion()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

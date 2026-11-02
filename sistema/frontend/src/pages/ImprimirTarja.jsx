@@ -162,8 +162,8 @@ export default function ImprimirTarja() {
         {anulada && (
           <p className="mb-4 rounded border border-red-200 bg-red-50 py-1 text-center text-xs font-semibold tracking-widest text-red-700">TARJA ANULADA</p>
         )}
-        {/* Desde la segunda impresión, la hoja dice que es una copia. */}
-        {tarja.veces_impresa > 1 && (
+        {/* Desde la segunda impresión, la hoja dice que es una copia; una anulada ya no se imprime. */}
+        {!anulada && tarja.veces_impresa > 1 && (
           <p className="mb-4 rounded border border-amber-200 bg-amber-50 py-1 text-center text-xs font-semibold tracking-widest text-amber-700 print:bg-transparent">
             REIMPRESIÓN (N° {tarja.veces_impresa})
           </p>

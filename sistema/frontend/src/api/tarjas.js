@@ -43,6 +43,14 @@ export async function saldoBandejasProductor(productorId) {
   return respuesta.data;
 }
 
+// Anula una tarja, solo el administrador (HU24); devuelve la tarja actualizada.
+export async function anularTarja(id) {
+  // Sin cuerpo: no se exige motivo y el servidor audita.
+  const respuesta = await client.post(`/tarjas/${id}/anular`);
+  // Devuelve la tarja anulada.
+  return respuesta.data;
+}
+
 // Consulta los acumulados sin procesar del productor seleccionado.
 export async function pendientesProductor(productorId) {
   // El identificador viaja como query param validado por FastAPI.
