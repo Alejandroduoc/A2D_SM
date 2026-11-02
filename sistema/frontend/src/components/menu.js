@@ -23,6 +23,12 @@ export const MENU = [
     roles: ["operador_recepcion", "administrador"], // Coincide con /opciones y /tarjas.
   },
   {
+    ruta: "/tarjas", // Consulta de tarjas (HU17); la ruta también se protege en App.jsx.
+    etiqueta: "Tarjas", // Nombre visible.
+    descripcion: "Búsqueda de tarjas por número, productor, fecha y estado, con su detalle y sus kilos (E3).",
+    roles: ["operador_recepcion", "administrador"], // Los mismos roles que exige /tarjas en la API.
+  },
+  {
     ruta: "/productores", // La ruta también se protege por rol en App.jsx.
     etiqueta: "Productores", // Nombre visible del mantenimiento.
     descripcion: "Productores que entregan fruta: RUT, razón social, contacto y estado (E2).",

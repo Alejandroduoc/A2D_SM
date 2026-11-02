@@ -1,5 +1,8 @@
 """Rutas de registro y consulta de tarjas de recepción."""
 
+# Filtros por fecha de recepción.
+from datetime import date
+
 # Agrupa rutas, inyecta dependencias, valida la URL y responde errores HTTP.
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 # Anota la sesión que FastAPI entrega a cada solicitud.
@@ -12,15 +15,16 @@ from app.core.database import get_db
 # Mayor id posible; un número mayor responde 422 en vez de un error interno.
 from app.core.validators import MAX_INT_SQL_SERVER
 # Modelo que devuelve el servicio antes de serializarlo.
-from app.models.tarja import Tarja
+from app.models.tarja import EstadoTarja, Tarja
 # Roles permitidos y usuario autenticado.
 from app.models.usuario import RolUsuario, Usuario
 # Contratos de entrada y salida de la API.
-from app.schemas.tarja import PendientesProductorOut, TarjaCreate, TarjaOut
+from app.schemas.tarja import PendientesProductorOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut
 # Delega las reglas de negocio al servicio.
 from app.services.tarja import (
     CatalogoNoValidoError,  # Productor o catálogo inexistente o inactivo.
     KilosNetosNoValidosError,  # Kilos netos cero o negativos.
+    listar_tarjas,  # Listado con filtros (HU17).
     obtener_tarja,  # Detalle de una tarja.
     pendientes_productor,  # Acumulados del productor.
     registrar_tarja,  # Alta en una sola transacción.
@@ -63,6 +67,27 @@ def crear(
         ) from error  # Conserva la causa original.
 
 
+# Lista las tarjas según los filtros recibidos (HU17 criterio 1).
+@router.get("", response_model=list[TarjaResumenOut])
+def listar(
+    numero_tarja: int | None = Query(default=None, gt=0, le=MAX_INT_SQL_SERVER),  # Número exacto.
+    productor_id: int | None = Query(default=None, gt=0, le=MAX_INT_SQL_SERVER),  # Productor elegido.
+    desde: date | None = Query(default=None),  # Primer día de recepción, incluido.
+    hasta: date | None = Query(default=None),  # Último día de recepción, incluido.
+    estado: EstadoTarja | None = Query(default=None),  # Un estado que no existe responde 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+) -> list[dict]:
+    # Un rango invertido no tiene resultados posibles: se avisa en vez de mostrar una lista vacía.
+    if desde is not None and hasta is not None and desde > hasta:
+        # Responde con el mensaje para el operador.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,  # Parámetros inválidos.
+            detail="La fecha inicial no puede ser posterior a la final",  # Mensaje para el operador.
+        )  # Finaliza el error.
+    # Delega la consulta de solo lectura al servicio.
+    return listar_tarjas(db, numero_tarja, productor_id, desde, hasta, estado)
+
+
 # Debe declararse antes de /{tarja_id} para no interpretar "pendientes" como id.
 @router.get("/pendientes", response_model=PendientesProductorOut)
 def pendientes(
@@ -79,12 +104,12 @@ def pendientes(
     )  # Finaliza la respuesta.
 
 
-# Obtiene el detalle persistido de una tarja.
-@router.get("/{tarja_id}", response_model=TarjaOut)
+# Obtiene el detalle completo de una tarja (HU17 criterio 2).
+@router.get("/{tarja_id}", response_model=TarjaDetalleOut)
 def obtener(
     tarja_id: IdRuta,  # Id en rango; si no, 422.
     db: Session = Depends(get_db),  # Sesión de la petición.
-) -> Tarja:
+) -> dict:
     # Busca la tarja por su identidad interna.
     tarja = obtener_tarja(db, tarja_id)
     # Una tarja inexistente responde 404.

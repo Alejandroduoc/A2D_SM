@@ -144,6 +144,60 @@ class TarjaOut(BaseModel):
         return promedio.quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
 
 
+# Fila del listado de tarjas (HU17 criterio 1).
+class TarjaResumenOut(BaseModel):
+    """Datos de una tarja en el listado, con los nombres de sus catálogos."""
+
+    # Identificador con el que se pide el detalle.
+    id: int
+    # Número correlativo de la tarja.
+    numero_tarja: int
+    # Día en que se recibió la fruta.
+    fecha_recepcion: date
+    # Código del productor.
+    productor_codigo: int
+    # Nombre del productor.
+    productor_razon_social: str
+    # Especie, obtenida de la variedad.
+    especie: str
+    # Variedad de la fruta.
+    variedad: str
+    # Cantidad de bandejas recibidas.
+    cantidad_bandejas: int
+    # Kilos netos de la tarja.
+    kilos_netos: int
+    # Estado de la tarja, como texto.
+    estado: str
+
+
+# Detalle completo de una tarja (HU17 criterio 2).
+class TarjaDetalleOut(TarjaOut):
+    """Agrega a la tarja los nombres de sus catálogos, el responsable y sus kilos."""
+
+    # Código del productor.
+    productor_codigo: int
+    # RUT del productor.
+    productor_rut: str
+    # Nombre del productor.
+    productor_razon_social: str
+    # Nombre del sistema productivo.
+    sistema_productivo: str
+    # Especie, obtenida de la variedad.
+    especie: str
+    # Nombre de la variedad.
+    variedad: str
+    # Nombre de la calidad.
+    calidad: str
+    # Nombre del tipo de bandeja.
+    tipo_bandeja: str
+    # Nombre del usuario que la registró; nunca sus credenciales.
+    registrada_por: str
+    # Kilos ya usados en procesos no anulados.
+    kilos_procesados: Decimal
+    # Kilos que quedan por procesar.
+    kilos_pendientes: Decimal
+
+
 # Acumulados del productor que ve el operador al elegirlo (decisión D).
 class PendientesProductorOut(BaseModel):
     """Tarjas y kilos del productor que todavía no se procesan."""

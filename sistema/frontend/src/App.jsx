@@ -18,6 +18,8 @@ import Usuarios from "./pages/Usuarios";
 import CambiarContrasena from "./pages/CambiarContrasena";
 // Formulario real de recepción de tarjas (HU12-HU14).
 import Recepcion from "./pages/Recepcion";
+// Consulta de tarjas (HU17).
+import Tarjas from "./pages/Tarjas";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -36,6 +38,7 @@ export default function App() {
             {/* Recepción y administrador, los mismos roles que exige /opciones en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
               <Route path="recepcion" element={<Recepcion />} />
+              <Route path="tarjas" element={<Tarjas />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>

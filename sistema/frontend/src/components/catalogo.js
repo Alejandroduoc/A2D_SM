@@ -39,7 +39,8 @@ export const MENSAJE_ERROR = "rounded border border-red-200 bg-red-50 px-3 py-2 
 export const MENSAJE_EXITO = "rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700";
 
 // Contenedor de una tabla: si no cabe, hace scroll dentro de sí mismo y no en la página.
-export const CONTENEDOR_TABLA = `overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm ${FOCO}`;
+// relative: el texto sr-only de la tabla queda dentro del scroll y no ensancha la página a 390 px.
+export const CONTENEDOR_TABLA = `relative overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm ${FOCO}`;
 
 // Encabezado de una tabla.
 export const ENCABEZADO_TABLA = "bg-frigorifico-50 text-left text-xs uppercase tracking-wide text-slate-500";

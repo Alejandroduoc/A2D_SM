@@ -748,6 +748,121 @@ def probar_api() -> None:
             )
 
 
+# HU17: filtros, detalle y permisos de la consulta de tarjas.
+def probar_consulta() -> None:
+    # Todo lo que se crea aquí se revierte.
+    with aislado() as (db, conexion, externa):
+        # Crea los datos de prueba.
+        datos = preparar(db)
+        # Operador de recepción, que registra y consulta.
+        recepcion, token = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        # Roles sin acceso a la consulta.
+        _, token_gerencia = datos["actores"][RolUsuario.GERENCIA]
+        _, token_proceso = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+        # Segundo productor, para probar ese filtro.
+        otro = Productor(rut=uuid.uuid4().hex[:8] + "-1", razon_social="QA Otro productor", activo=True)
+        db.add(otro)
+        db.commit()
+        # Fechas de recepción distintas.
+        hoy = hoy_en_chile()
+        ayer = hoy - timedelta(days=1)
+        anteayer = hoy - timedelta(days=2)
+        # Cuerpo base de las altas.
+        cuerpo = cuerpo_valido(datos)
+
+        # La API usa la sesión del escenario.
+        with api_con_sesion(db):
+            # Tres tarjas: dos del productor principal y una del otro.
+            _, t1 = solicitar("POST", BASE, token, dict(cuerpo, fecha_recepcion=anteayer.isoformat()))
+            _, t2 = solicitar("POST", BASE, token, dict(cuerpo, fecha_recepcion=ayer.isoformat()))
+            _, t3 = solicitar("POST", BASE, token, dict(cuerpo, productor_id=otro.id))
+            # Anula una tarja directamente, para probar el filtro de estado (HU24 aún no existe).
+            db.get(Tarja, t2["id"]).estado = EstadoTarja.ANULADA
+            db.commit()
+            # Cantidades antes de las lecturas.
+            antes = cantidades(db)
+
+            # Ayuda: ejecuta un listado y devuelve los ids.
+            def ids(consulta: str = "") -> list[int] | None:
+                estado, lista = solicitar("GET", BASE + consulta, token)
+                return [fila["id"] for fila in lista] if estado == 200 else None
+
+            # Sin filtros, las más recientes primero.
+            todas = ids()
+            comprobar("HU17 - sin filtros incluye las tres", {t1["id"], t2["id"], t3["id"]} <= set(todas))
+            comprobar("HU17 - más recientes primero", todas.index(t3["id"]) < todas.index(t2["id"]) < todas.index(t1["id"]))
+            # Campos exactos de la fila del listado.
+            _, lista = solicitar("GET", f"{BASE}?numero_tarja={t1['numero_tarja']}", token)
+            comprobar(
+                "HU17 - campos del listado",
+                len(lista) == 1
+                and set(lista[0]) == {"id", "numero_tarja", "fecha_recepcion", "productor_codigo", "productor_razon_social", "especie", "variedad", "cantidad_bandejas", "kilos_netos", "estado"},
+            )
+            # Cada filtro por separado.
+            comprobar("HU17 - filtro número", ids(f"?numero_tarja={t2['numero_tarja']}") == [t2["id"]])
+            comprobar("HU17 - filtro productor", ids(f"?productor_id={otro.id}") == [t3["id"]])
+            comprobar("HU17 - filtro desde y hasta el mismo día", ids(f"?productor_id={datos['productor'].id}&desde={ayer}&hasta={ayer}") == [t2["id"]])
+            comprobar("HU17 - filtro desde", ids(f"?productor_id={datos['productor'].id}&desde={ayer}") == [t2["id"]])
+            comprobar("HU17 - filtro hasta", ids(f"?productor_id={datos['productor'].id}&hasta={anteayer}") == [t1["id"]])
+            comprobar("HU17 - filtro estado", ids(f"?productor_id={datos['productor'].id}&estado=ANULADA") == [t2["id"]])
+            # Los filtros se combinan.
+            comprobar("HU17 - filtros combinados", ids(f"?productor_id={otro.id}&estado=ANULADA") == [])
+            # Sin coincidencias responde una lista vacía.
+            comprobar("HU17 - número sin coincidencias []", ids("?numero_tarja=2147483647") == [])
+            # El tope limita las filas.
+            with patch("app.services.tarja.MAXIMO_TARJAS_LISTADO", 1):
+                comprobar("HU17 - tope de filas", ids() == [t3["id"]])
+            # Filtros inválidos.
+            for consulta in ("?numero_tarja=0", f"?numero_tarja={'9' * 19}", f"?productor_id={'9' * 19}", "?estado=OTRO", "?desde=ayer", f"?desde={hoy}&hasta={ayer}"):
+                comprobar(f"HU17 - filtro inválido {consulta[:24]} 422", solicitar("GET", BASE + consulta, token)[0] == 422)
+
+            # Detalle: datos completos y kilos (criterio 2).
+            estado, detalle = solicitar("GET", f"{BASE}/{t1['id']}", token)
+            comprobar(
+                "HU17 - detalle con nombres",
+                estado == 200
+                and detalle["productor_razon_social"] == datos["productor"].razon_social
+                and detalle["productor_codigo"] == datos["productor"].codigo
+                and detalle["productor_rut"] == datos["productor"].rut
+                and detalle["sistema_productivo"] == datos["sistema"].nombre
+                and detalle["variedad"] == datos["variedad"].nombre
+                and detalle["calidad"] == datos["calidad"].nombre
+                and detalle["tipo_bandeja"] == datos["bandeja"].nombre
+                and detalle["especie"].startswith("QA Especie")
+                and detalle["registrada_por"] == recepcion.nombre_completo,
+            )
+            comprobar(
+                "HU17 - detalle con pesos y promedio",
+                detalle["kilos_netos"] == 920
+                and Decimal(detalle["tara_kg"]) == Decimal("1.20")
+                and Decimal(detalle["kg_promedio_bandeja"]) == Decimal("18.40")
+                and detalle["porcentaje_calidad"] == 85
+                and detalle["fecha_recepcion"] == anteayer.isoformat(),
+            )
+            comprobar(
+                "HU17 - kilos procesados y pendientes",
+                Decimal(detalle["kilos_procesados"]) == 0 and Decimal(detalle["kilos_pendientes"]) == 920,
+            )
+            comprobar("HU17 - detalle sin datos del usuario", "usuario_id" not in detalle and "password_hash" not in json.dumps(detalle))
+            # Una tarja anulada no tiene kilos pendientes.
+            _, anulada = solicitar("GET", f"{BASE}/{t2['id']}", token)
+            comprobar("HU17 - anulada sin kilos pendientes", anulada["estado"] == "ANULADA" and Decimal(anulada["kilos_pendientes"]) == 0)
+            # Un catálogo desactivado se sigue mostrando en las tarjas antiguas.
+            db.get(Calidad, datos["calidad"].id).activo = False
+            db.commit()
+            _, con_inactiva = solicitar("GET", f"{BASE}/{t1['id']}", token)
+            comprobar("HU17 - catálogo desactivado se sigue mostrando", con_inactiva["calidad"] == datos["calidad"].nombre)
+            # Id fuera de rango.
+            comprobar("HU17 - detalle id cero 422", solicitar("GET", f"{BASE}/0", token)[0] == 422)
+
+            # Permisos del listado.
+            comprobar("HU17 - sin token 401", solicitar("GET", BASE)[0] == 401)
+            comprobar("HU17 - gerencia 403", solicitar("GET", BASE, token_gerencia)[0] == 403)
+            comprobar("HU17 - proceso 403", solicitar("GET", BASE, token_proceso)[0] == 403)
+            # Las consultas no escriben (la edición de la calidad no cuenta en estas tablas).
+            comprobar("HU17 - consultas sin escrituras", cantidades(db) == antes)
+
+
 # Ejecuta todo y compara el estado final con el inicial.
 def main() -> None:
     # Un error inesperado suma una falla.
@@ -766,6 +881,8 @@ def main() -> None:
         probar_secuencia_concurrente()
         # API completa.
         probar_api()
+        # Consulta de tarjas (HU17).
+        probar_consulta()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

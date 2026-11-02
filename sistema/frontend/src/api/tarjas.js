@@ -9,6 +9,22 @@ export async function registrarTarja(datos) {
   return respuesta.data;
 }
 
+// Lista las tarjas según los filtros (HU17); los filtros sin valor no se envían.
+export async function listarTarjas(filtros) {
+  // Axios omite los parámetros undefined.
+  const respuesta = await client.get("/tarjas", { params: filtros });
+  // Devuelve las filas del listado.
+  return respuesta.data;
+}
+
+// Obtiene el detalle completo de una tarja (HU17).
+export async function obtenerTarja(id) {
+  // El id viaja en la ruta.
+  const respuesta = await client.get(`/tarjas/${id}`);
+  // Devuelve los datos, los nombres de los catálogos y los kilos.
+  return respuesta.data;
+}
+
 // Consulta los acumulados sin procesar del productor seleccionado.
 export async function pendientesProductor(productorId) {
   // El identificador viaja como query param validado por FastAPI.

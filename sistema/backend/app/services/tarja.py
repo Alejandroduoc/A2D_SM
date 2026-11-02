@@ -1,5 +1,7 @@
 """Reglas de negocio de las tarjas de recepción (HU12, HU13 y HU14)."""
 
+# Filtros por fecha de recepción.
+from datetime import date
 # Pesos exactos y redondeo bancario.
 from decimal import ROUND_HALF_EVEN, Decimal
 
@@ -12,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.auditoria import AccionAuditoria
 # Catálogos y entidades que deben existir y estar activos al registrar.
 from app.models.calidad import Calidad
+from app.models.especie import Especie
 from app.models.movimiento_bandeja import MovimientoBandeja, TipoMovimientoBandeja
 from app.models.productor import Productor
 from app.models.sistema_productivo import SistemaProductivo
@@ -23,6 +26,10 @@ from app.models.variedad import Variedad
 from app.schemas.tarja import TarjaCreate
 # Captura estados y prepara eventos dentro de la misma transacción.
 from app.services.auditoria import instantanea, registrar_auditoria
+
+
+# Tope de filas del listado: una búsqueda sin filtros no devuelve toda la tabla.
+MAXIMO_TARJAS_LISTADO = 200
 
 
 # El router traduce este error a HTTP 400.
@@ -177,7 +184,88 @@ def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
     return int(cantidad), int(kilos)
 
 
-# Obtiene una tarja por su identidad interna sin modificarla.
-def obtener_tarja(db: Session, tarja_id: int) -> Tarja | None:
+# Consulta común del listado y del detalle: la tarja con los nombres de sus catálogos.
+def _consulta_con_nombres():
+    # Las etiquetas coinciden con los campos de los schemas de salida.
+    return (
+        select(
+            Tarja,  # Todas las columnas de la tarja.
+            Productor.codigo.label("productor_codigo"),  # Código del productor.
+            Productor.rut.label("productor_rut"),  # RUT del productor.
+            Productor.razon_social.label("productor_razon_social"),  # Nombre del productor.
+            SistemaProductivo.nombre.label("sistema_productivo"),  # Nombre del sistema productivo.
+            Especie.nombre.label("especie"),  # Nombre de la especie.
+            Variedad.nombre.label("variedad"),  # Nombre de la variedad.
+            Calidad.nombre.label("calidad"),  # Nombre de la calidad.
+            TipoBandeja.nombre.label("tipo_bandeja"),  # Nombre del tipo de bandeja.
+            Usuario.nombre_completo.label("registrada_por"),  # Solo el nombre: nunca credenciales.
+        )  # Finaliza las columnas.
+        .join(Productor, Tarja.productor_id == Productor.id)  # Toda tarja tiene productor.
+        .join(SistemaProductivo, Tarja.sistema_productivo_id == SistemaProductivo.id)  # Y sistema productivo.
+        .join(Variedad, Tarja.variedad_id == Variedad.id)  # Y variedad.
+        .join(Especie, Variedad.especie_id == Especie.id)  # La especie se obtiene de la variedad.
+        .join(Calidad, Tarja.calidad_id == Calidad.id)  # Y calidad.
+        .join(TipoBandeja, Tarja.tipo_bandeja_id == TipoBandeja.id)  # Y tipo de bandeja.
+        .join(Usuario, Tarja.usuario_id == Usuario.id)  # Y usuario que la registró.
+    )  # Un catálogo desactivado se sigue mostrando: los joins no filtran por activo.
+
+
+# Convierte una fila de la consulta en los datos que esperan los schemas.
+def _datos_de_fila(fila) -> dict:
+    # Separa la tarja de los nombres.
+    datos = dict(fila._mapping)
+    tarja = datos.pop("Tarja")
+    # Une las columnas de la tarja con los nombres; el estado viaja como texto.
+    return {**instantanea(tarja), **datos, "estado": tarja.estado.value}
+
+
+# Calcula los kilos procesados y pendientes de una tarja (HU17 criterio 2).
+def kilos_de_tarja(tarja: Tarja) -> tuple[Decimal, Decimal]:
+    # Hasta E4 no existen procesos: en HU18 se sumarán los procesos no anulados de la tarja.
+    procesados = Decimal("0")
+    # Una tarja anulada o terminada ya no tiene kilos por procesar.
+    if tarja.estado in (EstadoTarja.ANULADA, EstadoTarja.PROCESADA):
+        return procesados, Decimal("0")
+    # Los demás estados conservan la diferencia.
+    return procesados, Decimal(tarja.kilos_netos) - procesados
+
+
+# Lista las tarjas que cumplen todos los filtros recibidos (HU17 criterio 1).
+def listar_tarjas(
+    db: Session,  # Sesión de la petición.
+    numero_tarja: int | None = None,  # Número exacto.
+    productor_id: int | None = None,  # Productor elegido.
+    desde: date | None = None,  # Primer día de recepción, incluido.
+    hasta: date | None = None,  # Último día de recepción, incluido.
+    estado: EstadoTarja | None = None,  # Estado de la tarja.
+) -> list[dict]:
+    # Parte de la consulta con los nombres de los catálogos.
+    consulta = _consulta_con_nombres()
+    # Cada filtro se agrega solo si llegó.
+    if numero_tarja is not None:
+        consulta = consulta.where(Tarja.numero_tarja == numero_tarja)
+    if productor_id is not None:
+        consulta = consulta.where(Tarja.productor_id == productor_id)
+    if desde is not None:
+        consulta = consulta.where(Tarja.fecha_recepcion >= desde)
+    if hasta is not None:
+        consulta = consulta.where(Tarja.fecha_recepcion <= hasta)
+    if estado is not None:
+        consulta = consulta.where(Tarja.estado == estado)
+    # Las más recientes primero, con un máximo de filas.
+    consulta = consulta.order_by(Tarja.numero_tarja.desc()).limit(MAXIMO_TARJAS_LISTADO)
+    # Devuelve cada fila lista para el schema.
+    return [_datos_de_fila(fila) for fila in db.execute(consulta).all()]
+
+
+# Obtiene el detalle completo de una tarja sin modificarla (HU17 criterio 2).
+def obtener_tarja(db: Session, tarja_id: int) -> dict | None:
+    # Busca la tarja con los nombres de sus catálogos.
+    fila = db.execute(_consulta_con_nombres().where(Tarja.id == tarja_id)).first()
     # Devuelve None si no existe; el router resuelve el 404.
-    return db.get(Tarja, tarja_id)
+    if fila is None:
+        return None
+    # Calcula los kilos a partir de la tarja.
+    procesados, pendientes = kilos_de_tarja(fila.Tarja)
+    # Agrega los kilos a los demás datos.
+    return {**_datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
