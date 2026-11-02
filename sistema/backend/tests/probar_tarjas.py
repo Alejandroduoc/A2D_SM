@@ -435,6 +435,25 @@ def probar_api() -> None:
                 "Detalle - inexistente 404",
                 solicitar("GET", f"{BASE}/999999999", token_recepcion)[0] == 404,
             )
+            # Un id mayor que un INT responde 422, no un error interno.
+            comprobar(
+                "Detalle - id mayor que un INT 422",
+                solicitar("GET", f"{BASE}/{'9' * 19}", token_recepcion)[0] == 422,
+            )
+            comprobar(
+                "Pendientes - id mayor que un INT 422",
+                solicitar(
+                    "GET", f"{BASE}/pendientes?productor_id={'9' * 19}", token_recepcion
+                )[0]
+                == 422,
+            )
+            comprobar(
+                "Alta - id mayor que un INT 422",
+                solicitar(
+                    "POST", BASE, token_recepcion, dict(cuerpo, productor_id=10**19)
+                )[0]
+                == 422,
+            )
 
             primera = db.get(Tarja, tarja_id)
             segunda_db = db.get(Tarja, segunda["id"])

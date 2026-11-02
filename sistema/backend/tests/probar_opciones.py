@@ -350,6 +350,22 @@ def probar_opciones() -> None:
             estado, lista = solicitar("GET", f"{BASE}/productores?buscar={productor.codigo}", recepcion)
             comprobar("A6 — código exacto encuentra al productor", estado == 200 and productor.id in ids(lista))
 
+            # El código exacto va primero aunque otro productor coincida antes por orden alfabético.
+            por_codigo = Productor(rut=rut_libre(db, usados), razon_social=f"ZZ orden {sufijo}", activo=True)
+            db.add(por_codigo)
+            db.flush()
+            por_nombre = Productor(rut=rut_libre(db, usados), razon_social=f"AA {por_codigo.codigo} orden {sufijo}", activo=True)
+            db.add(por_nombre)
+            db.commit()
+            estado, lista = solicitar("GET", f"{BASE}/productores?buscar={por_codigo.codigo}", recepcion)
+            comprobar("A6 — el código exacto sale primero", estado == 200 and ids(lista)[:1] == [por_codigo.id] and por_nombre.id in ids(lista))
+
+            # Un número mayor que un INT no es un código: responde sin error interno.
+            for texto in ("2147483648", "9" * 19, "9" * 50):
+                estado, lista = solicitar("GET", f"{BASE}/productores?buscar={texto}", recepcion)
+                comprobar(f"A6 — buscar {len(texto)} dígitos no falla", estado == 200 and isinstance(lista, list))
+            comprobar("O12 — especie_id mayor que un INT 422", solicitar("GET", f"{BASE}/variedades?especie_id={'9' * 19}", recepcion)[0] == 422)
+
             # O8: buscar por parte de la razón social; el inactivo no aparece.
             estado, lista = solicitar("GET", f"{BASE}/productores?buscar={marca}", recepcion)
             comprobar("O8 — razón social parcial encuentra al activo", estado == 200 and ids(lista) == [productor.id])

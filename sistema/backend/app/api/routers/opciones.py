@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 # Proporciona una sesión por petición.
 from app.core.database import get_db
+# Mayor id posible; un número mayor responde 422 en vez de un error interno.
+from app.core.validators import MAX_INT_SQL_SERVER
 # Modelos que devuelve el servicio antes de serializarlos.
 from app.models.calidad import Calidad
 from app.models.especie import Especie
@@ -54,7 +56,7 @@ def listar_especies(db: Session = Depends(get_db)) -> list[Especie]:
 @router.get("/variedades", response_model=list[OpcionOut])
 # Recibe el id de la especie y la sesión de la petición.
 def listar_variedades(
-    especie_id: int = Query(gt=0),  # Obligatorio y mayor que 0; si falta o es 0, FastAPI responde 422.
+    especie_id: int = Query(gt=0, le=MAX_INT_SQL_SERVER),  # Obligatorio y en rango; si falta o es 0, FastAPI responde 422.
     db: Session = Depends(get_db),  # Sesión de la petición.
 ) -> list[Variedad]:
     """Lista las variedades activas de una especie activa; [] si la especie no existe o está inactiva."""
@@ -89,7 +91,7 @@ def listar_tipos_bandeja(db: Session = Depends(get_db)) -> list[TipoBandeja]:
     return tipos_bandeja_activos(db)
 
 
-# Buscador de productores activos por RUT o razón social.
+# Buscador de productores activos por código, RUT o razón social.
 @router.get("/productores", response_model=list[ProductorOpcionOut])
 # Recibe el texto escrito por el operador y la sesión de la petición.
 def listar_productores(

@@ -8,6 +8,9 @@ import re
 # Permite unificar representaciones Unicode conservando letras y acentos.
 import unicodedata
 
+# Mayor valor de una columna INT de SQL Server; un número mayor no puede ser un id ni un código.
+MAX_INT_SQL_SERVER = 2_147_483_647
+
 
 # Valida si un RUT chileno tiene un dígito verificador correcto.
 def validar_rut_chileno(rut: str) -> bool:

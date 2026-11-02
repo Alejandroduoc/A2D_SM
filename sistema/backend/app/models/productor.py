@@ -1,13 +1,23 @@
 """Productores con RUT único y estado para conservar su historial."""
 
 # Tipos de las siete columnas previstas para el catálogo de productores.
-from sqlalchemy import Boolean, Integer, String, text
+from sqlalchemy import Boolean, Integer, Sequence, String, text
 
 # Declaran atributos tipados con el estilo SQLAlchemy 2 del proyecto.
 from sqlalchemy.orm import Mapped, mapped_column
 
 # Registra el modelo en el mismo conjunto de tablas de la aplicación.
 from app.core.database import Base
+
+# Secuencia del código. En la base real la crea la migración e650ab5e4bce; registrarla aquí
+# permite que Base.metadata.create_all (base temporal de probar_catalogos) también la cree.
+SEQ_CODIGO_PRODUCTOR = Sequence(
+    "seq_codigo_productor",  # Mismo nombre que usa el DEFAULT de la columna codigo.
+    start=1,  # Mismo inicio que la migración.
+    increment=1,  # Correlativo de uno en uno.
+    data_type=Integer,  # INT, igual que la columna codigo.
+    metadata=Base.metadata,  # La crea create_all antes de las tablas.
+)  # Finaliza la declaración de la secuencia.
 
 
 # Representa al productor mediante un id interno que no cambia al corregir su RUT.

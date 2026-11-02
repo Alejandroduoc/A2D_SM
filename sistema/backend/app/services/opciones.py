@@ -3,11 +3,13 @@
 # Limpia puntos, guion y espacios del texto que escribe el operador.
 import re
 
-# Construye las consultas; func.replace quita el guion del RUT guardado; or_ une las condiciones.
-from sqlalchemy import func, or_, select
+# Construye las consultas; func.replace quita el guion del RUT guardado; or_ une las condiciones; case ordena.
+from sqlalchemy import case, func, or_, select
 # Sesión de base de datos que entrega el router.
 from sqlalchemy.orm import Session
 
+# Mayor valor posible de un código de productor (columna INT).
+from app.core.validators import MAX_INT_SQL_SERVER
 # Modelos de los catálogos y de productores que se leen; aquí no se modifica ninguno.
 from app.models.calidad import Calidad
 from app.models.especie import Especie
@@ -81,7 +83,7 @@ def tipos_bandeja_activos(db: Session) -> list[TipoBandeja]:
     return list(db.scalars(consulta).all())
 
 
-# Productores activos cuyo RUT empieza con el texto o cuya razón social lo contiene.
+# Productores activos con ese código, cuyo RUT empieza con el texto o cuya razón social lo contiene.
 def buscar_productores(db: Session, texto: str) -> list[Productor]:
     # Quita espacios al inicio y al final.
     texto = texto.strip()
@@ -93,9 +95,15 @@ def buscar_productores(db: Session, texto: str) -> list[Productor]:
     # La razón social se busca siempre; autoescape evita que % o _ del operador funcionen como comodines.
     condicion = Productor.razon_social.contains(texto, autoescape=True)
 
+    # Sin código exacto, los resultados van por orden alfabético.
+    orden = [Productor.razon_social]
     # Los dígitos también identifican el código exacto, sin quitar la búsqueda por RUT.
-    if es_codigo:
-        condicion = or_(condicion, Productor.codigo == int(texto))
+    # Un número mayor que un INT no puede ser un código y SQL Server no lo aceptaría como parámetro.
+    if es_codigo and int(texto) <= MAX_INT_SQL_SERVER:
+        codigo = int(texto)
+        condicion = or_(condicion, Productor.codigo == codigo)
+        # El código exacto va primero: en recepción, Enter elige el primer resultado.
+        orden.insert(0, case((Productor.codigo == codigo, 0), else_=1))
 
     # Deja el texto como el RUT guardado pero sin guion: "12.345.678-5" pasa a "123456785".
     rut_limpio = re.sub(r"[.\-\s]", "", texto).upper().lstrip("0")
@@ -106,11 +114,11 @@ def buscar_productores(db: Session, texto: str) -> list[Productor]:
         # Encuentra el productor tanto por los primeros dígitos como por el RUT completo.
         condicion = or_(condicion, rut_sin_guion.startswith(rut_limpio))
 
-    # Solo productores activos, por orden alfabético y con un máximo de resultados.
+    # Solo productores activos, con el código exacto primero, y con un máximo de resultados.
     consulta = (
         select(Productor)  # Devuelve productores.
         .where(Productor.activo == True, condicion)  # noqa: E712  Activos que coinciden.
-        .order_by(Productor.razon_social)  # Orden alfabético para la lista.
+        .order_by(*orden)  # Código exacto primero y después orden alfabético.
         .limit(MAXIMO_RESULTADOS)  # SQL Server lo traduce a TOP 20.
     )  # Finaliza la consulta.
     # Devuelve los objetos Productor encontrados.

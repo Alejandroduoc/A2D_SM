@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 # Base de los schemas, límites de campos, validadores y campos calculados.
 from pydantic import BaseModel, Field, computed_field, field_validator
 
+# Mayor id posible; un número mayor responde 422 en vez de un error interno.
+from app.core.validators import MAX_INT_SQL_SERVER
 # Misma regla de los pesos de HU10: un booleano no es un número.
 from app.schemas.tipo_bandeja import validar_decimal_no_booleano
 
@@ -38,15 +40,15 @@ class TarjaCreate(BaseModel):
     # Rechaza campos no declarados (numero_tarja, kilos_netos, estado, etc.).
     model_config = {"extra": "forbid"}
     # Productor que entrega la fruta; strict impide textos y booleanos.
-    productor_id: int = Field(gt=0, strict=True)
+    productor_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Sistema productivo de la fruta.
-    sistema_productivo_id: int = Field(gt=0, strict=True)
+    sistema_productivo_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Variedad de la fruta; la especie se obtiene de ella.
-    variedad_id: int = Field(gt=0, strict=True)
+    variedad_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Calidad de la fruta.
-    calidad_id: int = Field(gt=0, strict=True)
+    calidad_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Tipo de bandeja; el service copia su tara en la tarja.
-    tipo_bandeja_id: int = Field(gt=0, strict=True)
+    tipo_bandeja_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Cantidad de bandejas, al menos una y hasta el máximo.
     cantidad_bandejas: int = Field(gt=0, le=MAX_BANDEJAS, strict=True)
     # Peso del pallet; puede ser cero si la fruta llega sin pallet.
