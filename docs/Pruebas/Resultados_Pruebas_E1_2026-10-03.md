@@ -41,7 +41,7 @@ requiere la contrasena real del entorno y no debe registrarse en este archivo.
 
 ## Pruebas de dependencias
 
-> **Corrección 2026-10-17:** este acta decía "15 de 15". `tests/probar_deps.py` tiene 14 casos (6 de `get_current_user`, 5 de `require_rol` y 3 de `require_roles`) desde su primera versión (commit `8b6eb5a`); se volvió a ejecutar el 2026-10-17 con resultado 14 OK y 0 FALLA. Las pruebas siempre pasaron; solo estaba mal el conteo.
+> **Corrección 2026-10-17:** este acta decía "15 de 15". `tests/probar_deps.py` tiene 14 casos (6 de `get_current_user`, 5 de `require_rol` y 3 de `require_roles`) desde su primera versión (commit `3366c5e`); se volvió a ejecutar el 2026-10-17 con resultado 14 OK y 0 FALLA. Las pruebas siempre pasaron; solo estaba mal el conteo.
 
 El comando:
 

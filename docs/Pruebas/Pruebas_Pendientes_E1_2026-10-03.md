@@ -4,7 +4,7 @@ Creado: 2026-10-03 · Responsable propuesto: Angelo (QA) · Duración estimada: 
 
 > Completa el acta `Resultados_Pruebas_E1_2026-10-03.md`. Cubre los casos que esa acta no probó: la edición de usuarios (`PUT`) y los cambios hechos hoy en el código.
 >
-> - Commit `8fcda74`: `exclude_none` en `actualizar_usuario` y bloqueo para que un administrador no se quite su propio rol.
+> - Commit `317aa0a`: `exclude_none` en `actualizar_usuario` y bloqueo para que un administrador no se quite su propio rol.
 > - Validador en `schemas/auth.py` que elimina los roles repetidos.
 > - Cambio de nombre del rol `supervisor` a `gerencia` (migración `5e84fd3d65d7`).
 
