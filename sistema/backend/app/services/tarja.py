@@ -1,7 +1,7 @@
 """Reglas de negocio de las tarjas de recepción (HU12, HU13 y HU14)."""
 
-# Filtros por fecha de recepción.
-from datetime import date
+# Filtros por fecha de recepción y momento de cada impresión.
+from datetime import date, datetime, timezone
 # Pesos exactos y redondeo bancario.
 from decimal import ROUND_HALF_EVEN, Decimal
 
@@ -40,6 +40,16 @@ class CatalogoNoValidoError(Exception):
 # El router traduce este error a HTTP 400.
 class KilosNetosNoValidosError(Exception):
     """Los kilos netos calculados son cero o negativos (HU14 criterio 2)."""
+
+
+# El router traduce este error a HTTP 404.
+class TarjaNoEncontradaError(Exception):
+    """La tarja pedida no existe."""
+
+
+# El router traduce este error a HTTP 409.
+class TarjaAnuladaError(Exception):
+    """Una tarja anulada no se imprime: no debe identificar fruta en la planta."""
 
 
 # Calcula los kilos netos de una tarja (HU14 criterio 1).
@@ -269,3 +279,51 @@ def obtener_tarja(db: Session, tarja_id: int) -> dict | None:
     procesados, pendientes = kilos_de_tarja(fila.Tarja)
     # Agrega los kilos a los demás datos.
     return {**_datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
+
+
+# Registra una impresión o reimpresión de la tarja (HU16 criterio 3).
+def registrar_impresion(db: Session, tarja_id: int, usuario: Usuario) -> dict:
+    # Protege toda la escritura hasta el único commit.
+    try:
+        # Bloquea la fila: dos impresiones a la vez no pueden perder una en el contador.
+        tarja = db.execute(
+            select(Tarja)  # Relee la tarja completa.
+            .where(Tarja.id == tarja_id)  # Solo la fila pedida.
+            .with_hint(Tarja, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")  # Bloqueo de actualización.
+            .execution_options(populate_existing=True)  # Reemplaza los valores antiguos en memoria.
+        ).scalars().first()  # Devuelve la tarja o None.
+        # Una tarja inexistente responde 404.
+        if tarja is None:
+            raise TarjaNoEncontradaError("Tarja no encontrada")
+        # Una tarja anulada no se imprime.
+        if tarja.estado == EstadoTarja.ANULADA:
+            raise TarjaAnuladaError("No se puede imprimir una tarja anulada")
+        # Captura el estado antes de modificarlo.
+        antes = instantanea(tarja)
+        # Suma la impresión.
+        tarja.veces_impresa += 1
+        # Guarda el momento en UTC.
+        tarja.impresa_en = datetime.now(timezone.utc)
+        # Comprueba las restricciones antes de auditar.
+        db.flush()
+        # Audita en la misma transacción; el motivo distingue la primera impresión de las copias.
+        registrar_auditoria(
+            db,  # Comparte la sesión que contiene el cambio.
+            usuario.id,  # Responsable autenticado.
+            "tarjas",  # Tabla afectada.
+            tarja.id,  # Registro afectado.
+            AccionAuditoria.UPDATE,  # La tarja cambia su contador.
+            antes=antes,  # Estado anterior.
+            despues=instantanea(tarja),  # Estado posterior.
+            motivo="Reimpresión" if tarja.veces_impresa > 1 else "Impresión",  # Queda registrada (criterio 3).
+        )  # Finaliza el evento.
+        # Confirma el contador y su auditoría.
+        db.commit()
+    # Cualquier error revierte la operación completa.
+    except Exception:
+        # No queda un contador sin auditoría.
+        db.rollback()
+        # Deja que el router decida la respuesta.
+        raise
+    # Devuelve la tarja actualizada, con los nombres que necesita la hoja.
+    return obtener_tarja(db, tarja_id)

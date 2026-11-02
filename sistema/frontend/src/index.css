@@ -72,3 +72,16 @@ h4 {
 .site-footer p {
   margin: 0;
 }
+
+/* En papel no se imprimen el fondo ni el pie del sistema (hoja de la tarja, HU16). */
+@media print {
+  body {
+    background: #fff;
+  }
+
+  body::before,
+  .app-background,
+  .site-footer {
+    display: none;
+  }
+}

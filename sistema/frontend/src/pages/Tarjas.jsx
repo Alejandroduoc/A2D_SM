@@ -1,5 +1,7 @@
 // Estado, efectos y referencias de la consulta.
 import { useCallback, useEffect, useRef, useState } from "react";
+// Enlace a la hoja de impresión.
+import { Link } from "react-router-dom";
 // Traduce errores HTTP a mensajes legibles.
 import { extraerMensajeError } from "../api/client";
 // Listado con filtros y detalle de una tarja.
@@ -328,15 +330,23 @@ export default function Tarjas() {
                     <td className={`${CELDA} text-right text-slate-600`}>{tarja.kilos_netos}</td>
                     <td className={CELDA}><span className={claseEstadoTarja(tarja.estado)}>{textoEstado(tarja.estado)}</span></td>
                     <td className={`${CELDA} text-right`}>
-                      <button
-                        type="button"
-                        onClick={() => verDetalle(tarja.id)}
-                        disabled={cargandoDetalle === tarja.id}
-                        aria-label={`Ver detalle de la tarja ${tarja.numero_tarja}`}
-                        className={`whitespace-nowrap ${BOTON_EDITAR}`}
-                      >
-                        {cargandoDetalle === tarja.id ? "Cargando…" : "Ver detalle"}
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => verDetalle(tarja.id)}
+                          disabled={cargandoDetalle === tarja.id}
+                          aria-label={`Ver detalle de la tarja ${tarja.numero_tarja}`}
+                          className={`whitespace-nowrap ${BOTON_EDITAR}`}
+                        >
+                          {cargandoDetalle === tarja.id ? "Cargando…" : "Ver detalle"}
+                        </button>
+                        {/* Una tarja anulada no se imprime (HU16). */}
+                        {tarja.estado !== "ANULADA" && (
+                          <Link to={`/tarjas/${tarja.id}/imprimir`} aria-label={`${tarja.veces_impresa > 0 ? "Reimprimir" : "Imprimir"} la tarja ${tarja.numero_tarja}`} className={`whitespace-nowrap ${BOTON_EDITAR}`}>
+                            {tarja.veces_impresa > 0 ? "Reimprimir" : "Imprimir"}
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

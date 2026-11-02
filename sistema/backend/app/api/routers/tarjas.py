@@ -27,7 +27,10 @@ from app.services.tarja import (
     listar_tarjas,  # Listado con filtros (HU17).
     obtener_tarja,  # Detalle de una tarja.
     pendientes_productor,  # Acumulados del productor.
+    registrar_impresion,  # Impresión o reimpresión (HU16).
     registrar_tarja,  # Alta en una sola transacción.
+    TarjaAnuladaError,  # Una tarja anulada no se imprime.
+    TarjaNoEncontradaError,  # La tarja no existe.
 )  # Finaliza las importaciones del servicio.
 
 
@@ -121,3 +124,24 @@ def obtener(
         )  # Finaliza el error.
     # Devuelve la tarja encontrada.
     return tarja
+
+
+# Registra una impresión o reimpresión de la tarja (HU16 criterio 3).
+@router.post("/{tarja_id}/imprimir", response_model=TarjaDetalleOut)
+def imprimir(
+    tarja_id: IdRuta,  # Id en rango; si no, 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+    usuario: Usuario = Depends(get_current_user),  # Responsable leído de la base.
+) -> dict:
+    # El servicio controla la transacción.
+    try:
+        # Devuelve la tarja con el contador actualizado.
+        return registrar_impresion(db, tarja_id, usuario)
+    # La tarja no existe.
+    except TarjaNoEncontradaError as error:
+        # Responde 404 con el mensaje del servicio.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    # La tarja está anulada.
+    except TarjaAnuladaError as error:
+        # Responde 409: la petición es válida, pero el estado de la tarja no lo permite.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error

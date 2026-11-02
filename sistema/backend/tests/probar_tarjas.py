@@ -54,7 +54,7 @@ from app.schemas.tarja import TarjaCreate, hoy_en_chile
 # Misma instantánea que guarda la auditoría.
 from app.services.auditoria import instantanea
 # Funciones del service que se prueban directamente.
-from app.services.tarja import calcular_kilos_netos, registrar_tarja
+from app.services.tarja import calcular_kilos_netos, registrar_impresion, registrar_tarja
 
 
 # Tablas cuyas huellas no deben cambiar al terminar.
@@ -465,11 +465,11 @@ def probar_api() -> None:
         with api_con_sesion(db):
             # Rutas que publica la aplicación.
             rutas = app.openapi()["paths"]
-            # El módulo publica exactamente tres rutas.
+            # El módulo publica exactamente estas rutas.
             comprobar(
-                "A3 - tres rutas publicadas",
+                "A3 - rutas publicadas",
                 {ruta for ruta in rutas if ruta.startswith(BASE)}
-                == {BASE, BASE + "/pendientes", BASE + "/{tarja_id}"},
+                == {BASE, BASE + "/pendientes", BASE + "/{tarja_id}", BASE + "/{tarja_id}/imprimir"},
             )
 
             # Cantidades antes de los rechazos de permisos.
@@ -796,7 +796,7 @@ def probar_consulta() -> None:
             comprobar(
                 "HU17 - campos del listado",
                 len(lista) == 1
-                and set(lista[0]) == {"id", "numero_tarja", "fecha_recepcion", "productor_codigo", "productor_razon_social", "especie", "variedad", "cantidad_bandejas", "kilos_netos", "estado"},
+                and set(lista[0]) == {"id", "numero_tarja", "fecha_recepcion", "productor_codigo", "productor_razon_social", "especie", "variedad", "cantidad_bandejas", "kilos_netos", "estado", "veces_impresa"},
             )
             # Cada filtro por separado.
             comprobar("HU17 - filtro número", ids(f"?numero_tarja={t2['numero_tarja']}") == [t2["id"]])
@@ -863,6 +863,109 @@ def probar_consulta() -> None:
             comprobar("HU17 - consultas sin escrituras", cantidades(db) == antes)
 
 
+# HU16: impresión, reimpresión, auditoría y permisos.
+def probar_impresion() -> None:
+    # Todo lo que se crea aquí se revierte.
+    with aislado() as (db, conexion, externa):
+        # Crea los datos de prueba.
+        datos = preparar(db)
+        # Operador de recepción, que registra e imprime.
+        recepcion, token = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        # Administrador, también autorizado.
+        admin, token_admin = datos["actores"][RolUsuario.ADMINISTRADOR]
+        # Roles sin acceso.
+        _, token_gerencia = datos["actores"][RolUsuario.GERENCIA]
+        _, token_proceso = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+
+        # La API usa la sesión del escenario.
+        with api_con_sesion(db):
+            # Una tarja nueva nunca se imprimió.
+            _, tarja = solicitar("POST", BASE, token, cuerpo_valido(datos))
+            ruta = f"{BASE}/{tarja['id']}/imprimir"
+            comprobar("HU16 - tarja nueva sin impresiones", tarja["veces_impresa"] == 0 and tarja["impresa_en"] is None)
+
+            # Eventos de auditoría de la tarja, en orden.
+            def eventos() -> list[Auditoria]:
+                return list(db.scalars(select(Auditoria).where(Auditoria.tabla == "tarjas", Auditoria.registro_id == str(tarja["id"])).order_by(Auditoria.id)))
+
+            # Permisos: nadie sin rol suma impresiones.
+            comprobar("HU16 - sin token 401", solicitar("POST", ruta)[0] == 401)
+            comprobar("HU16 - gerencia 403", solicitar("POST", ruta, token_gerencia)[0] == 403)
+            comprobar("HU16 - proceso 403", solicitar("POST", ruta, token_proceso)[0] == 403)
+            comprobar("HU16 - rechazos sin impresiones", db.get(Tarja, tarja["id"]).veces_impresa == 0 and len(eventos()) == 1)
+
+            # Primera impresión.
+            estado, primera = solicitar("POST", ruta, token)
+            comprobar("HU16 - primera impresión 200", estado == 200 and primera["veces_impresa"] == 1 and primera["impresa_en"] is not None)
+            # La respuesta trae lo que muestra la hoja (criterio 1).
+            comprobar(
+                "HU16 - datos de la hoja",
+                primera["numero_tarja"] == tarja["numero_tarja"]
+                and primera["productor_razon_social"] == datos["productor"].razon_social
+                and primera["sistema_productivo"] == datos["sistema"].nombre
+                and primera["variedad"] == datos["variedad"].nombre
+                and primera["especie"].startswith("QA Especie")
+                and primera["calidad"] == datos["calidad"].nombre
+                and primera["tipo_bandeja"] == datos["bandeja"].nombre
+                and primera["cantidad_bandejas"] == 50
+                and Decimal(primera["kilos_brutos"]) == Decimal("1000")
+                and primera["kilos_netos"] == 920
+                and Decimal(primera["kg_promedio_bandeja"]) == Decimal("18.40")
+                and primera["fecha_recepcion"] == hoy_en_chile().isoformat(),
+            )
+            # Queda auditada como impresión, con el actor real y el antes y el después.
+            evento = eventos()[-1]
+            comprobar(
+                "HU16 - auditoría de la impresión",
+                evento.accion == AccionAuditoria.UPDATE
+                and evento.usuario_id == recepcion.id
+                and evento.motivo == "Impresión"
+                and json.loads(evento.valores_antes)["veces_impresa"] == 0
+                and json.loads(evento.valores_despues)["veces_impresa"] == 1,
+            )
+            # Reimpresión (criterio 3), con otro usuario.
+            estado, segunda = solicitar("POST", ruta, token_admin)
+            evento = eventos()[-1]
+            comprobar("HU16 - reimpresión suma", estado == 200 and segunda["veces_impresa"] == 2)
+            comprobar("HU16 - reimpresión registrada", evento.motivo == "Reimpresión" and evento.usuario_id == admin.id)
+            # Imprimir no cambia los datos de la tarja.
+            comprobar(
+                "HU16 - no cambia los datos",
+                all(segunda[campo] == primera[campo] for campo in ("numero_tarja", "kilos_netos", "tara_kg", "estado", "kilos_pendientes", "fecha_hora")),
+            )
+            # Imprimir no mueve bandejas.
+            comprobar("HU16 - no agrega movimientos", db.scalar(select(func.count()).select_from(MovimientoBandeja).where(MovimientoBandeja.tarja_id == tarja["id"])) == 1)
+            # El listado informa las impresiones.
+            _, lista = solicitar("GET", f"{BASE}?numero_tarja={tarja['numero_tarja']}", token)
+            comprobar("HU16 - listado con veces impresa", lista[0]["veces_impresa"] == 2)
+            # Solo se imprime una tarja guardada (criterio 2).
+            comprobar("HU16 - tarja inexistente 404", solicitar("POST", f"{BASE}/2147483647/imprimir", token)[0] == 404)
+            comprobar("HU16 - id cero 422", solicitar("POST", f"{BASE}/0/imprimir", token)[0] == 422)
+            comprobar("HU16 - id mayor que un INT 422", solicitar("POST", f"{BASE}/{'9' * 19}/imprimir", token)[0] == 422)
+
+            # Un fallo al auditar revierte el contador.
+            antes = cantidades(db)
+            with patch("app.services.tarja.registrar_auditoria", side_effect=RuntimeError("fallo simulado de auditoría")):
+                try:
+                    registrar_impresion(db, tarja["id"], recepcion)
+                except RuntimeError:
+                    pass
+                else:
+                    comprobar("HU16 - el fallo fue propagado", False)
+            db.expire_all()
+            comprobar("HU16 - fallo no cambia el contador", db.get(Tarja, tarja["id"]).veces_impresa == 2 and cantidades(db) == antes)
+
+            # Una tarja anulada no se imprime.
+            db.get(Tarja, tarja["id"]).estado = EstadoTarja.ANULADA
+            db.commit()
+            antes = cantidades(db)
+            comprobar("HU16 - anulada 409", solicitar("POST", ruta, token)[0] == 409)
+            db.expire_all()
+            comprobar("HU16 - anulada sin cambios", db.get(Tarja, tarja["id"]).veces_impresa == 2 and cantidades(db) == antes)
+            # La transacción de la prueba sigue viva.
+            comprobar("HU16 - transacción externa conservada", externa.is_active and conexion.in_transaction())
+
+
 # Ejecuta todo y compara el estado final con el inicial.
 def main() -> None:
     # Un error inesperado suma una falla.
@@ -883,6 +986,8 @@ def main() -> None:
         probar_api()
         # Consulta de tarjas (HU17).
         probar_consulta()
+        # Impresión de tarjas (HU16).
+        probar_impresion()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

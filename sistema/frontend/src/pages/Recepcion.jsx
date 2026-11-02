@@ -1,5 +1,7 @@
 // Estado, efectos y referencia del formulario de recepción.
 import { useEffect, useRef, useState } from "react";
+// Lleva a la hoja de impresión al guardar y recibe lo que se conserva de la tarja anterior.
+import { useLocation, useNavigate } from "react-router-dom";
 // Traduce errores HTTP a mensajes legibles sin borrar lo escrito.
 import { extraerMensajeError } from "../api/client";
 // Catálogos activos usados por la recepción.
@@ -10,7 +12,7 @@ import { pendientesProductor, registrarTarja } from "../api/tarjas";
 import SelectorCatalogo from "../components/SelectorCatalogo";
 import SelectorProductor from "../components/SelectorProductor";
 // Clases comunes de formularios y mensajes.
-import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, MENSAJE_EXITO, SUBTITULO } from "../components/catalogo";
+import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SUBTITULO } from "../components/catalogo";
 
 // Límites acordados provisionalmente con el backend de A1 ([CONFIRMAR] con la planta).
 const MAX_BANDEJAS = 500;
@@ -88,6 +90,10 @@ function formularioVacio(fecha) {
 
 // Formulario operativo para registrar tarjas de recepción.
 export default function Recepcion() {
+  // Navegación a la hoja de impresión.
+  const navigate = useNavigate();
+  // Productor y fecha que vuelven desde la hoja, para seguir con la siguiente tarja.
+  const { state: anterior } = useLocation();
   // Día de hoy en la planta, para el valor inicial y el máximo de la fecha.
   const fechaHoy = hoyEnChile();
   // Permite recorrer los campos del formulario al presionar Enter.
@@ -104,23 +110,29 @@ export default function Recepcion() {
   const [cargandoVariedades, setCargandoVariedades] = useState(false);
   const [errorVariedades, setErrorVariedades] = useState("");
   // Identidades elegidas para la tarja.
-  const [productor, setProductor] = useState(null);
+  const [productor, setProductor] = useState(anterior?.productor ?? null);
   const [sistemaId, setSistemaId] = useState("");
   const [especieId, setEspecieId] = useState("");
   const [variedadId, setVariedadId] = useState("");
   const [calidadId, setCalidadId] = useState("");
   const [bandejaId, setBandejaId] = useState("");
   // Datos numéricos y fecha que escribe el operador.
-  const [form, setForm] = useState(() => formularioVacio(fechaHoy));
-  // Acumulados del productor y recarga posterior a una nueva tarja.
+  const [form, setForm] = useState(() => formularioVacio(anterior?.fecha_recepcion ?? fechaHoy));
+  // Acumulados del productor.
   const [pendientes, setPendientes] = useState(null);
   const [cargandoPendientes, setCargandoPendientes] = useState(false);
   const [errorPendientes, setErrorPendientes] = useState("");
-  const [recargaPendientes, setRecargaPendientes] = useState(0);
-  // Estados de escritura y mensajes de resultado.
+  // Estado de escritura y mensaje de error; el éxito se avisa en la hoja de impresión.
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
-  const [exito, setExito] = useState("");
+
+  // Al volver con el productor ya elegido, el cursor parte en el primer catálogo,
+  // cuando terminan de cargar las listas: antes esa lista está deshabilitada.
+  useEffect(() => {
+    if (!cargando && anterior?.productor) document.getElementById("recepcion-sistema")?.focus();
+    // Solo cuando termina la carga inicial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando]);
 
   // Carga en paralelo los catálogos que no dependen de otra selección.
   useEffect(() => {
@@ -192,7 +204,7 @@ export default function Recepcion() {
     return () => { vigente = false; };
   }, [especieId]);
 
-  // Muestra los acumulados del productor elegido y los actualiza tras guardar.
+  // Muestra los acumulados del productor elegido.
   useEffect(() => {
     // Sin productor no hay acumulados.
     if (!productor) {
@@ -227,7 +239,7 @@ export default function Recepcion() {
     cargarPendientes();
     // Marca como obsoleta la respuesta del productor anterior.
     return () => { vigente = false; };
-  }, [productor, recargaPendientes]);
+  }, [productor]);
 
   // Selecciona la bandeja completa para leer su tara sin usar float.
   const bandeja = bandejas.find((opcion) => String(opcion.id) === bandejaId);
@@ -294,9 +306,8 @@ export default function Recepcion() {
     const { name, value } = evento.target;
     // Actualiza solo ese campo.
     setForm((anterior) => ({ ...anterior, [name]: value }));
-    // Un cambio deja obsoletos los mensajes anteriores.
+    // Un cambio deja obsoleto el error anterior.
     setError("");
-    setExito("");
   }
 
   // Una especie nueva invalida la variedad que pertenecía a la anterior.
@@ -346,7 +357,6 @@ export default function Recepcion() {
     // Bloquea el formulario mientras responde la API.
     setGuardando(true);
     setError("");
-    setExito("");
     try {
       // Número, tara, kilos netos, estado y usuario los pone el sistema.
       const registrada = await registrarTarja({
@@ -361,19 +371,14 @@ export default function Recepcion() {
         porcentaje_calidad: calidad, // Calidad visual.
         fecha_recepcion: form.fecha_recepcion, // Día de llegada de la fruta.
       });
-      // Informa el número y los kilos que confirmó la API.
-      setExito(`Tarja N° ${registrada.numero_tarja} registrada: ${registrada.kilos_netos} kg netos`);
-      // Conserva productor y fecha; limpia los demás datos de la recepción.
-      setSistemaId("");
-      setEspecieId("");
-      setVariedadId("");
-      setCalidadId("");
-      setBandejaId("");
-      setForm(formularioVacio(form.fecha_recepcion));
-      // Actualiza los acumulados del productor con la tarja nueva.
-      setRecargaPendientes((valor) => valor + 1);
-      // Guardar queda deshabilitado: el foco vuelve al inicio de la siguiente tarja.
-      requestAnimationFrame(() => document.getElementById("recepcion-sistema")?.focus());
+      // Igual que el legado y socradex: al guardar se abre la tarja para imprimirla (HU16).
+      navigate(`/tarjas/${registrada.id}/imprimir`, {
+        state: {
+          recienRegistrada: true, // La hoja avisa que se registró.
+          productor, // Se conserva para la siguiente tarja.
+          fecha_recepcion: form.fecha_recepcion, // También la fecha.
+        },
+      });
     } catch (errorRecibido) {
       // Muestra el error sin borrar lo escrito.
       setError(extraerMensajeError(errorRecibido, "No se pudo registrar la tarja"));
@@ -393,10 +398,9 @@ export default function Recepcion() {
         <p className="mt-2 text-sm text-slate-500">Registre la fruta recibida y revise los kilos netos antes de guardar.</p>
       </div>
 
-      {/* Errores de carga y resultado de la última escritura. */}
+      {/* Errores de carga y de la última escritura. */}
       {errorCarga && <p className={MENSAJE_ERROR} role="alert">{errorCarga}</p>}
       {error && <p className={MENSAJE_ERROR} role="alert">{error}</p>}
-      {exito && <p className={MENSAJE_EXITO} role="status">{exito}</p>}
 
       {/* Formulario grande dividido según el flujo operativo. */}
       <form
@@ -631,7 +635,7 @@ export default function Recepcion() {
           {/* Guardar es la única acción que envía el formulario. */}
           <div className="mt-6 border-t border-slate-200 pt-5">
             <button type="submit" disabled={!formularioValido || guardando} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
-            <p className={AYUDA}>Enter avanza al siguiente campo hasta Guardar; solo este botón registra la tarja.</p>
+            <p className={AYUDA}>Enter avanza al siguiente campo hasta Guardar; solo este botón registra la tarja y abre su hoja de impresión.</p>
           </div>
         </fieldset>
       </form>

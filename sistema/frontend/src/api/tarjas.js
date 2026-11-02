@@ -25,6 +25,14 @@ export async function obtenerTarja(id) {
   return respuesta.data;
 }
 
+// Registra una impresión o reimpresión; devuelve la tarja actualizada (HU16).
+export async function registrarImpresion(id) {
+  // Sin cuerpo: el servidor suma el contador y audita.
+  const respuesta = await client.post(`/tarjas/${id}/imprimir`);
+  // Devuelve los datos que muestra la hoja.
+  return respuesta.data;
+}
+
 // Consulta los acumulados sin procesar del productor seleccionado.
 export async function pendientesProductor(productorId) {
   // El identificador viaja como query param validado por FastAPI.

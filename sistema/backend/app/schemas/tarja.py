@@ -168,6 +168,8 @@ class TarjaResumenOut(BaseModel):
     kilos_netos: int
     # Estado de la tarja, como texto.
     estado: str
+    # Veces impresa: decide si el listado ofrece Imprimir o Reimprimir (HU16).
+    veces_impresa: int
 
 
 # Detalle completo de una tarja (HU17 criterio 2).

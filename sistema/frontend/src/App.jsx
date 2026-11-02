@@ -20,6 +20,8 @@ import CambiarContrasena from "./pages/CambiarContrasena";
 import Recepcion from "./pages/Recepcion";
 // Consulta de tarjas (HU17).
 import Tarjas from "./pages/Tarjas";
+// Hoja de impresión de la tarja (HU16).
+import ImprimirTarja from "./pages/ImprimirTarja";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -30,6 +32,10 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         {/* La protección exterior valida sesión para cualquier perfil autenticado. */}
         <Route element={<ProtectedRoute />}>
+          {/* Sin Layout: la hoja de impresión no muestra el menú; mismos roles que /tarjas en la API. */}
+          <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
+            <Route path="tarjas/:id/imprimir" element={<ImprimirTarja />} />
+          </Route>
           <Route element={<Layout />}>
             {/* Inicio conserva el acceso de todos los perfiles. */}
             <Route index element={<Inicio />} />
