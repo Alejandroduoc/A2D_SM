@@ -69,8 +69,8 @@ class Proceso(Base):
         default=lambda: datetime.now(timezone.utc),  # Asigna UTC al crear la cabecera.
         nullable=False,  # El momento de registro siempre existe.
     )  # Finaliza la fecha de registro.
-    # Conserva la suma calculada de cajas de todas las filas del detalle.
-    cantidad_cajas: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Conserva la suma calculada de cajas; con decimales, para que un saldo menor que una caja entre al proceso.
+    cantidad_cajas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     # Conserva la suma calculada de kilos procesados de todas las filas.
     kilos_salida: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     # Permite anular lógicamente sin borrar la trazabilidad del proceso.
@@ -110,8 +110,8 @@ class ProcesoTarja(Base):
         index=True,  # Acelera saldo, trazabilidad y recálculo de estado por tarja.
         nullable=False,  # Toda fila debe tener una tarja de origen.
     )  # Finaliza la relación con la tarja.
-    # Guarda las cajas de esta tarja dentro del proceso.
-    cantidad_cajas: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Guarda las cajas de esta tarja dentro del proceso; una caja puede armarse con fruta de dos tarjas.
+    cantidad_cajas: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     # Guarda el peso calculado desde cajas o ingresado para embalaje granel.
     kilos_procesados: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     # Marca que esta fila es el último proceso vigente de la tarja.

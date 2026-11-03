@@ -16,6 +16,8 @@ from app.models.auditoria import AccionAuditoria
 from app.models.calidad import Calidad
 from app.models.especie import Especie
 from app.models.movimiento_bandeja import MovimientoBandeja, TipoMovimientoBandeja
+# Procesos de E4: de ellos salen los kilos ya usados de cada tarja.
+from app.models.proceso import Proceso, ProcesoTarja
 from app.models.productor import Productor
 from app.models.sistema_productivo import SistemaProductivo
 from app.models.tarja import EstadoTarja, Tarja
@@ -184,7 +186,7 @@ def registrar_tarja(db: Session, datos: TarjaCreate, usuario: Usuario) -> Tarja:
 
 
 # Resume las tarjas que todavía no terminan su procesamiento.
-def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
+def pendientes_productor(db: Session, productor_id: int) -> tuple[int, Decimal]:
     # Cuenta las tarjas y suma sus kilos netos; sin tarjas, la suma es 0 y no NULL.
     consulta = select(
         func.count(Tarja.id),  # Cantidad de tarjas.
@@ -195,8 +197,19 @@ def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
     )  # Finaliza la consulta.
     # Una consulta agregada siempre devuelve una fila.
     cantidad, kilos = db.execute(consulta).one()
-    # En E4, las tarjas PARCIAL descontarán los kilos ya procesados.
-    return int(cantidad), int(kilos)
+    # Suma lo que ya salió de esas mismas tarjas, en procesos no anulados.
+    procesados = db.scalar(
+        select(func.coalesce(func.sum(ProcesoTarja.kilos_procesados), 0))  # Sin procesos, 0.
+        .join(Proceso, ProcesoTarja.proceso_id == Proceso.id)  # Une con la cabecera.
+        .join(Tarja, ProcesoTarja.tarja_id == Tarja.id)  # Une con la tarja.
+        .where(
+            Tarja.productor_id == productor_id,  # Solo el productor elegido.
+            Tarja.estado.in_((EstadoTarja.RECEPCIONADA, EstadoTarja.PARCIAL)),  # Las mismas tarjas.
+            Proceso.anulado == False,  # noqa: E712  Un proceso anulado deja de contar.
+        )  # Finaliza los filtros.
+    )  # Finaliza la suma.
+    # Entrega la cantidad y lo que falta procesar, con dos decimales.
+    return int(cantidad), (Decimal(kilos) - Decimal(procesados)).quantize(Decimal("0.01"))
 
 
 # Calcula el saldo de bandejas de un productor, por tipo de bandeja (HU15 criterio 3).
@@ -235,7 +248,7 @@ def saldo_bandejas_productor(db: Session, productor_id: int) -> list[dict]:
 
 
 # Consulta común del listado y del detalle: la tarja con los nombres de sus catálogos.
-def _consulta_con_nombres():
+def consulta_con_nombres():
     # Las etiquetas coinciden con los campos de los schemas de salida.
     return (
         select(
@@ -261,7 +274,7 @@ def _consulta_con_nombres():
 
 
 # Convierte una fila de la consulta en los datos que esperan los schemas.
-def _datos_de_fila(fila) -> dict:
+def datos_de_fila(fila) -> dict:
     # Separa la tarja de los nombres.
     datos = dict(fila._mapping)
     tarja = datos.pop("Tarja")
@@ -269,10 +282,25 @@ def _datos_de_fila(fila) -> dict:
     return {**instantanea(tarja), **datos, "estado": tarja.estado.value}
 
 
+# Suma los kilos de una tarja en sus procesos no anulados (HU18 criterio 4).
+def kilos_procesados_de_tarja(db: Session, tarja_id: int) -> Decimal:
+    # Sin procesos la suma es NULL: coalesce la deja en 0.
+    suma = db.scalar(
+        select(func.coalesce(func.sum(ProcesoTarja.kilos_procesados), 0))  # Suma de sus kilos.
+        .join(Proceso, ProcesoTarja.proceso_id == Proceso.id)  # Une con la cabecera.
+        .where(
+            ProcesoTarja.tarja_id == tarja_id,  # Solo esta tarja.
+            Proceso.anulado == False,  # noqa: E712  Un proceso anulado deja de contar.
+        )  # Finaliza los filtros.
+    )  # Finaliza la suma.
+    # Siempre con dos decimales.
+    return Decimal(suma).quantize(Decimal("0.01"))
+
+
 # Calcula los kilos procesados y pendientes de una tarja (HU17 criterio 2).
-def kilos_de_tarja(tarja: Tarja) -> tuple[Decimal, Decimal]:
-    # Hasta E4 no existen procesos: en HU18 se sumarán los procesos no anulados de la tarja.
-    procesados = Decimal("0")
+def kilos_de_tarja(db: Session, tarja: Tarja) -> tuple[Decimal, Decimal]:
+    # Suma sus procesos no anulados.
+    procesados = kilos_procesados_de_tarja(db, tarja.id)
     # Una tarja anulada o terminada ya no tiene kilos por procesar.
     if tarja.estado in (EstadoTarja.ANULADA, EstadoTarja.PROCESADA):
         return procesados, Decimal("0")
@@ -290,7 +318,7 @@ def listar_tarjas(
     estado: EstadoTarja | None = None,  # Estado de la tarja.
 ) -> list[dict]:
     # Parte de la consulta con los nombres de los catálogos.
-    consulta = _consulta_con_nombres()
+    consulta = consulta_con_nombres()
     # Cada filtro se agrega solo si llegó.
     if numero_tarja is not None:
         consulta = consulta.where(Tarja.numero_tarja == numero_tarja)
@@ -305,20 +333,20 @@ def listar_tarjas(
     # Las más recientes primero, con un máximo de filas.
     consulta = consulta.order_by(Tarja.numero_tarja.desc()).limit(MAXIMO_TARJAS_LISTADO)
     # Devuelve cada fila lista para el schema.
-    return [_datos_de_fila(fila) for fila in db.execute(consulta).all()]
+    return [datos_de_fila(fila) for fila in db.execute(consulta).all()]
 
 
 # Obtiene el detalle completo de una tarja sin modificarla (HU17 criterio 2).
 def obtener_tarja(db: Session, tarja_id: int) -> dict | None:
     # Busca la tarja con los nombres de sus catálogos.
-    fila = db.execute(_consulta_con_nombres().where(Tarja.id == tarja_id)).first()
+    fila = db.execute(consulta_con_nombres().where(Tarja.id == tarja_id)).first()
     # Devuelve None si no existe; el router resuelve el 404.
     if fila is None:
         return None
     # Calcula los kilos a partir de la tarja.
-    procesados, pendientes = kilos_de_tarja(fila.Tarja)
+    procesados, pendientes = kilos_de_tarja(db, fila.Tarja)
     # Agrega los kilos a los demás datos.
-    return {**_datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
+    return {**datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
 
 
 # Registra una impresión o reimpresión de la tarja (HU16 criterio 3).
@@ -386,6 +414,9 @@ def anular_tarja(db: Session, tarja_id: int, usuario: Usuario) -> dict:
         # Anularla dos veces no tiene sentido y dejaría un evento falso.
         if tarja.estado == EstadoTarja.ANULADA:
             raise TarjaNoAnulableError("La tarja ya está anulada")
+        # Una tarja rebajada como merma se reabre antes de anularla.
+        if tarja.merma_rebajada:
+            raise TarjaNoAnulableError("La tarja tiene una merma rebajada: primero se debe reabrir desde Procesamiento")
         # Criterio 2: con kilos procesados, primero se anulan sus procesos (HU25).
         if tarja.estado != EstadoTarja.RECEPCIONADA:
             raise TarjaNoAnulableError("La tarja tiene kilos en procesos: primero se deben anular esos procesos")

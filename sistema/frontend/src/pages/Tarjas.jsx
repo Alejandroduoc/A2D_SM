@@ -8,6 +8,8 @@ import { extraerMensajeError } from "../api/client";
 import { useAuth } from "../api/AuthContext";
 // Listado con filtros y detalle de una tarja.
 import { anularTarja, listarTarjas, obtenerTarja } from "../api/tarjas";
+// Cálculo exacto de la merma que muestra el detalle.
+import { aCentimos, textoCentimos } from "../components/procesamiento";
 // Buscador compartido de productores (HU11).
 import SelectorProductor from "../components/SelectorProductor";
 // Clases comunes de formularios, tablas y mensajes.
@@ -239,6 +241,8 @@ export default function Tarjas() {
       ["Promedio por bandeja", `${formatearKilos(detalle.kg_promedio_bandeja)} kg`],
       ["Kilos procesados", `${formatearKilos(detalle.kilos_procesados)} kg`],
       ["Kilos pendientes", `${formatearKilos(detalle.kilos_pendientes)} kg`],
+      // Una tarja terminada ya no tiene pendientes: lo que no salió en cajas es su merma.
+      ...(detalle.estado === "PROCESADA" ? [["Merma", `${textoCentimos(detalle.kilos_netos * 100 - aCentimos(detalle.kilos_procesados))} kg`]] : []),
       ["Fecha de recepción", formatearFecha(detalle.fecha_recepcion)],
       ["Registrada", formatearFechaHora(detalle.fecha_hora)],
       ["Registrada por", detalle.registrada_por],

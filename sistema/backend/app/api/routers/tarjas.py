@@ -100,13 +100,13 @@ def pendientes(
     productor_id: int = Query(gt=0, le=MAX_INT_SQL_SERVER),  # Obligatorio y en rango; si no, 422.
     db: Session = Depends(get_db),  # Sesión de la petición.
 ) -> PendientesProductorOut:
-    # Obtiene la cantidad de tarjas y la suma de sus kilos netos.
+    # Obtiene la cantidad de tarjas y los kilos que les faltan por procesar.
     cantidad, kilos = pendientes_productor(db, productor_id)
     # Arma la respuesta con los acumulados del productor (decisión D).
     return PendientesProductorOut(
         productor_id=productor_id,  # Productor consultado.
         tarjas_sin_procesar=cantidad,  # Tarjas RECEPCIONADA o PARCIAL.
-        kilos_sin_procesar=kilos,  # Suma de sus kilos netos.
+        kilos_sin_procesar=kilos,  # Kilos netos menos lo procesado.
     )  # Finaliza la respuesta.
 
 

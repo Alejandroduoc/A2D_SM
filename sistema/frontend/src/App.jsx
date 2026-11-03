@@ -24,6 +24,10 @@ import Tarjas from "./pages/Tarjas";
 import Bandejas from "./pages/Bandejas";
 // Hoja de impresión de la tarja (HU16).
 import ImprimirTarja from "./pages/ImprimirTarja";
+// Registro de procesos de tarjas (HU18).
+import Procesamiento from "./pages/Procesamiento";
+// Comprobante del proceso.
+import ImprimirProceso from "./pages/ImprimirProceso";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -38,6 +42,10 @@ export default function App() {
           <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
             <Route path="tarjas/:id/imprimir" element={<ImprimirTarja />} />
           </Route>
+          {/* Sin Layout: el comprobante no muestra el menú; mismos roles que /procesos en la API. */}
+          <Route element={<ProtectedRoute rolesPermitidos={["operador_proceso", "administrador"]} />}>
+            <Route path="procesamiento/:id/imprimir" element={<ImprimirProceso />} />
+          </Route>
           <Route element={<Layout />}>
             {/* Inicio conserva el acceso de todos los perfiles. */}
             <Route index element={<Inicio />} />
@@ -48,6 +56,10 @@ export default function App() {
               <Route path="recepcion" element={<Recepcion />} />
               <Route path="tarjas" element={<Tarjas />} />
               <Route path="bandejas" element={<Bandejas />} />
+            </Route>
+            {/* Proceso y administrador, los mismos roles que exige /procesos en la API. */}
+            <Route element={<ProtectedRoute rolesPermitidos={["operador_proceso", "administrador"]} />}>
+              <Route path="procesamiento" element={<Procesamiento />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>

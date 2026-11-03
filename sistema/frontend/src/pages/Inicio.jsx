@@ -35,9 +35,9 @@ export default function Inicio() {
           ))}
         </div>
       ) : (
-        // Operadores y gerencia aún no tienen módulos: llegan con E3 y E4.
+        // Gerencia aún no tiene módulos: llegan con la bitácora y la trazabilidad de E4.
         <p className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-          Los módulos de recepción y procesamiento de tarjas estarán disponibles en las próximas etapas.
+          Los módulos de consulta de gerencia estarán disponibles en las próximas etapas.
         </p>
       )}
     </div>

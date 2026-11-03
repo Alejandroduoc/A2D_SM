@@ -18,8 +18,11 @@ import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SU
 
 // Capacidades técnicas de SQL Server y de los DECIMAL definidos en TarjaCreate.
 // La planta confirmó que no existen máximos operativos para estos tres valores.
+// Mayor cantidad de bandejas que admite una columna INT.
 const MAX_INT_SQL_SERVER = 2147483647;
+// Mayor pallet que admite DECIMAL(8,2), en centésimos.
 const MAX_PALLET_CENTIMOS = 99999999;
+// Mayor peso de balanza que admite DECIMAL(10,2), en centésimos.
 const MAX_BALANZA_CENTIMOS = 9999999999;
 
 // Obtiene YYYY-MM-DD usando el día de la planta y no la fecha UTC del navegador.
@@ -472,7 +475,8 @@ export default function Recepcion() {
                 ? "Consultando pendientes…"
                 : errorPendientes
                   ? <span className="text-red-700">{errorPendientes}</span>
-                  : `${pendientes?.tarjas_sin_procesar ?? 0} tarjas y ${pendientes?.kilos_sin_procesar ?? 0} kg sin procesar`}
+                  // Desde HU18 los kilos traen decimales: ",00" no aporta y los demás se muestran con coma.
+                  : `${pendientes?.tarjas_sin_procesar ?? 0} tarjas y ${String(pendientes?.kilos_sin_procesar ?? 0).replace(/\.00$/, "").replace(".", ",")} kg sin procesar`}
             </div>
           )}
 

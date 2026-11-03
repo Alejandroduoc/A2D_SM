@@ -9,6 +9,7 @@ from decimal import Decimal
 
 # Tipos de columna, restricciones y la secuencia del número de tarja.
 from sqlalchemy import (
+    Boolean,  # Merma rebajada.
     CheckConstraint,  # Reglas que SQL Server comprueba en cada fila.
     Date,  # Día sin hora.
     DateTime,  # Fecha con hora.
@@ -159,3 +160,5 @@ class Tarja(Base):
     veces_impresa: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Última impresión, si la hubo (HU16).
     impresa_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # El operador rebajó como merma sus kilos pendientes; la merma es de la recepción, no del proceso.
+    merma_rebajada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

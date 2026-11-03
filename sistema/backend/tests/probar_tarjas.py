@@ -70,6 +70,8 @@ TABLAS = (
     "tipos_bandeja",
     "tarjas",
     "movimientos_bandeja",
+    "procesos",
+    "proceso_tarjas",
 )
 # Ruta base del módulo.
 BASE = "/api/v1/tarjas"
@@ -627,7 +629,7 @@ def probar_api() -> None:
                 "Pendientes - solo RECEPCIONADA y PARCIAL",
                 estado == 200
                 and pendientes["tarjas_sin_procesar"] == 1
-                and pendientes["kilos_sin_procesar"] == 920,
+                and Decimal(pendientes["kilos_sin_procesar"]) == 920,
             )
             # Un id cero responde 422.
             comprobar(
@@ -711,16 +713,17 @@ def probar_api() -> None:
 
             # La planta no fija máximos operativos: los antiguos 500, 100 y 5.000 se aceptan.
             estado, sin_tope = solicitar(
-                "POST",
-                BASE,
-                token_recepcion,
+                "POST",  # Registra la tarja.
+                BASE,  # Ruta del módulo.
+                token_recepcion,  # Operador de recepción.
                 dict(
-                    cuerpo,
-                    cantidad_bandejas=501,
-                    peso_pallet_kg="101.00",
-                    kilos_brutos="5001.00",
-                ),
-            )
+                    cuerpo,  # Cuerpo válido.
+                    cantidad_bandejas=501,  # Antes superaba el máximo de bandejas.
+                    peso_pallet_kg="101.00",  # Antes superaba el máximo de pallet.
+                    kilos_brutos="5001.00",  # Antes superaba el máximo de balanza.
+                ),  # Finaliza el cuerpo.
+            )  # Finaliza la petición.
+            # Se acepta y conserva los valores.
             comprobar(
                 "Sin tope operativo - HTTP 201",
                 estado == 201
@@ -744,17 +747,22 @@ def probar_api() -> None:
             )
 
             # Dos netos válidos cercanos a INT deben acumularse en BIGINT.
+            # Primera tarja cercana al máximo de INT.
             db.get(Tarja, sin_tope["id"]).kilos_netos = 2000000000
+            # Segunda tarja cercana al máximo de INT.
             db.get(Tarja, salida_hoy["id"]).kilos_netos = 2000000000
+            # Solo confirma el savepoint.
             db.commit()
+            # Pide los acumulados del productor.
             estado, acumulados_grandes = solicitar(
-                "GET",
-                f"{BASE}/pendientes?productor_id={datos['productor'].id}",
-                token_recepcion,
-            )
+                "GET",  # Consulta de solo lectura.
+                f"{BASE}/pendientes?productor_id={datos['productor'].id}",  # Productor de las dos tarjas.
+                token_recepcion,  # Operador de recepción.
+            )  # Finaliza la petición.
+            # La suma supera INT sin error.
             comprobar(
                 "Pendientes - suma BIGINT sin desborde",
-                estado == 200 and acumulados_grandes["kilos_sin_procesar"] >= 4000000000,
+                estado == 200 and Decimal(acumulados_grandes["kilos_sin_procesar"]) >= 4000000000,
             )
 
             # Un fallo al auditar debe revertir tarja y movimiento.
@@ -1070,12 +1078,17 @@ def probar_saldo_bandejas() -> None:
             # Dos acumulados de INT superan el máximo de INT sin desbordar el saldo.
             db.add_all(
                 [
+                    # Entrada cercana al máximo de INT.
                     MovimientoBandeja(productor_id=productor_id, tipo_bandeja_id=bandeja_2.id, tipo=TipoMovimientoBandeja.ENTRADA, cantidad=2000000000),
+                    # Salida cercana al máximo de INT.
                     MovimientoBandeja(productor_id=productor_id, tipo_bandeja_id=bandeja_2.id, tipo=TipoMovimientoBandeja.SALIDA, cantidad=2000000000),
                 ]
             )
+            # Solo confirma el savepoint.
             db.commit()
+            # Lee el saldo del tipo de bandeja.
             fila = saldos()[bandeja_2.id]
+            # Las sumas no desbordan y el saldo sigue correcto.
             comprobar(
                 "HU15 - sumas BIGINT sin desborde",
                 fila["entradas"] == 2000000010 and fila["salidas"] == 2000000025 and fila["saldo"] == -15,
@@ -1130,7 +1143,7 @@ def probar_anulacion() -> None:
             # Ayuda: tarjas y kilos pendientes del productor.
             def pendientes() -> tuple[int, int]:
                 _, datos_p = solicitar("GET", f"{BASE}/pendientes?productor_id={productor_id}", token)
-                return datos_p["tarjas_sin_procesar"], datos_p["kilos_sin_procesar"]
+                return datos_p["tarjas_sin_procesar"], Decimal(datos_p["kilos_sin_procesar"])
 
             # Estado inicial: dos tarjas suman.
             comprobar("HU24 - antes: saldo y pendientes", saldo() == 100 and pendientes() == (2, 1840))

@@ -123,6 +123,8 @@ class TarjaOut(BaseModel):
     veces_impresa: int
     # Última impresión, si la hubo (HU16).
     impresa_en: datetime | None
+    # Sus kilos pendientes se rebajaron como merma.
+    merma_rebajada: bool
 
     # Se agrega a la respuesta aunque no sea una columna (HU14 criterio 3).
     @computed_field
@@ -216,5 +218,5 @@ class PendientesProductorOut(BaseModel):
     productor_id: int
     # Tarjas en estado RECEPCIONADA o PARCIAL.
     tarjas_sin_procesar: int
-    # Suma de sus kilos netos.
-    kilos_sin_procesar: int
+    # Sus kilos netos menos lo procesado; con decimales desde HU18, porque las cajas pueden pesar 11,35 kg.
+    kilos_sin_procesar: Decimal

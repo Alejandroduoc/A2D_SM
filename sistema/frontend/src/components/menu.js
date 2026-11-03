@@ -35,6 +35,12 @@ export const MENU = [
     roles: ["operador_recepcion", "administrador"], // Los mismos roles que exige /tarjas en la API.
   },
   {
+    ruta: "/procesamiento", // Registro de procesos (HU18); la ruta también se protege en App.jsx.
+    etiqueta: "Procesamiento", // Nombre visible.
+    descripcion: "Procesos de tarjas: folio, embalaje, cajas, consumo parcial y merma (E4).",
+    roles: ["operador_proceso", "administrador"], // Los mismos roles que exige /procesos en la API.
+  },
+  {
     ruta: "/productores", // La ruta también se protege por rol en App.jsx.
     etiqueta: "Productores", // Nombre visible del mantenimiento.
     descripcion: "Productores que entregan fruta: RUT, razón social, contacto y estado (E2).",
