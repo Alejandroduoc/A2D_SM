@@ -15,14 +15,6 @@ from app.core.validators import MAX_INT_SQL_SERVER
 # Misma regla de los pesos de HU10: un booleano no es un número.
 from app.schemas.tipo_bandeja import validar_decimal_no_booleano
 
-# Máximos de "peso fuera de rango" (HU12 criterio 3). [CONFIRMAR] con la planta.
-# Cantidad máxima de bandejas en una tarja.
-MAX_BANDEJAS = 500
-# Peso máximo del pallet en kilos.
-MAX_PALLET_KG = Decimal("100")
-# Peso máximo que registra la balanza en kilos.
-MAX_BALANZA_KG = Decimal("5000")
-
 # Zona horaria de la planta; la fecha en UTC adelanta un día después de las 21:00.
 ZONA_CHILE = ZoneInfo("America/Santiago")
 
@@ -49,12 +41,12 @@ class TarjaCreate(BaseModel):
     calidad_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Tipo de bandeja; el service copia su tara en la tarja.
     tipo_bandeja_id: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
-    # Cantidad de bandejas, al menos una y hasta el máximo.
-    cantidad_bandejas: int = Field(gt=0, le=MAX_BANDEJAS, strict=True)
+    # Cantidad de bandejas: positiva y dentro de la capacidad técnica de INT.
+    cantidad_bandejas: int = Field(gt=0, le=MAX_INT_SQL_SERVER, strict=True)
     # Peso del pallet; puede ser cero si la fruta llega sin pallet.
-    peso_pallet_kg: Decimal = Field(ge=0, le=MAX_PALLET_KG, max_digits=8, decimal_places=2)
-    # Peso de balanza (brutos), positivo y hasta el máximo.
-    kilos_brutos: Decimal = Field(gt=0, le=MAX_BALANZA_KG, max_digits=10, decimal_places=2)
+    peso_pallet_kg: Decimal = Field(ge=0, max_digits=8, decimal_places=2)
+    # Peso de balanza (brutos), positivo; DECIMAL define su capacidad técnica.
+    kilos_brutos: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
     # Porcentaje de calidad visual, de 0 a 100 (decisión B).
     porcentaje_calidad: int = Field(ge=0, le=100, strict=True)
     # Fecha de recepción; si no llega, el validador pone hoy (decisión C).

@@ -16,12 +16,11 @@ import { situacionBandejas } from "../components/saldoBandejas";
 // Clases comunes de formularios y mensajes.
 import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SUBTITULO } from "../components/catalogo";
 
-// Límites acordados provisionalmente con el backend de A1 ([CONFIRMAR] con la planta).
-const MAX_BANDEJAS = 500;
-// 100 kg de pallet, expresados en centésimos.
-const MAX_PALLET_CENTIMOS = 10000;
-// 5.000 kg de balanza, expresados en centésimos.
-const MAX_BALANZA_CENTIMOS = 500000;
+// Capacidades técnicas de SQL Server y de los DECIMAL definidos en TarjaCreate.
+// La planta confirmó que no existen máximos operativos para estos tres valores.
+const MAX_INT_SQL_SERVER = 2147483647;
+const MAX_PALLET_CENTIMOS = 99999999;
+const MAX_BALANZA_CENTIMOS = 9999999999;
 
 // Obtiene YYYY-MM-DD usando el día de la planta y no la fecha UTC del navegador.
 function hoyEnChile() {
@@ -287,8 +286,8 @@ export default function Recepcion() {
   // Valores numéricos de los campos enteros.
   const cantidad = Number(form.cantidad_bandejas);
   const calidad = Number(form.porcentaje_calidad);
-  // Validación en el momento, con los mismos límites de TarjaCreate (HU12 criterio 3).
-  const cantidadValida = Number.isInteger(cantidad) && cantidad > 0 && cantidad <= MAX_BANDEJAS;
+  // Validación en el momento, con los mismos límites técnicos de TarjaCreate.
+  const cantidadValida = Number.isInteger(cantidad) && cantidad > 0 && cantidad <= MAX_INT_SQL_SERVER;
   const calidadValida = form.porcentaje_calidad !== ""
     && Number.isInteger(calidad)
     && calidad >= 0
@@ -571,7 +570,7 @@ export default function Recepcion() {
                   name="cantidad_bandejas"
                   type="number"
                   min="1"
-                  max={MAX_BANDEJAS}
+                  max={MAX_INT_SQL_SERVER}
                   step="1"
                   value={form.cantidad_bandejas}
                   onChange={cambiarCampo}
@@ -582,7 +581,7 @@ export default function Recepcion() {
                 />
                 {/* Aviso en línea, solo si ya se escribió algo. */}
                 {form.cantidad_bandejas && !cantidadValida && (
-                  <p id="recepcion-cantidad-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese entre 1 y {MAX_BANDEJAS} bandejas.</p>
+                  <p id="recepcion-cantidad-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese una cantidad entera positiva.</p>
                 )}
               </div>
               {/* Peso del pallet; parte en 0. */}
@@ -593,7 +592,7 @@ export default function Recepcion() {
                   name="peso_pallet_kg"
                   type="number"
                   min="0"
-                  max="100"
+                  max="999999.99"
                   step="0.01"
                   value={form.peso_pallet_kg}
                   onChange={cambiarCampo}
@@ -604,7 +603,7 @@ export default function Recepcion() {
                 />
                 {/* Aviso en línea. */}
                 {!palletValido && (
-                  <p id="recepcion-pallet-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese un peso entre 0 y 100 kg.</p>
+                  <p id="recepcion-pallet-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese un peso no negativo con hasta dos decimales.</p>
                 )}
               </div>
               {/* Peso de balanza. */}
@@ -615,7 +614,7 @@ export default function Recepcion() {
                   name="kilos_brutos"
                   type="number"
                   min="0.01"
-                  max="5000"
+                  max="99999999.99"
                   step="0.01"
                   value={form.kilos_brutos}
                   onChange={cambiarCampo}
@@ -626,7 +625,7 @@ export default function Recepcion() {
                 />
                 {/* Aviso en línea, solo si ya se escribió algo. */}
                 {form.kilos_brutos && !brutosValidos && (
-                  <p id="recepcion-brutos-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese un peso mayor que 0 y hasta 5.000 kg.</p>
+                  <p id="recepcion-brutos-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese un peso mayor que cero con hasta dos decimales.</p>
                 )}
               </div>
               {/* Fecha de recepción: por defecto hoy, editable y nunca futura (decisión C). */}

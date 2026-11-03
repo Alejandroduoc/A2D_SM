@@ -6,7 +6,7 @@ from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_EVEN, Decimal
 
 # Consultas agregadas, sumas condicionales y acceso directo a la secuencia de SQL Server.
-from sqlalchemy import case, func, select, text
+from sqlalchemy import BigInteger, case, cast, func, select, text
 # Sesión compartida por la tarja, el movimiento y sus auditorías.
 from sqlalchemy.orm import Session
 
@@ -188,7 +188,7 @@ def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
     # Cuenta las tarjas y suma sus kilos netos; sin tarjas, la suma es 0 y no NULL.
     consulta = select(
         func.count(Tarja.id),  # Cantidad de tarjas.
-        func.coalesce(func.sum(Tarja.kilos_netos), 0),  # Suma de kilos netos.
+        func.coalesce(func.sum(cast(Tarja.kilos_netos, BigInteger)), 0),  # Suma en BIGINT para no desbordar INT.
     ).where(
         Tarja.productor_id == productor_id,  # Solo el productor elegido.
         Tarja.estado.in_((EstadoTarja.RECEPCIONADA, EstadoTarja.PARCIAL)),  # Sin terminar ni anular.
@@ -202,9 +202,9 @@ def pendientes_productor(db: Session, productor_id: int) -> tuple[int, int]:
 # Calcula el saldo de bandejas de un productor, por tipo de bandeja (HU15 criterio 3).
 def saldo_bandejas_productor(db: Session, productor_id: int) -> list[dict]:
     # No se guarda: se calcula con los movimientos, igual que el legado (Form4.vb).
-    entradas = func.sum(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.ENTRADA, MovimientoBandeja.cantidad), else_=0))
+    entradas = func.sum(cast(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.ENTRADA, MovimientoBandeja.cantidad), else_=0), BigInteger))
     # Las salidas llegan con la guía; se restan para que la regla no cambie entonces (criterio 5).
-    salidas = func.sum(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.SALIDA, MovimientoBandeja.cantidad), else_=0))
+    salidas = func.sum(cast(case((MovimientoBandeja.tipo == TipoMovimientoBandeja.SALIDA, MovimientoBandeja.cantidad), else_=0), BigInteger))
     # Una fila por tipo de bandeja con movimientos.
     consulta = (
         select(

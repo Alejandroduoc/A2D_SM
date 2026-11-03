@@ -682,7 +682,7 @@ def probar_api() -> None:
 
             # Fecha futura en Chile.
             manana = (hoy_en_chile() + timedelta(days=1)).isoformat()
-            # Campos que el cliente no envía y valores fuera de rango.
+            # Campos que el cliente no envía y valores inválidos.
             invalidos = (
                 {"numero_tarja": 99},
                 {"kilos_netos": 1},
@@ -690,10 +690,11 @@ def probar_api() -> None:
                 {"porcentaje_calidad": 101},
                 {"porcentaje_calidad": -1},
                 {"cantidad_bandejas": 0},
+                {"cantidad_bandejas": 2147483648},
                 {"fecha_recepcion": manana},
                 {"peso_pallet_kg": "-1"},
-                {"peso_pallet_kg": "101"},
-                {"kilos_brutos": "5001"},
+                {"peso_pallet_kg": "1000000.00"},
+                {"kilos_brutos": "100000000.00"},
             )
             # Cada caso se prueba por separado.
             for indice, cambio in enumerate(invalidos, 1):
@@ -708,6 +709,26 @@ def probar_api() -> None:
                 # No deja filas ni eventos.
                 comprobar(f"Schema V{indice} - sin escrituras", cantidades(db) == antes)
 
+            # La planta no fija máximos operativos: los antiguos 500, 100 y 5.000 se aceptan.
+            estado, sin_tope = solicitar(
+                "POST",
+                BASE,
+                token_recepcion,
+                dict(
+                    cuerpo,
+                    cantidad_bandejas=501,
+                    peso_pallet_kg="101.00",
+                    kilos_brutos="5001.00",
+                ),
+            )
+            comprobar(
+                "Sin tope operativo - HTTP 201",
+                estado == 201
+                and sin_tope["cantidad_bandejas"] == 501
+                and Decimal(sin_tope["peso_pallet_kg"]) == Decimal("101.00")
+                and Decimal(sin_tope["kilos_brutos"]) == Decimal("5001.00"),
+            )
+
             # Omitir la fecha utiliza hoy en Chile.
             # Copia el cuerpo base.
             sin_fecha = dict(cuerpo)
@@ -720,6 +741,20 @@ def probar_api() -> None:
                 "Fecha - omitida usa hoy en Chile",
                 estado == 201
                 and salida_hoy["fecha_recepcion"] == hoy_en_chile().isoformat(),
+            )
+
+            # Dos netos válidos cercanos a INT deben acumularse en BIGINT.
+            db.get(Tarja, sin_tope["id"]).kilos_netos = 2000000000
+            db.get(Tarja, salida_hoy["id"]).kilos_netos = 2000000000
+            db.commit()
+            estado, acumulados_grandes = solicitar(
+                "GET",
+                f"{BASE}/pendientes?productor_id={datos['productor'].id}",
+                token_recepcion,
+            )
+            comprobar(
+                "Pendientes - suma BIGINT sin desborde",
+                estado == 200 and acumulados_grandes["kilos_sin_procesar"] >= 4000000000,
             )
 
             # Un fallo al auditar debe revertir tarja y movimiento.
@@ -1031,6 +1066,20 @@ def probar_saldo_bandejas() -> None:
             db.commit()
             fila = saldos()[bandeja_2.id]
             comprobar("HU15 - salida resta y deja saldo negativo", fila["entradas"] == 10 and fila["salidas"] == 25 and fila["saldo"] == -15)
+
+            # Dos acumulados de INT superan el máximo de INT sin desbordar el saldo.
+            db.add_all(
+                [
+                    MovimientoBandeja(productor_id=productor_id, tipo_bandeja_id=bandeja_2.id, tipo=TipoMovimientoBandeja.ENTRADA, cantidad=2000000000),
+                    MovimientoBandeja(productor_id=productor_id, tipo_bandeja_id=bandeja_2.id, tipo=TipoMovimientoBandeja.SALIDA, cantidad=2000000000),
+                ]
+            )
+            db.commit()
+            fila = saldos()[bandeja_2.id]
+            comprobar(
+                "HU15 - sumas BIGINT sin desborde",
+                fila["entradas"] == 2000000010 and fila["salidas"] == 2000000025 and fila["saldo"] == -15,
+            )
 
             # Un tipo desactivado se sigue mostrando: el productor conserva esas bandejas.
             db.get(TipoBandeja, tipo_1).activo = False
