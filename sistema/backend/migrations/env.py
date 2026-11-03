@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401
     embalaje,
     especie,
     movimiento_bandeja,
+    proceso,
     productor,
     sistema_productivo,
     tipo_bandeja,
