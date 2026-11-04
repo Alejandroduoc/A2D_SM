@@ -16,6 +16,8 @@ from datetime import timedelta
 from decimal import Decimal
 # Simula el fallo de la auditoría.
 from unittest.mock import patch
+# Escapa los folios en la URL.
+from urllib.parse import urlencode
 
 # Consultas de lectura y SQL directo.
 from sqlalchemy import func, select, text
@@ -537,6 +539,128 @@ def probar_terminada_y_merma() -> None:
         db.rollback()
 
 
+# HU19: rendimiento y merma por folios, calculados al consultar.
+def probar_rendimiento() -> None:
+    # Escenario aislado.
+    with aislado() as (db, _, _externa), api_con_sesion(db):
+        # Datos comunes.
+        datos = preparar(db)
+
+        # Ayuda: consulta con los folios indicados.
+        def consultar(*folios: str, token: str | None = datos["token_proceso"]) -> tuple[int, object]:
+            # Cada folio viaja como un parámetro repetido; urlencode escapa lo que escriba el operador.
+            return solicitar("GET", f"{BASE}/rendimiento?" + urlencode([("folios", folio) for folio in folios]), token)
+
+        # Ayuda: la fila de una tarja dentro del resultado.
+        def de_tarja(resultado: dict, tarja: dict) -> dict | None:
+            # Sin coincidencias, no está.
+            return next((f for f in resultado["tarjas"] if f["tarja_id"] == tarja["id"]), None)
+
+        # Tarja de 920 kg en dos procesos: 400 y 200 kg.
+        tarja = nueva_tarja(datos)
+        _, p_1 = procesar(datos, datos["caja_10"], fila(tarja, 40))
+        _, p_2 = procesar(datos, datos["caja_10"], fila(tarja, 20))
+
+        # Roles.
+        comprobar("HU19 - sin token 401", consultar(p_1["folio"], token=None)[0] == 401)
+        comprobar("HU19 - recepción 403", consultar(p_1["folio"], token=datos["token_recepcion"])[0] == 403)
+        comprobar("HU19 - gerencia 403", consultar(p_1["folio"], token=datos["token_gerencia"])[0] == 403)
+        comprobar("HU19 - administrador 200", consultar(p_1["folio"], token=datos["token_admin"])[0] == 200)
+        # Entradas inválidas.
+        comprobar("HU19 - sin folios 422", solicitar("GET", f"{BASE}/rendimiento", datos["token_proceso"])[0] == 422)
+        estado, respuesta = consultar("abc")
+        comprobar("HU19 - folio inválido 422 con mensaje", estado == 422 and "abc" in respuesta["detail"])
+        comprobar("HU19 - folio con símbolos 422", consultar("P1'; DROP TABLE procesos;--")[0] == 422)
+        comprobar("HU19 - folio demasiado largo 422", consultar("P12345678901")[0] == 422)
+        comprobar("HU19 - demasiados folios 422", consultar(*[f"P{n}" for n in range(1, 202)])[0] == 422)
+
+        # Criterio 2: todos sus procesos vigentes, aunque se pida un solo folio.
+        estado, resultado = consultar(p_1["folio"])
+        calculo = de_tarja(resultado, tarja)
+        comprobar("HU19 - encuentra la tarja por el folio", estado == 200 and calculo is not None and calculo["numero_tarja"] == tarja["numero_tarja"])
+        comprobar("HU19 - entrada = kilos netos", Decimal(calculo["kilos_entrada"]) == 920)
+        comprobar("HU19 - procesados = todos sus procesos", Decimal(calculo["kilos_procesados"]) == 600)
+        comprobar("HU19 - merma = entrada - procesados", Decimal(calculo["merma"]) == 320)
+        comprobar("HU19 - rendimiento con dos decimales", calculo["rendimiento"] == "65.22")
+        comprobar("HU19 - muestra sus folios", calculo["folios"] == [p_1["folio"], p_2["folio"]])
+        comprobar("HU19 - muestra productor y fruta", calculo["productor_razon_social"] == datos["productor"].razon_social and calculo["especie"] and calculo["variedad"] and calculo["calidad"])
+        # Criterio 1: el folio se acepta como lo escriba el operador.
+        numero = p_1["folio"][1:]
+        for escrito in (numero, f"p{numero}", f" {p_1['folio']} ", f"P00{numero}"):
+            _, otra = consultar(escrito)
+            comprobar(f"HU19 - acepta {escrito.strip()!r}", de_tarja(otra, tarja) is not None and otra["folios_no_encontrados"] == [])
+        # Una tarja en dos folios aparece una sola vez.
+        _, resultado = consultar(p_1["folio"], p_2["folio"], p_1["folio"])
+        comprobar("HU19 - tarja en dos folios, una fila", len(resultado["tarjas"]) == 1)
+
+        # Criterio 4: abierta es provisional.
+        comprobar("HU19 - parcial es provisional", calculo["provisional"] is True)
+        # El redondeo es el del Form42: 1 de 800 kg es 0,125 %, y queda en 0,12.
+        chica = nueva_tarja(datos, kilos_brutos="880.00")
+        _, p_chica = procesar(datos, datos["granel"], fila(chica, 1, kilos_procesados="1.00"))
+        _, otra = consultar(p_chica["folio"])
+        comprobar("HU19 - redondeo bancario", de_tarja(otra, chica)["rendimiento"] == "0.12")
+
+        # Terminada con saldo 0: sin merma, 100 % y definitiva.
+        completa = nueva_tarja(datos)
+        _, p_completa = procesar(datos, datos["caja_10"], fila(completa, 92))
+        _, otra = consultar(p_completa["folio"])
+        calculo = de_tarja(otra, completa)
+        comprobar("HU19 - saldo 0: sin merma, 100 % y definitiva", Decimal(calculo["merma"]) == 0 and calculo["rendimiento"] == "100.00" and calculo["provisional"] is False)
+        # Terminada con la marca: la merma es definitiva.
+        marcada = nueva_tarja(datos)
+        _, p_marca = procesar(datos, datos["caja_10"], fila(marcada, 90, tarja_terminada=True))
+        _, otra = consultar(p_marca["folio"])
+        calculo = de_tarja(otra, marcada)
+        comprobar("HU19 - con marca: merma definitiva", Decimal(calculo["merma"]) == 20 and calculo["provisional"] is False)
+        # Rebajada: también definitiva.
+        rebajada = nueva_tarja(datos)
+        _, p_reb = procesar(datos, datos["caja_10"], fila(rebajada, 46))
+        solicitar("POST", f"{BASE}/tarjas/{rebajada['id']}/terminar", datos["token_proceso"])
+        _, otra = consultar(p_reb["folio"])
+        calculo = de_tarja(otra, rebajada)
+        comprobar("HU19 - rebajada: merma definitiva", Decimal(calculo["merma"]) == 460 and calculo["rendimiento"] == "50.00" and calculo["provisional"] is False)
+
+        # Criterio 3: total de las tarjas consultadas, con el rendimiento sobre las sumas.
+        _, varias = consultar(p_completa["folio"], p_reb["folio"])
+        comprobar("HU19 - total de entrada, procesados y merma", len(varias["tarjas"]) == 2 and Decimal(varias["total"]["kilos_entrada"]) == 1840 and Decimal(varias["total"]["kilos_procesados"]) == 1380 and Decimal(varias["total"]["merma"]) == 460)
+        comprobar("HU19 - rendimiento total sobre las sumas", varias["total"]["rendimiento"] == "75.00")
+        comprobar("HU19 - total definitivo si todas terminaron", varias["total"]["provisional"] is False)
+        # Con tarjas de distinto avance, el total no es el promedio de los porcentajes: 921 de 1.720 kg.
+        _, dispares = consultar(p_completa["folio"], p_chica["folio"])
+        comprobar("HU19 - rendimiento total no es un promedio", dispares["total"]["rendimiento"] == "53.55")
+        _, varias = consultar(p_completa["folio"], p_1["folio"])
+        comprobar("HU19 - total provisional si alguna sigue abierta", varias["total"]["provisional"] is True)
+
+        # Folios que no entran en el cálculo.
+        _, otra = consultar(p_1["folio"], "P2147483647")
+        comprobar("HU19 - avisa el folio inexistente y calcula el resto", otra["folios_no_encontrados"] == ["P2147483647"] and de_tarja(otra, tarja) is not None)
+        _, vacia = consultar("P2147483647")
+        comprobar("HU19 - sin tarjas: total en cero y sin dividir", vacia["tarjas"] == [] and Decimal(vacia["total"]["kilos_entrada"]) == 0 and vacia["total"]["rendimiento"] is None and vacia["total"]["provisional"] is False)
+
+        # Criterio 5: cambia solo al anular, sin corregir nada a mano.
+        comprobar("HU19 - anular: admin 200", solicitar("POST", f"{BASE}/{p_2['id']}/anular", datos["token_admin"])[0] == 200)
+        _, otra = consultar(p_1["folio"])
+        calculo = de_tarja(otra, tarja)
+        comprobar("HU19 - sin el proceso anulado, cambia solo", Decimal(calculo["kilos_procesados"]) == 400 and Decimal(calculo["merma"]) == 520 and calculo["folios"] == [p_1["folio"]])
+        # El folio anulado se avisa y no aporta tarjas.
+        _, otra = consultar(p_2["folio"])
+        comprobar("HU19 - folio anulado: se avisa y no calcula", otra["folios_anulados"] == [p_2["folio"]] and otra["tarjas"] == [])
+        # Una tarja rebajada cuyo proceso se anula deja de ser definitiva.
+        solicitar("POST", f"{BASE}/{p_reb['id']}/anular", datos["token_admin"])
+        _, otra = consultar(p_reb["folio"])
+        comprobar("HU19 - rebajada con su proceso anulado sale del cálculo", otra["folios_anulados"] == [p_reb["folio"]] and de_tarja(otra, rebajada) is None)
+        # También cambia solo al editar.
+        solicitar("PUT", f"{BASE}/{p_1['id']}", datos["token_proceso"], {"tarjas": [fila(tarja, "38.5")]})
+        _, otra = consultar(p_1["folio"])
+        comprobar("HU19 - cambia solo al editar", Decimal(de_tarja(otra, tarja)["kilos_procesados"]) == 385)
+
+        # Consultar no escribe ni audita.
+        antes = cantidades(db)
+        consultar(p_1["folio"], p_completa["folio"])
+        comprobar("HU19 - consultar no escribe", cantidades(db) == antes)
+
+
 # HU25: anular un proceso; todo queda pendiente y la merma la vuelve a decidir el operador.
 def probar_anulacion() -> None:
     # Escenario aislado.
@@ -1021,6 +1145,8 @@ def main() -> None:
         probar_edicion()
         # Anulación de un proceso (HU25).
         probar_anulacion()
+        # Rendimiento y merma por folios (HU19).
+        probar_rendimiento()
         # Transacción y auditoría.
         probar_transaccion_y_auditoria()
     # Registra el error sin detener el informe.

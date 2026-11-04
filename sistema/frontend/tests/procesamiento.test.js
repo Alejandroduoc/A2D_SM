@@ -3,7 +3,7 @@ import test from "node:test";
 // Compara resultados con las aserciones estrictas de Node.
 import assert from "node:assert/strict";
 // Funciones de cálculo de la pantalla de procesamiento.
-import { aCentimos, cajasParaSaldo, centimosDeFila, filasDeProceso, motivoMezcla, revisarFila, textoCajas, textoCentimos, textoKilos } from "../src/components/procesamiento.js";
+import { aCentimos, cajasParaSaldo, centimosDeFila, filasDeProceso, motivoMezcla, revisarFila, separarFolios, textoCajas, textoCentimos, textoKilos } from "../src/components/procesamiento.js";
 
 // Embalaje fijo igual al 5x5 libras del legado.
 const CAJA = { es_granel: false, kg_por_caja: "11.35" };
@@ -97,6 +97,14 @@ test("al editar, lo que se baja vuelve a la tarja de recepción", () => {
   // Subir usa lo disponible, que ya incluye lo que tiene la fila.
   assert.equal(revisarFila(CAJA_10, { ...editada, cantidad_cajas: "92" }).valida, true);
   assert.equal(revisarFila(CAJA_10, { ...editada, cantidad_cajas: "93" }).valida, false);
+});
+
+// HU19: uno o varios folios, como los escriba el operador.
+test("separa los folios escritos", () => {
+  assert.deepEqual(separarFolios("P12"), ["P12"]);
+  assert.deepEqual(separarFolios(" P12, P13;p14  15\n"), ["P12", "P13", "p14", "15"]);
+  assert.deepEqual(separarFolios(",  ;"), []);
+  assert.deepEqual(separarFolios(null), []);
 });
 
 // Misma fruta en todo el proceso, como en la API.

@@ -28,6 +28,8 @@ import ImprimirTarja from "./pages/ImprimirTarja";
 import Procesamiento from "./pages/Procesamiento";
 // Comprobante del proceso.
 import ImprimirProceso from "./pages/ImprimirProceso";
+// Rendimiento y merma por folios (HU19).
+import Rendimiento from "./pages/Rendimiento";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -60,6 +62,7 @@ export default function App() {
             {/* Proceso y administrador, los mismos roles que exige /procesos en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["operador_proceso", "administrador"]} />}>
               <Route path="procesamiento" element={<Procesamiento />} />
+              <Route path="rendimiento" element={<Rendimiento />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>

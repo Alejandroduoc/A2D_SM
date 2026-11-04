@@ -128,6 +128,12 @@ export function motivoMezcla(detalle, tarja) {
   return "";
 }
 
+// Separa los folios que escribe el operador, con comas, punto y coma o espacios.
+export function separarFolios(texto) {
+  // La validación del formato la hace la API, que explica cuál no sirve.
+  return String(texto ?? "").split(/[\s,;]+/).filter(Boolean);
+}
+
 // Convierte un proceso guardado en las filas del formulario de edición.
 export function filasDeProceso(proceso) {
   // Una fila por cada tarja del proceso.

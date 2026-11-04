@@ -227,3 +227,65 @@ class TarjaTerminadaOut(BaseModel):
     kilos_merma: Decimal
     # Estado resultante.
     estado: str
+
+
+# Una tarja de recepción con su rendimiento y su merma (HU19 criterio 2).
+class RendimientoTarjaOut(BaseModel):
+    """Se calcula al consultar: nunca se guarda."""
+
+    # Identificador interno de la tarja.
+    tarja_id: int
+    # Número de la tarja.
+    numero_tarja: int
+    # Código del productor.
+    productor_codigo: int
+    # Nombre del productor.
+    productor_razon_social: str
+    # Especie de la fruta.
+    especie: str
+    # Variedad de la fruta.
+    variedad: str
+    # Calidad de la fruta.
+    calidad: str
+    # Procesos vigentes de la tarja, también los de folios que no se ingresaron.
+    folios: list[str]
+    # Kilos netos de la tarja.
+    kilos_entrada: Decimal
+    # Suma de sus kilos en todos sus procesos no anulados.
+    kilos_procesados: Decimal
+    # Kilos de entrada menos kilos procesados.
+    merma: Decimal
+    # Kilos procesados sobre kilos de entrada, en porcentaje con dos decimales.
+    rendimiento: Decimal
+    # Verdadero mientras la tarja no esté terminada (criterio 4).
+    provisional: bool
+
+
+# Total de las tarjas consultadas (HU19 criterio 3).
+class RendimientoTotalOut(BaseModel):
+    """Suma las tarjas y calcula el rendimiento sobre esas sumas."""
+
+    # Suma de los kilos de entrada.
+    kilos_entrada: Decimal
+    # Suma de los kilos procesados.
+    kilos_procesados: Decimal
+    # Suma de las mermas.
+    merma: Decimal
+    # Nulo si no hay tarjas: no se divide por cero.
+    rendimiento: Decimal | None
+    # Verdadero si alguna tarja sigue abierta.
+    provisional: bool
+
+
+# Resultado de la consulta por folios (HU19).
+class RendimientoOut(BaseModel):
+    """Las tarjas, su total y los folios que no entraron en el cálculo."""
+
+    # Una fila por tarja, aunque aparezca en varios folios.
+    tarjas: list[RendimientoTarjaOut]
+    # Total de esas tarjas.
+    total: RendimientoTotalOut
+    # Folios ingresados que no existen.
+    folios_no_encontrados: list[str]
+    # Folios ingresados que están anulados y no cuentan.
+    folios_anulados: list[str]

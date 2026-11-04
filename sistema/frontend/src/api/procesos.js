@@ -43,6 +43,16 @@ export async function anularProceso(id) {
   return respuesta.data;
 }
 
+// Calcula el rendimiento y la merma de las tarjas asociadas a los folios (HU19).
+export async function consultarRendimiento(folios) {
+  // Cada folio viaja como un parámetro repetido: ?folios=P1&folios=P2.
+  const parametros = new URLSearchParams(folios.map((folio) => ["folios", folio]));
+  // El servidor calcula con los procesos vigentes; no se guarda nada.
+  const respuesta = await client.get(`/procesos/rendimiento?${parametros}`);
+  // Devuelve las tarjas, su total y los folios que no entraron.
+  return respuesta.data;
+}
+
 // Lista los procesos, los más recientes primero.
 export async function listarProcesos() {
   // Sin filtros: la API limita la cantidad de filas.

@@ -1,5 +1,7 @@
 """Reglas de negocio del procesamiento de tarjas (HU18)."""
 
+# Revisa el formato de los folios que escribe el operador.
+import re
 # Pesos exactos, sin float, y redondeo bancario.
 from decimal import ROUND_HALF_EVEN, Decimal
 
@@ -42,6 +44,15 @@ MAXIMO_FILAS_LISTADO = 200
 MAX_DECIMAL_COLUMNA = Decimal("99999999.99")
 # Precisión de los kilos.
 CENTESIMO = Decimal("0.01")
+# Tope de folios de una consulta: SQL Server limita los parámetros de una sentencia.
+MAXIMO_FOLIOS_CONSULTA = 200
+# Folio con o sin la letra P; un INT tiene hasta diez dígitos.
+_PATRON_FOLIO = re.compile(r"P?(\d{1,10})")
+
+
+# El router traduce este error a HTTP 422.
+class FoliosNoValidosError(Exception):
+    """Un folio no tiene el formato P más número, o se pidieron demasiados."""
 
 
 # El router traduce este error a HTTP 404.
@@ -174,6 +185,102 @@ def listar_tarjas_rebajadas(db: Session) -> list[dict]:
     consulta = _consulta_tarjas_con_kilos().where(Tarja.merma_rebajada == True)  # noqa: E712
     # En estas tarjas, la diferencia con los netos es su merma.
     return _tarjas_con_kilos(db, consulta.order_by(Tarja.numero_tarja.desc()).limit(MAXIMO_FILAS_LISTADO))
+
+
+# Deja los folios como se guardan, sin repetidos y en el orden escrito.
+def _normalizar_folios(folios: list[str]) -> list[str]:
+    # Prepara el resultado.
+    salida = []
+    # Revisa cada folio.
+    for folio in folios:
+        # Acepta p12, P12 o 12, como lo escriba el operador.
+        coincide = _PATRON_FOLIO.fullmatch(folio.strip().upper())
+        # Un texto que no es un folio se avisa, no se ignora.
+        if coincide is None:
+            raise FoliosNoValidosError(f"\"{folio.strip()[:20]}\" no es un folio válido")
+        # Sin ceros a la izquierda, como lo guarda el sistema.
+        normalizado = f"P{int(coincide.group(1))}"
+        # Un folio repetido se considera una sola vez.
+        if normalizado not in salida:
+            salida.append(normalizado)
+    # Un listado absurdo se rechaza antes de llegar a la base.
+    if len(salida) > MAXIMO_FOLIOS_CONSULTA:
+        raise FoliosNoValidosError(f"Se pueden consultar hasta {MAXIMO_FOLIOS_CONSULTA} folios a la vez")
+    # Entrega los folios listos para buscar.
+    return salida
+
+
+# Calcula el porcentaje con dos decimales y el redondeo del Form42 del legado.
+def _rendimiento(procesados: Decimal, entrada: Decimal) -> Decimal:
+    # Multiplica primero para no perder precisión.
+    return (procesados * 100 / entrada).quantize(CENTESIMO, rounding=ROUND_HALF_EVEN)
+
+
+# Calcula rendimiento y merma de las tarjas asociadas a los folios (HU19); no escribe nada.
+def calcular_rendimiento(db: Session, folios: list[str]) -> dict:
+    """No se guarda: se calcula al consultar, para que siempre coincida con los procesos vigentes."""
+    # Deja los folios como se guardan.
+    buscados = _normalizar_folios(folios)
+    # Busca los procesos de esos folios.
+    procesos = db.execute(select(Proceso.id, Proceso.folio, Proceso.anulado).where(Proceso.folio.in_(buscados))).all()
+    # Folios que existen.
+    existentes = {proceso.folio for proceso in procesos}
+    # Un proceso anulado no cuenta, pero se avisa para que el operador sepa por qué falta.
+    anulados = {proceso.folio for proceso in procesos if proceso.anulado}
+    # Procesos que sí cuentan.
+    vigentes = [proceso.id for proceso in procesos if not proceso.anulado]
+    # Tarjas de recepción asociadas (criterio 1).
+    asociadas = select(ProcesoTarja.tarja_id).where(ProcesoTarja.proceso_id.in_(vigentes))
+    # Kilos procesados en TODOS sus procesos no anulados: el legado tomaba solo el primero.
+    filas = _tarjas_con_kilos(db, _consulta_tarjas_con_kilos().where(Tarja.id.in_(asociadas)).order_by(Tarja.numero_tarja))
+    # Folios vigentes de cada tarja, para mostrarlos.
+    folios_por_tarja = {}
+    # Lee los folios en orden de registro.
+    for tarja_id, folio in db.execute(
+        select(ProcesoTarja.tarja_id, Proceso.folio)  # Tarja y folio.
+        .join(Proceso, ProcesoTarja.proceso_id == Proceso.id)  # Une con la cabecera.
+        .where(
+            ProcesoTarja.tarja_id.in_([fila["id"] for fila in filas]),  # Solo las tarjas del resultado.
+            Proceso.anulado == False,  # noqa: E712  Un proceso anulado deja de contar.
+        )  # Finaliza los filtros.
+        .order_by(Proceso.id)  # Orden de registro.
+    ).all():
+        # Agrupa por tarja.
+        folios_por_tarja.setdefault(tarja_id, []).append(folio)
+    # Prepara una fila por tarja.
+    tarjas = []
+    # Calcula cada tarja (criterio 2).
+    for fila in filas:
+        # Kilos de entrada: los netos de la recepción.
+        entrada = Decimal(fila["kilos_netos"])
+        # Kilos procesados vigentes.
+        procesados = fila["kilos_procesados"]
+        # Agrega la fila.
+        tarjas.append({
+            **fila,  # Datos y nombres de la tarja.
+            "tarja_id": fila["id"],  # Identificador.
+            "folios": folios_por_tarja.get(fila["id"], []),  # Sus procesos vigentes.
+            "kilos_entrada": entrada.quantize(CENTESIMO),  # Con dos decimales.
+            "merma": entrada - procesados,  # Lo que no salió en cajas.
+            "rendimiento": _rendimiento(procesados, entrada),  # Porcentaje.
+            "provisional": fila["estado"] != EstadoTarja.PROCESADA.value,  # Definitivo solo si terminó (criterio 4).
+        })  # Finaliza la fila.
+    # Suma de las tarjas (criterio 3).
+    total_entrada = sum((tarja["kilos_entrada"] for tarja in tarjas), Decimal("0.00"))
+    total_procesados = sum((tarja["kilos_procesados"] for tarja in tarjas), Decimal("0.00"))
+    # Entrega el resultado.
+    return {
+        "tarjas": tarjas,  # Una fila por tarja.
+        "total": {
+            "kilos_entrada": total_entrada,  # Suma de la entrada.
+            "kilos_procesados": total_procesados,  # Suma de lo procesado.
+            "merma": total_entrada - total_procesados,  # Suma de las mermas.
+            "rendimiento": _rendimiento(total_procesados, total_entrada) if tarjas else None,  # No divide por cero.
+            "provisional": any(tarja["provisional"] for tarja in tarjas),  # Basta una abierta.
+        },  # Finaliza el total.
+        "folios_no_encontrados": [folio for folio in buscados if folio not in existentes],  # No existen.
+        "folios_anulados": [folio for folio in buscados if folio in anulados],  # No cuentan.
+    }  # Finaliza la respuesta.
 
 
 # Lista los embalajes activos para el formulario.

@@ -22,11 +22,13 @@ from app.schemas.proceso import (
     ProcesoDetalleOut,  # Proceso con sus tarjas.
     ProcesoEdicion,  # Cómo debe quedar un proceso registrado.
     ProcesoResumenOut,  # Fila del listado.
+    RendimientoOut,  # Rendimiento y merma por folios (HU19).
     TarjaDisponibleOut,  # Tarja que se puede procesar.
     TarjaTerminadaOut,  # Tarja cerrada con su merma.
 )  # Finaliza las importaciones de schemas.
 # Delega las reglas de negocio al servicio.
 from app.services.proceso import (
+    FoliosNoValidosError,  # Folio con formato inválido.
     KilosProcesoNoValidosError,  # Kilos faltantes, sobrantes o sobre la capacidad.
     MezclaNoPermitidaError,  # Tarjas con distinta fruta.
     ProcesoNoEditableError,  # Proceso anulado.
@@ -34,6 +36,7 @@ from app.services.proceso import (
     SaldoInsuficienteError,  # Más kilos de los que le quedan a la tarja.
     TarjaNoProcesableError,  # Tarja anulada o terminada.
     anular_proceso,  # Anulación sin borrar (HU25).
+    calcular_rendimiento,  # Rendimiento y merma por folios (HU19).
     editar_proceso,  # Corrige un proceso registrado.
     embalajes_activos,  # Lista del formulario.
     listar_procesos,  # Listado.
@@ -94,6 +97,23 @@ def crear(
 def listar(db: Session = Depends(get_db)) -> list[dict]:
     # Delega la consulta de solo lectura al servicio.
     return listar_procesos(db)
+
+
+# Rendimiento y merma de las tarjas asociadas a los folios (HU19).
+# Debe declararse antes de /{proceso_id} para no interpretar "rendimiento" como id.
+@router.get("/rendimiento", response_model=RendimientoOut)
+def rendimiento(
+    folios: list[str] = Query(min_length=1),  # Uno o varios: ?folios=P1&folios=P2. Sin folios responde 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+) -> dict:
+    # El servicio solo lee: no se audita ni se guarda nada.
+    try:
+        # Devuelve las tarjas, su total y los folios que no entraron.
+        return calcular_rendimiento(db, folios)
+    # Un texto que no es un folio se avisa al operador.
+    except FoliosNoValidosError as error:
+        # Responde 422 con el mensaje del servicio.
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
 
 # Debe declararse antes de /{proceso_id} para no interpretar "embalajes" como id.
