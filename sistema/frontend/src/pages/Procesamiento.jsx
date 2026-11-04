@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 // Traduce errores HTTP a mensajes legibles.
 import { extraerMensajeError } from "../api/client";
+// Usuario de la sesión: solo el administrador ve Anular.
+import { useAuth } from "../api/AuthContext";
 // Lecturas y escrituras del módulo.
 import {
+  anularProceso,
   editarProceso,
   listarEmbalajesProceso,
   listarProcesos,
@@ -41,6 +44,8 @@ import { aCentimos, cajasParaSaldo, filasDeProceso, motivoMezcla, revisarFila, t
 
 // Mismo tope de filas que el backend.
 const MAXIMO_FILAS = 200;
+// Etiqueta de un proceso anulado, con el rojo de las tarjas anuladas.
+const ETIQUETA_ANULADO = "rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-normal text-red-700";
 
 // Obtiene YYYY-MM-DD usando el día de la planta y no la fecha UTC del navegador.
 function hoyEnChile() {
@@ -75,6 +80,9 @@ function textoFruta(tarja) {
 export default function Procesamiento() {
   // Abre el comprobante después de guardar.
   const navegar = useNavigate();
+  // La API sigue siendo la autoridad; esto solo evita mostrar una acción que respondería 403.
+  const { usuario } = useAuth();
+  const esAdministrador = usuario.roles.includes("administrador");
   // Listas que vienen de la API.
   const [embalajes, setEmbalajes] = useState([]);
   const [disponibles, setDisponibles] = useState([]);
@@ -414,6 +422,35 @@ export default function Procesamiento() {
     }
   }
 
+  // Anula un proceso, previa confirmación (HU25).
+  async function anular(proceso) {
+    // Es irreversible: se pide confirmar. No se exige motivo.
+    if (!window.confirm(`¿Anular el proceso ${proceso.folio}? Sus ${textoKilos(proceso.kilos_salida)} kg vuelven a sus tarjas de recepción, que quedan pendientes y pierden su merma rebajada. Esta acción no se puede deshacer.`)) return;
+    // Bloquea la fila y limpia los mensajes.
+    setCargandoProceso(proceso.id);
+    setError("");
+    setMensaje("");
+    try {
+      // La API anula el proceso, devuelve los kilos y audita en una sola transacción.
+      const anulado = await anularProceso(proceso.id);
+      // Informa el resultado.
+      setMensaje(`Proceso ${anulado.folio} anulado: ${textoKilos(anulado.kilos_salida)} kg volvieron a sus tarjas de recepción.`);
+      // Si su detalle estaba abierto, lo actualiza.
+      setProcesoAbierto((abierto) => (abierto?.id === anulado.id ? anulado : abierto));
+      // Refresca las tres tablas.
+      const [listaTarjas, listaRebajadas, listaProcesos] = await Promise.all([listarTarjasDisponibles(), listarTarjasRebajadas(), listarProcesos()]);
+      setDisponibles(listaTarjas);
+      setRebajadas(listaRebajadas);
+      setProcesos(listaProcesos);
+    } catch (errorRecibido) {
+      // Muestra el motivo del rechazo.
+      setError(extraerMensajeError(errorRecibido, "No se pudo anular el proceso"));
+    } finally {
+      // Libera la fila.
+      setCargandoProceso(null);
+    }
+  }
+
   // Abre el detalle de un proceso.
   async function verProceso(id) {
     // Marca la fila que se está cargando.
@@ -746,7 +783,11 @@ export default function Procesamiento() {
       {procesoAbierto && (
         <section aria-labelledby="titulo-proceso" className={TARJETA}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 id="titulo-proceso" className="font-semibold text-frigorifico-900">Proceso {procesoAbierto.folio}</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 id="titulo-proceso" className="font-semibold text-frigorifico-900">Proceso {procesoAbierto.folio}</h2>
+              {/* Un proceso anulado se sigue viendo, marcado. */}
+              {procesoAbierto.anulado && <span className={ETIQUETA_ANULADO}>Anulado</span>}
+            </div>
             <button type="button" onClick={() => setProcesoAbierto(null)} className={BOTON_EDITAR}>Cerrar</button>
           </div>
           <p className="mb-3 text-sm text-slate-600">
@@ -807,7 +848,11 @@ export default function Procesamiento() {
               ) : (
                 procesos.map((proceso) => (
                   <tr key={proceso.id} className="hover:bg-slate-50">
-                    <td className={`${CELDA} font-medium text-slate-700`}>{proceso.folio}</td>
+                    <td className={`${CELDA} font-medium text-slate-700`}>
+                      {proceso.folio}
+                      {/* Un proceso anulado se sigue viendo, marcado. */}
+                      {proceso.anulado && <span className={`ml-2 ${ETIQUETA_ANULADO}`}>Anulado</span>}
+                    </td>
                     <td className={`whitespace-nowrap ${CELDA} text-slate-600`}>{formatearFecha(proceso.fecha_elaboracion)}</td>
                     <td className={`${CELDA} text-slate-600`}>{proceso.embalaje}</td>
                     <td className={`${CELDA} text-right text-slate-600`}>{textoCajas(proceso.cantidad_cajas)}</td>
@@ -839,6 +884,18 @@ export default function Procesamiento() {
                         {/* Comprobante del proceso, como el botón Imprimir del Form30 del legado. */}
                         {!proceso.anulado && (
                           <Link to={`/procesamiento/${proceso.id}/imprimir`} aria-label={`Imprimir el proceso ${proceso.folio}`} className={`whitespace-nowrap ${BOTON_EDITAR}`}>Imprimir</Link>
+                        )}
+                        {/* Solo el administrador (HU25 criterio 1); al editar no se ofrece. */}
+                        {esAdministrador && !proceso.anulado && !editando && (
+                          <button
+                            type="button"
+                            onClick={() => anular(proceso)}
+                            disabled={cargandoProceso === proceso.id}
+                            aria-label={`Anular el proceso ${proceso.folio}`}
+                            className={`whitespace-nowrap ${BOTON_PELIGRO}`}
+                          >
+                            Anular
+                          </button>
                         )}
                       </div>
                     </td>

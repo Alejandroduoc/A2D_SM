@@ -42,7 +42,7 @@ from app.models.variedad import Variedad
 # Fecha de hoy en Chile.
 from app.schemas.tarja import hoy_en_chile
 # Funciones del service que se prueban directamente.
-from app.services.proceso import editar_proceso, recalcular_estado, registrar_proceso, terminar_tarja
+from app.services.proceso import anular_proceso, editar_proceso, recalcular_estado, registrar_proceso, terminar_tarja
 # Entrada del service.
 from app.schemas.proceso import ProcesoCreate, ProcesoEdicion
 # Reutiliza el aislamiento, los actores y las peticiones de la prueba de tarjas.
@@ -537,6 +537,143 @@ def probar_terminada_y_merma() -> None:
         db.rollback()
 
 
+# HU25: anular un proceso; todo queda pendiente y la merma la vuelve a decidir el operador.
+def probar_anulacion() -> None:
+    # Escenario aislado.
+    with aislado() as (db, _, _externa), api_con_sesion(db):
+        # Datos comunes.
+        datos = preparar(db)
+
+        # Ayuda: anula con el token indicado.
+        def anular(proceso_id: int, token: str | None = datos["token_admin"]) -> tuple[int, object]:
+            # Usa la API real.
+            return solicitar("POST", f"{BASE}/{proceso_id}/anular", token)
+
+        # Criterio 1: solo el administrador.
+        tarja = nueva_tarja(datos)
+        _, proceso = procesar(datos, datos["caja_10"], fila(tarja, 40))
+        antes = cantidades(db)
+        comprobar("HU25 - sin token 401", anular(proceso["id"], None)[0] == 401)
+        comprobar("HU25 - operador de proceso 403", anular(proceso["id"], datos["token_proceso"])[0] == 403)
+        comprobar("HU25 - recepción 403", anular(proceso["id"], datos["token_recepcion"])[0] == 403)
+        comprobar("HU25 - gerencia 403", anular(proceso["id"], datos["token_gerencia"])[0] == 403)
+        # El rol que cuenta es el de la base, no el del JWT.
+        operador = datos["actores"][RolUsuario.OPERADOR_PROCESO][0]
+        token_obsoleto = create_access_token(operador.nombre_usuario, [RolUsuario.ADMINISTRADOR.value])
+        comprobar("HU25 - rol obsoleto del JWT 403", anular(proceso["id"], token_obsoleto)[0] == 403)
+        comprobar("HU25 - rechazos sin escrituras", cantidades(db) == antes and db.get(Proceso, proceso["id"]).anulado is False)
+        comprobar("HU25 - inexistente 404", anular(2147483647)[0] == 404)
+        comprobar("HU25 - id sobre INT 422", anular(2147483648)[0] == 422)
+
+        # Un fallo al auditar revierte todo (criterio 4).
+        with patch("app.services.proceso.registrar_auditoria", side_effect=RuntimeError("fallo simulado de auditoría")):
+            # El error debe llegar hasta aquí.
+            try:
+                anular_proceso(db, proceso["id"], datos["actores"][RolUsuario.ADMINISTRADOR][0])
+                revirtio = False
+            # La anulación se revierte.
+            except RuntimeError:
+                revirtio = True
+        db.expire_all()
+        comprobar("HU25 - fallo de auditoría revierte", revirtio and cantidades(db) == antes and db.get(Proceso, proceso["id"]).anulado is False and tarja_de(db, tarja).estado == EstadoTarja.PARCIAL and kilos_de(datos, tarja) == (Decimal(400), Decimal(520)))
+
+        # Anular: los kilos vuelven y la tarja queda como recién recibida (criterio 3).
+        filas_antes = db.scalar(select(func.count()).select_from(ProcesoTarja))
+        estado, anulado = anular(proceso["id"])
+        comprobar("HU25 - 200 y queda anulado", estado == 200 and anulado["anulado"] is True)
+        comprobar("HU25 - sin procesos vuelve a recepcionada", tarja_de(db, tarja).estado == EstadoTarja.RECEPCIONADA)
+        comprobar("HU25 - los kilos vuelven", kilos_de(datos, tarja) == (Decimal(0), Decimal(920)))
+        _, lista = solicitar("GET", f"{BASE}/tarjas-disponibles?numero_tarja={tarja['numero_tarja']}", datos["token_proceso"])
+        comprobar("HU25 - vuelve a estar disponible", len(lista) == 1 and Decimal(lista[0]["kilos_pendientes"]) == 920)
+        # Criterio 2: no se borra y conserva su folio.
+        comprobar("HU25 - no borra nada", db.scalar(select(func.count()).select_from(ProcesoTarja)) == filas_antes and db.get(Proceso, proceso["id"]).folio == proceso["folio"])
+        _, detalle = solicitar("GET", f"{BASE}/{proceso['id']}", datos["token_proceso"])
+        comprobar("HU25 - el detalle sigue disponible, marcado", detalle["anulado"] is True and detalle["folio"] == proceso["folio"] and len(detalle["tarjas"]) == 1)
+        _, listado = solicitar("GET", BASE, datos["token_proceso"])
+        comprobar("HU25 - sigue en el listado", any(p["id"] == proceso["id"] and p["anulado"] is True for p in listado))
+        comprobar("HU25 - DELETE no existe", solicitar("DELETE", f"{BASE}/{proceso['id']}", datos["token_admin"])[0] == 405)
+        # El folio no se reutiliza.
+        _, siguiente = procesar(datos, datos["caja_10"], fila(tarja, 1))
+        comprobar("HU25 - el folio no se reutiliza", int(siguiente["folio"][1:]) > int(proceso["folio"][1:]))
+        # Anularlo dos veces no tiene sentido.
+        antes = cantidades(db)
+        comprobar("HU25 - dos veces 409", anular(proceso["id"])[0] == 409 and cantidades(db) == antes)
+        # Un proceso anulado no se edita.
+        comprobar("HU25 - anulado no se edita", solicitar("PUT", f"{BASE}/{proceso['id']}", datos["token_proceso"], {"tarjas": [fila(tarja, 1)]})[0] == 409)
+        # La auditoría registra quién y cuándo, sin exigir motivo al administrador.
+        admin = datos["actores"][RolUsuario.ADMINISTRADOR][0]
+        eventos = list(db.scalars(select(Auditoria).where(Auditoria.tabla == "procesos", Auditoria.registro_id == str(proceso["id"]), Auditoria.accion == AccionAuditoria.UPDATE)))
+        comprobar("HU25 - auditoría de la cabecera", len(eventos) == 1 and eventos[0].usuario_id == admin.id and json.loads(eventos[0].valores_antes)["anulado"] is False and json.loads(eventos[0].valores_despues)["anulado"] is True and proceso["folio"] in eventos[0].motivo)
+        eventos = list(db.scalars(select(Auditoria).where(Auditoria.tabla == "tarjas", Auditoria.registro_id == str(tarja["id"]), Auditoria.motivo == f"Anulación del proceso {proceso['folio']}")))
+        comprobar("HU25 - auditoría de la tarja", len(eventos) == 1 and "PARCIAL" in eventos[0].valores_antes and "RECEPCIONADA" in eventos[0].valores_despues)
+
+        # Con otro proceso vigente queda parcial, con lo de ese proceso.
+        con_otro = nueva_tarja(datos)
+        _, p_1 = procesar(datos, datos["caja_10"], fila(con_otro, 10))
+        _, p_2 = procesar(datos, datos["caja_10"], fila(con_otro, 20))
+        anular(p_1["id"])
+        comprobar("HU25 - con otro proceso queda parcial", tarja_de(db, con_otro).estado == EstadoTarja.PARCIAL and kilos_de(datos, con_otro) == (Decimal(200), Decimal(720)))
+        # HU12 descuenta solo lo vigente.
+        anular(p_2["id"])
+        comprobar("HU25 - sin procesos vigentes vuelve a recepcionada", tarja_de(db, con_otro).estado == EstadoTarja.RECEPCIONADA)
+
+        # Una tarja cerrada con saldo 0 se reabre.
+        cerrada = nueva_tarja(datos)
+        _, p_c1 = procesar(datos, datos["caja_10"], fila(cerrada, 90))
+        _, p_c2 = procesar(datos, datos["caja_10"], fila(cerrada, 2))
+        comprobar("HU25 - parte cerrada con saldo 0", tarja_de(db, cerrada).estado == EstadoTarja.PROCESADA)
+        anular(p_c1["id"])
+        comprobar("HU25 - saldo 0 se reabre", tarja_de(db, cerrada).estado == EstadoTarja.PARCIAL and kilos_de(datos, cerrada) == (Decimal(20), Decimal(900)))
+
+        # Marca en el proceso anulado: se pierde.
+        marca_propia = nueva_tarja(datos)
+        _, p_m = procesar(datos, datos["caja_10"], fila(marca_propia, 10, tarja_terminada=True))
+        anular(p_m["id"])
+        comprobar("HU25 - su propia marca se pierde", tarja_de(db, marca_propia).estado == EstadoTarja.RECEPCIONADA and kilos_de(datos, marca_propia) == (Decimal(0), Decimal(920)))
+
+        # Marca en otro proceso: también se pierde, porque se decidió con otros kilos.
+        marca_otra = nueva_tarja(datos)
+        _, p_a = procesar(datos, datos["caja_10"], fila(marca_otra, 5))
+        _, p_b = procesar(datos, datos["caja_10"], fila(marca_otra, 5, tarja_terminada=True))
+        comprobar("HU25 - parte con marca en otro proceso", tarja_de(db, marca_otra).estado == EstadoTarja.PROCESADA)
+        anular(p_a["id"])
+        db.expire_all()
+        comprobar("HU25 - la marca de otro proceso se pierde", db.get(ProcesoTarja, (p_b["id"], marca_otra["id"])).tarja_terminada is False)
+        comprobar("HU25 - queda pendiente, no con más merma", tarja_de(db, marca_otra).estado == EstadoTarja.PARCIAL and kilos_de(datos, marca_otra) == (Decimal(50), Decimal(870)))
+        eventos = list(db.scalars(select(Auditoria).where(Auditoria.tabla == "proceso_tarjas", Auditoria.registro_id == f"{p_b['id']}:{marca_otra['id']}", Auditoria.motivo == f"Anulación del proceso {p_a['folio']}")))
+        comprobar("HU25 - quitar la marca queda auditado", len(eventos) == 1)
+
+        # Merma rebajada: se pierde; la vuelve a decidir el operador.
+        rebajada = nueva_tarja(datos)
+        _, p_r = procesar(datos, datos["caja_10"], fila(rebajada, 10))
+        solicitar("POST", f"{BASE}/tarjas/{rebajada['id']}/terminar", datos["token_proceso"])
+        comprobar("HU25 - parte con merma rebajada", tarja_de(db, rebajada).merma_rebajada is True)
+        anular(p_r["id"])
+        comprobar("HU25 - la merma rebajada se pierde", tarja_de(db, rebajada).merma_rebajada is False and tarja_de(db, rebajada).estado == EstadoTarja.RECEPCIONADA)
+        _, rebajadas = solicitar("GET", f"{BASE}/tarjas-rebajadas", datos["token_proceso"])
+        comprobar("HU25 - sale de las rebajadas", all(opcion["id"] != rebajada["id"] for opcion in rebajadas))
+        # El sistema no decide solo: sigue pendiente hasta que el operador lo decida.
+        estado, resultado = solicitar("POST", f"{BASE}/tarjas/{rebajada['id']}/terminar", datos["token_proceso"])
+        comprobar("HU25 - el operador la vuelve a rebajar", estado == 200 and Decimal(resultado["kilos_merma"]) == 920)
+        solicitar("POST", f"{BASE}/tarjas/{rebajada['id']}/reabrir", datos["token_proceso"])
+
+        # Varias tarjas: todas vuelven.
+        una = nueva_tarja(datos)
+        otra = nueva_tarja(datos)
+        _, p_v = procesar(datos, datos["caja_10"], fila(una, 3), fila(otra, 4))
+        anular(p_v["id"])
+        comprobar("HU25 - todas sus tarjas vuelven", kilos_de(datos, una) == (Decimal(0), Decimal(920)) and kilos_de(datos, otra) == (Decimal(0), Decimal(920)))
+        # Se pueden procesar de nuevo.
+        estado, de_nuevo = procesar(datos, datos["caja_10"], fila(una, 3))
+        comprobar("HU25 - se procesa de nuevo con otro folio", estado == 201 and de_nuevo["folio"] != p_v["folio"] and kilos_de(datos, una) == (Decimal(30), Decimal(890)))
+        # HU24: una tarja sin procesos vigentes ya se puede anular; el proceso anulado no lo impide.
+        estado, _ = solicitar("POST", f"{BASE_TARJAS}/{otra['id']}/anular", datos["token_admin"])
+        comprobar("HU24 - tras anular el proceso, la tarja se puede anular", estado == 200 and tarja_de(db, otra).estado == EstadoTarja.ANULADA)
+        # El detalle del proceso anulado no ofrece kilos de la tarja anulada como disponibles para la fila.
+        _, detalle = solicitar("GET", f"{BASE}/{p_v['id']}", datos["token_proceso"])
+        comprobar("HU25 - el detalle muestra el estado actual de sus tarjas", {f["estado_tarja"] for f in detalle["tarjas"]} == {"PARCIAL", "ANULADA"})
+
+
 # Decisión del 03/11: un proceso ya registrado se edita y los kilos que salen vuelven a la recepción.
 def probar_edicion() -> None:
     # Escenario aislado.
@@ -882,6 +1019,8 @@ def main() -> None:
         probar_varias_tarjas()
         # Corrección de un proceso ya registrado.
         probar_edicion()
+        # Anulación de un proceso (HU25).
+        probar_anulacion()
         # Transacción y auditoría.
         probar_transaccion_y_auditoria()
     # Registra el error sin detener el informe.

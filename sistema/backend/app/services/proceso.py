@@ -397,6 +397,35 @@ def registrar_proceso(db: Session, datos: ProcesoCreate, usuario: Usuario) -> di
     return obtener_proceso(db, proceso.id)
 
 
+# Quita el cierre decidido de una tarja que recupera kilos, porque se decidió con otros kilos.
+def _quitar_cierre_decidido(db: Session, tarja: Tarja, proceso_id: int) -> list[tuple[ProcesoTarja, dict, AccionAuditoria]]:
+    # Quita la merma rebajada.
+    tarja.merma_rebajada = False
+    # Busca sus marcas vigentes, también en otros procesos.
+    marcadas = db.scalars(
+        select(ProcesoTarja)  # La fila del detalle.
+        .join(Proceso, ProcesoTarja.proceso_id == Proceso.id)  # Une con la cabecera.
+        .where(
+            ProcesoTarja.tarja_id == tarja.id,  # Solo esta tarja.
+            ProcesoTarja.tarja_terminada == True,  # noqa: E712  Solo las marcadas.
+            Proceso.anulado == False,  # noqa: E712  Solo procesos vigentes.
+        )  # Finaliza los filtros.
+    ).all()  # Devuelve todas.
+    # Eventos de las filas que cambian.
+    eventos = []
+    # Revisa cada marca.
+    for marcada in marcadas:
+        # La fila del proceso que se está corrigiendo ya trae lo que pidió el operador.
+        if marcada.proceso_id == proceso_id:
+            continue
+        # Captura la fila antes de quitarle la marca.
+        eventos.append((marcada, instantanea(marcada), AccionAuditoria.UPDATE))
+        # Quita la marca.
+        marcada.tarja_terminada = False
+    # Entrega los eventos para auditarlos.
+    return eventos
+
+
 # Corrige un proceso ya registrado: sube o baja sus cajas, agrega tarjas o las quita.
 def editar_proceso(db: Session, proceso_id: int, datos: ProcesoEdicion, usuario: Usuario) -> dict:
     """Decisión del 2026-11-03: un pallet con error se edita y sus kilos se ajustan.
@@ -532,29 +561,8 @@ def editar_proceso(db: Session, proceso_id: int, datos: ProcesoEdicion, usuario:
 
         # Una tarja que recupera kilos deja de estar cerrada por decisión: se tomó con otros kilos.
         for tarja_id in sorted(devueltas):
-            # Tarja ya bloqueada.
-            tarja = bloqueadas[tarja_id]
-            # Quita la merma rebajada.
-            tarja.merma_rebajada = False
-            # Busca sus marcas vigentes, también en otros procesos.
-            marcadas = db.scalars(
-                select(ProcesoTarja)  # La fila del detalle.
-                .join(Proceso, ProcesoTarja.proceso_id == Proceso.id)  # Une con la cabecera.
-                .where(
-                    ProcesoTarja.tarja_id == tarja_id,  # Solo esta tarja.
-                    ProcesoTarja.tarja_terminada == True,  # noqa: E712  Solo las marcadas.
-                    Proceso.anulado == False,  # noqa: E712  Solo procesos vigentes.
-                )  # Finaliza los filtros.
-            ).all()  # Devuelve todas.
-            # Una marca pedida en esta misma edición es una decisión nueva y se respeta.
-            for marcada in marcadas:
-                # La fila de este proceso ya trae lo que pidió el operador.
-                if marcada.proceso_id == proceso.id:
-                    continue
-                # Captura la fila antes de quitarle la marca.
-                eventos.append((marcada, instantanea(marcada), AccionAuditoria.UPDATE))
-                # Quita la marca.
-                marcada.tarja_terminada = False
+            # Quita su merma rebajada y las marcas de otros procesos, y suma esos eventos.
+            eventos.extend(_quitar_cierre_decidido(db, bloqueadas[tarja_id], proceso.id))
         # Lleva los cambios a la base antes de recalcular.
         db.flush()
         # Cada tarja queda con el estado que indican sus procesos, en la misma transacción.
@@ -599,6 +607,94 @@ def editar_proceso(db: Session, proceso_id: int, datos: ProcesoEdicion, usuario:
         # Deja que el router decida la respuesta.
         raise
     # Devuelve el proceso actualizado.
+    return obtener_proceso(db, proceso_id)
+
+
+# Anula un proceso sin borrarlo; sus kilos vuelven a sus tarjas de recepción (HU25).
+def anular_proceso(db: Session, proceso_id: int, usuario: Usuario) -> dict:
+    """Cada tarja del proceso vuelve a quedar pendiente hasta procesarse de nuevo o rebajarse.
+
+    Decisión del 2026-11-03: el sistema calcula los kilos de merma, pero la decisión es del
+    operador. Por eso la tarja pierde su merma rebajada y sus marcas, también las de otros
+    procesos: se decidieron con otros kilos y no pueden crecer sin que nadie lo decida.
+    """
+    # Protege toda la escritura hasta el único commit (criterio 4).
+    try:
+        # Bloquea primero la cabecera, en el mismo orden que la edición.
+        proceso = db.execute(
+            select(Proceso)  # Relee la cabecera completa.
+            .where(Proceso.id == proceso_id)  # Solo el proceso pedido.
+            .with_hint(Proceso, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")  # Bloqueo de actualización.
+            .execution_options(populate_existing=True)  # Reemplaza los valores antiguos en memoria.
+        ).scalars().first()  # Devuelve el proceso o None.
+        # Un proceso inexistente responde 404.
+        if proceso is None:
+            raise ProcesoNoEncontradoError("Proceso no encontrado")
+        # Anularlo dos veces no tiene sentido y dejaría un evento falso.
+        if proceso.anulado:
+            raise ProcesoNoEditableError(f"El proceso {proceso.folio} ya está anulado")
+        # Lee las tarjas del proceso.
+        tarja_ids = sorted(db.scalars(select(ProcesoTarja.tarja_id).where(ProcesoTarja.proceso_id == proceso.id)).all())
+        # Bloquea en orden de id: nadie consume esos kilos mientras vuelven.
+        tarjas = [_bloquear_tarja(db, tarja_id) for tarja_id in tarja_ids]
+
+        # Captura la cabecera y las tarjas antes de modificarlas.
+        proceso_antes = instantanea(proceso)
+        estados_antes = [(tarja, instantanea(tarja)) for tarja in tarjas]
+        # Queda anulado y no se borra; su folio no se reutiliza (criterio 2).
+        proceso.anulado = True
+        # Debe estar en la base para que sus filas dejen de contar.
+        db.flush()
+
+        # Eventos de las marcas que se quitan en otros procesos.
+        eventos = []
+        # Todas sus tarjas recuperan kilos, porque cada fila tiene más de cero.
+        for tarja in tarjas:
+            eventos.extend(_quitar_cierre_decidido(db, tarja, proceso.id))
+        # Lleva los cambios a la base antes de recalcular.
+        db.flush()
+        # Cada tarja queda con el estado que indican sus procesos vigentes (criterio 3).
+        for tarja in tarjas:
+            recalcular_estado(db, tarja)
+        # Comprueba las restricciones antes de auditar.
+        db.flush()
+
+        # El motivo explica por qué cambian las tarjas; al administrador no se le exige uno (criterio 1).
+        motivo = f"Anulación del proceso {proceso.folio}"
+        # Audita la cabecera: quién y cuándo.
+        registrar_auditoria(
+            db,  # Comparte la sesión.
+            usuario.id,  # Administrador autenticado.
+            "procesos",  # Tabla afectada.
+            proceso.id,  # Registro afectado.
+            AccionAuditoria.UPDATE,  # No se borra: se marca anulado.
+            antes=proceso_antes,  # Estado anterior.
+            despues=instantanea(proceso),  # Estado posterior.
+            motivo=motivo,  # Causa del cambio.
+        )  # Finaliza el evento.
+        # Audita las marcas quitadas en otros procesos.
+        for fila_evento, antes, accion in eventos:
+            registrar_auditoria(
+                db,  # Comparte la sesión.
+                usuario.id,  # Administrador autenticado.
+                "proceso_tarjas",  # Tabla afectada.
+                f"{fila_evento.proceso_id}:{fila_evento.tarja_id}",  # La clave de esta tabla es compuesta.
+                accion,  # Cambia la marca.
+                antes=antes,  # Estado anterior.
+                despues=instantanea(fila_evento),  # Estado posterior.
+                motivo=motivo,  # Causa del cambio.
+            )  # Finaliza el evento.
+        # Audita las tarjas que cambiaron de estado o perdieron su merma.
+        _auditar_tarjas(db, usuario, estados_antes, motivo)
+        # Confirma todo una sola vez (criterio 4).
+        db.commit()
+    # Cualquier error revierte la operación completa.
+    except Exception:
+        # No queda un proceso anulado con sus tarjas sin devolver.
+        db.rollback()
+        # Deja que el router decida la respuesta.
+        raise
+    # Devuelve el proceso anulado.
     return obtener_proceso(db, proceso_id)
 
 

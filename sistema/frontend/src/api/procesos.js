@@ -35,6 +35,14 @@ export async function editarProceso(id, datos) {
   return respuesta.data;
 }
 
+// Anula un proceso, solo el administrador (HU25); devuelve el proceso actualizado.
+export async function anularProceso(id) {
+  // Sin cuerpo: no se exige motivo y el servidor audita.
+  const respuesta = await client.post(`/procesos/${id}/anular`);
+  // Devuelve el proceso anulado.
+  return respuesta.data;
+}
+
 // Lista los procesos, los más recientes primero.
 export async function listarProcesos() {
   // Sin filtros: la API limita la cantidad de filas.

@@ -33,6 +33,7 @@ from app.services.proceso import (
     ProcesoNoEncontradoError,  # El proceso no existe.
     SaldoInsuficienteError,  # Más kilos de los que le quedan a la tarja.
     TarjaNoProcesableError,  # Tarja anulada o terminada.
+    anular_proceso,  # Anulación sin borrar (HU25).
     editar_proceso,  # Corrige un proceso registrado.
     embalajes_activos,  # Lista del formulario.
     listar_procesos,  # Listado.
@@ -158,6 +159,31 @@ def reabrir(
     # La tarja no tiene una merma rebajada.
     except TarjaNoProcesableError as error:
         # Responde 409 con el mensaje del servicio.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+
+# Anula un proceso, solo el administrador (HU25 criterio 1).
+@router.post(
+    "/{proceso_id}/anular",  # POST y no DELETE: el proceso no se borra.
+    response_model=ProcesoDetalleOut,  # Devuelve el proceso anulado.
+    dependencies=[Depends(require_roles(RolUsuario.ADMINISTRADOR))],  # Más estricto que el resto del router.
+)  # Finaliza la declaración de la ruta.
+def anular(
+    proceso_id: IdRuta,  # Id en rango; si no, 422.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+    usuario: Usuario = Depends(get_current_user),  # Responsable leído de la base.
+) -> dict:
+    # El servicio controla la transacción.
+    try:
+        # Devuelve el proceso ya anulado.
+        return anular_proceso(db, proceso_id, usuario)
+    # El proceso no existe.
+    except ProcesoNoEncontradoError as error:
+        # Responde 404 con el mensaje del servicio.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    # Ya estaba anulado.
+    except ProcesoNoEditableError as error:
+        # Responde 409: la petición es válida, pero el estado del proceso no lo permite.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
 
 
