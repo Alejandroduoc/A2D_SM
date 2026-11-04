@@ -35,9 +35,9 @@ export default function Inicio() {
           ))}
         </div>
       ) : (
-        // Gerencia aún no tiene módulos: llegan con la bitácora y la trazabilidad de E4.
+        // Todos los perfiles tienen módulos; este aviso queda para una cuenta sin roles vigentes.
         <p className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-          Los módulos de consulta de gerencia estarán disponibles en las próximas etapas.
+          Su cuenta no tiene módulos asignados. Consulte con el administrador.
         </p>
       )}
     </div>

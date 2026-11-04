@@ -30,6 +30,8 @@ import Procesamiento from "./pages/Procesamiento";
 import ImprimirProceso from "./pages/ImprimirProceso";
 // Rendimiento y merma por folios (HU19).
 import Rendimiento from "./pages/Rendimiento";
+// Recorrido completo de una tarja (HU23).
+import Trazabilidad from "./pages/Trazabilidad";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -63,6 +65,10 @@ export default function App() {
             <Route element={<ProtectedRoute rolesPermitidos={["operador_proceso", "administrador"]} />}>
               <Route path="procesamiento" element={<Procesamiento />} />
               <Route path="rendimiento" element={<Rendimiento />} />
+            </Route>
+            {/* Gerencia y administrador, los mismos roles que exige /trazabilidad en la API. */}
+            <Route element={<ProtectedRoute rolesPermitidos={["gerencia", "administrador"]} />}>
+              <Route path="trazabilidad" element={<Trazabilidad />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>
