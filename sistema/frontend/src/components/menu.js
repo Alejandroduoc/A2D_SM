@@ -53,6 +53,12 @@ export const MENU = [
     roles: ["gerencia", "administrador"], // Los mismos roles que exige /trazabilidad en la API.
   },
   {
+    ruta: "/auditoria", // Bitácora de cambios (HU22); la ruta también se protege en App.jsx.
+    etiqueta: "Auditoría", // Nombre visible.
+    descripcion: "Consulta de cambios con usuario, fecha, tabla, acción y valores (E4).",
+    roles: ["gerencia", "administrador"], // Solo estos perfiles pueden consultar la bitácora.
+  },
+  {
     ruta: "/productores", // La ruta también se protege por rol en App.jsx.
     etiqueta: "Productores", // Nombre visible del mantenimiento.
     descripcion: "Productores que entregan fruta: RUT, razón social, contacto y estado (E2).",

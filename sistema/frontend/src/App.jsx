@@ -32,6 +32,8 @@ import ImprimirProceso from "./pages/ImprimirProceso";
 import Rendimiento from "./pages/Rendimiento";
 // Recorrido completo de una tarja (HU23).
 import Trazabilidad from "./pages/Trazabilidad";
+// Consulta de la bitácora de auditoría (HU22).
+import Auditoria from "./pages/Auditoria";
 
 // Declara las rutas públicas y protegidas.
 export default function App() {
@@ -69,6 +71,7 @@ export default function App() {
             {/* Gerencia y administrador, los mismos roles que exige /trazabilidad en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["gerencia", "administrador"]} />}>
               <Route path="trazabilidad" element={<Trazabilidad />} />
+              <Route path="auditoria" element={<Auditoria />} />
             </Route>
             {/* La URL de Productores se protege además de ocultar su opción de menú. */}
             <Route element={<ProtectedRoute rolesPermitidos={["administrador"]} />}>

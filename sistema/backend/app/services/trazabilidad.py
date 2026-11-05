@@ -45,6 +45,8 @@ TEXTO_ESTADO = {
     "PROCESADA": "Procesada",
     "ANULADA": "Anulada",
 }
+# Cantidad bien escrita; "007" no lo es: es un texto, aunque valga lo mismo que "7".
+_NUMERO = re.compile(r"-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?")
 
 
 # Kilos con dos decimales y coma: 400.00 pasa a 400,00.
@@ -62,35 +64,44 @@ def _cajas(valor) -> str:
 
 
 # Devuelve el valor como se lee en pantalla.
-def _texto_valor(campo: str, valor) -> str | None:
+def texto_valor(campo: str, valor) -> str | None:
     # Sin valor no hay texto.
     if valor is None:
         return None
     # Un booleano se lee mejor con palabras.
     if isinstance(valor, bool):
         return "Sí" if valor else "No"
+    # Una lista, como los roles de un usuario, se lee separada por comas.
+    if isinstance(valor, list):
+        return ", ".join(str(elemento) for elemento in valor)
     # Los kilos llevan dos decimales.
     if campo == "kilos_procesados":
         return _kilos(valor)
     # Las cajas, sin ceros de sobra.
     if campo == "cantidad_cajas":
         return _cajas(valor)
-    # Traduce el estado; los demás valores quedan igual.
-    return TEXTO_ESTADO.get(str(valor), str(valor))
+    # Traduce solo el estado: otro campo puede contener esa misma palabra como texto.
+    if campo == "estado":
+        return TEXTO_ESTADO.get(str(valor), str(valor))
+    # Los demás valores quedan igual.
+    return str(valor)
 
 
 # Indica si dos valores guardados representan lo mismo: "15.00" y "15" son la misma cantidad.
-def _iguales(antes, despues) -> bool:
+def valores_iguales(antes, despues) -> bool:
     # Mismo valor exacto.
     if antes == despues:
         return True
     # Un booleano no se compara como número.
     if isinstance(antes, bool) or isinstance(despues, bool):
         return False
-    # Compara como número si ambos lo son.
+    # Si alguno no es una cantidad bien escrita, son distintos.
+    if not (_NUMERO.fullmatch(str(antes)) and _NUMERO.fullmatch(str(despues))):
+        return False
+    # Compara como cantidades.
     try:
         return Decimal(str(antes)) == Decimal(str(despues))
-    # Si alguno no es un número, son distintos.
+    # Un exponente imposible, como "1e99999999999999999999", no es una cantidad.
     except InvalidOperation:
         return False
 
@@ -105,8 +116,8 @@ def _cambios(antes: dict, despues: dict) -> list[dict]:
         if campo not in antes or campo not in despues:
             continue
         # Agrega los que cambiaron.
-        if not _iguales(antes[campo], despues[campo]):
-            cambios.append({"campo": etiqueta, "antes": _texto_valor(campo, antes[campo]), "despues": _texto_valor(campo, despues[campo])})
+        if not valores_iguales(antes[campo], despues[campo]):
+            cambios.append({"campo": etiqueta, "antes": texto_valor(campo, antes[campo]), "despues": texto_valor(campo, despues[campo])})
     # Entrega los cambios.
     return cambios
 

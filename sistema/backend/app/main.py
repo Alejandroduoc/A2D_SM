@@ -1,7 +1,7 @@
 from fastapi import FastAPI #Creamos la instancia de la aplicación FastAPI
 from fastapi.middleware.cors import CORSMiddleware #Agregamos el middleware CORS para permitir solicitudes desde diferentes orígenes
 
-from app.api.routers import auth, embalajes, especies, opciones, procesos, productores, tarjas, tipos_bandeja, trazabilidad, variedades # Importamos autenticación, los mantenimientos y las opciones de formularios.
+from app.api.routers import auth, auditoria, embalajes, especies, opciones, procesos, productores, tarjas, tipos_bandeja, trazabilidad, variedades # Importamos autenticación, los mantenimientos y las opciones de formularios.
 from app.api.routers.calidades import router as calidades_router
 from app.api.routers.sistemas_productivos import router as sistemas_productivos_router
 from app.core.config import settings # Importamos la configuración
@@ -68,6 +68,9 @@ app.include_router(procesos.router, prefix=settings.api_v1_prefix)
 
 # Publica la consulta de trazabilidad para gerencia y administración (HU23).
 app.include_router(trazabilidad.router, prefix=settings.api_v1_prefix)
+
+# Publica la consulta de la bitácora para gerencia y administración (HU22).
+app.include_router(auditoria.router, prefix=settings.api_v1_prefix)
 
 @app.get("/health", tags=["Health"])  # Definimos la ruta raíz de la API    
 def health() -> dict[str, str]: # Definimos la función que se ejecutará al acceder a la ruta raíz
