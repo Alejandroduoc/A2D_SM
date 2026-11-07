@@ -376,6 +376,17 @@ export default function Recepcion() {
 
   // Saldo actual del productor en la bandeja elegida; sin movimientos, está al día.
   const saldoActual = saldos.find((fila) => String(fila.tipo_bandeja_id) === bandejaId)?.saldo ?? 0;
+  // En edición, el saldo ya incluye la entrada original cuando se conserva productor y bandeja.
+  const reemplazaMovimientoOriginal = Boolean(
+    editando
+    && tarjaOriginal
+    && productor?.id === tarjaOriginal.productor_id
+    && String(bandejaId) === String(tarjaOriginal.tipo_bandeja_id),
+  );
+  // Sustituye la cantidad original por la corregida; al cambiar productor o bandeja, suma una nueva entrada.
+  const saldoProyectado = cantidadValida
+    ? saldoActual + cantidad - (reemplazaMovimientoOriginal ? tarjaOriginal.cantidad_bandejas : 0)
+    : null;
   // Semáforo del saldo, igual que el Form4 del legado.
   const situacionSaldo = situacionBandejas(saldoActual);
 
@@ -424,9 +435,9 @@ export default function Recepcion() {
     // En un botón, Enter hace lo normal: pulsarlo (Guardar, Cambiar o un resultado de la búsqueda).
     if (evento.target.tagName === "BUTTON") return;
     // En un campo, Enter no debe enviar el formulario.
-    evento.preventDefault();
     // El motivo admite varias líneas y Enter debe conservar su edición natural.
     if (evento.target.tagName === "TEXTAREA") return;
+    evento.preventDefault();
     // El buscador de productores maneja su propio Enter.
     if (evento.target.type === "search") return;
     // Recorre los campos en orden y termina en Guardar, si ya está habilitado.
@@ -743,7 +754,7 @@ export default function Recepcion() {
                   <span className={situacionSaldo.clase}>{situacionSaldo.texto}</span>
                   <span>Saldo actual: <strong className="text-frigorifico-900">{saldoActual}</strong></span>
                   {/* Con esta tarja, el saldo sube según la cantidad escrita. */}
-                  {cantidadValida && <span>Con esta tarja: <strong className="text-frigorifico-900">{saldoActual + cantidad}</strong></span>}
+                  {saldoProyectado !== null && <span>Saldo proyectado: <strong className="text-frigorifico-900">{saldoProyectado}</strong></span>}
                 </div>
               )}
             </section>
