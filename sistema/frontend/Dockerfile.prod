@@ -3,8 +3,8 @@
 # Se construye desde docker-compose.prod.yml; no hace falta ejecutarla a mano.
 
 # ---- Etapa 1: compilar ----
-# Misma versión de Node que el Dockerfile de desarrollo.
-FROM node:20-alpine AS compilacion
+# Misma versión LTS de Node que el Dockerfile de desarrollo.
+FROM node:26-alpine AS compilacion
 
 # Carpeta de trabajo de la compilación.
 WORKDIR /app

@@ -1,5 +1,5 @@
-# Usa Node 20, versión LTS y compatible con Vite.
-FROM node:20-alpine
+# Usa Node 26, LTS vigente y compatible con Vite, React Router y sus dependencias.
+FROM node:26-alpine
 
 # Define la carpeta de trabajo del contenedor.
 WORKDIR /app
