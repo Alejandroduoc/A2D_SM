@@ -1251,6 +1251,91 @@ def probar_anulacion() -> None:
             comprobar("HU24 - transacción externa conservada", externa.is_active and conexion.in_transaction())
 
 
+# HU20: corrige una tarja solo antes del procesamiento y conserva toda su trazabilidad.
+def probar_edicion() -> None:
+    # Aísla actores, catálogos, tarja y auditorías de este escenario.
+    with aislado() as (db, conexion, externa):
+        # Prepara referencias activas y un actor de cada perfil.
+        datos = preparar(db)
+        # Recupera los tokens necesarios para comprobar los permisos exactos.
+        recepcion, token_recepcion = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        _, token_admin = datos["actores"][RolUsuario.ADMINISTRADOR]
+        _, token_gerencia = datos["actores"][RolUsuario.GERENCIA]
+        _, token_proceso = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+        # Parte de una recepción válida.
+        cuerpo = cuerpo_valido(datos)
+
+        # Usa la sesión aislada también en las rutas HTTP reales.
+        with api_con_sesion(db):
+            # Crea la tarja que se corregirá.
+            _, creada = solicitar("POST", BASE, token_recepcion, cuerpo)
+            # Completa el mismo contrato de alta con el motivo obligatorio de HU20.
+            correccion = {**cuerpo, "kilos_brutos": "1020.00", "motivo": "Corrección de lectura de balanza"}
+            # Declara la ruta una vez para todos los casos.
+            ruta = f"{BASE}/{creada['id']}"
+            # Los perfiles no autorizados y un motivo vacío no dejan escrituras.
+            antes = cantidades(db)
+            comprobar("HU20 - sin token 401", solicitar("PUT", ruta, datos=correccion)[0] == 401)
+            comprobar("HU20 - gerencia 403", solicitar("PUT", ruta, token_gerencia, correccion)[0] == 403)
+            comprobar("HU20 - proceso 403", solicitar("PUT", ruta, token_proceso, correccion)[0] == 403)
+            comprobar("HU20 - motivo vacío 422", solicitar("PUT", ruta, token_recepcion, {**correccion, "motivo": "   "})[0] == 422)
+            comprobar("HU20 - rechazos sin escrituras", cantidades(db) == antes)
+
+            # Cambia el catálogo para demostrar que la corrección no toma una tara nueva.
+            datos["bandeja"].peso_tara_kg = Decimal("3.30")
+            db.commit()
+            # Corrige como operador de recepción.
+            estado, corregida = solicitar("PUT", ruta, token_recepcion, correccion)
+            # El neto usa la tara histórica 1,20: 1020 - 50 x 1,20 - 20 = 940.
+            comprobar(
+                "HU20 - corrige y recalcula con tara histórica",
+                estado == 200 and corregida["kilos_netos"] == 940 and Decimal(corregida["tara_kg"]) == Decimal("1.20"),
+            )
+            # La entrada de bandejas mantiene el saldo alineado con la tarja editada.
+            movimiento = db.scalar(select(MovimientoBandeja).where(MovimientoBandeja.tarja_id == creada["id"]))
+            comprobar("HU20 - conserva movimiento de bandejas", movimiento.cantidad == 50 and movimiento.anulado is False)
+            # Solo la tarja cambia al corregir kilos; no se inventa una auditoría de movimiento.
+            eventos = list(db.scalars(select(Auditoria).where(Auditoria.usuario_id == recepcion.id).order_by(Auditoria.id)))
+            comprobar(
+                "HU20 - auditoría solo de tarja sin cambio de saldo",
+                eventos[-1].tabla == "tarjas"
+                and eventos[-1].motivo == correccion["motivo"]
+                and json.loads(eventos[-1].valores_antes)["kilos_brutos"] == "1000.00"
+                and json.loads(eventos[-1].valores_despues)["kilos_brutos"] == "1020.00",
+            )
+            # Crea una segunda bandeja activa para comprobar una sincronización real del saldo.
+            bandeja_alterna = TipoBandeja(nombre=f"QA Bandeja alterna {uuid.uuid4().hex[:8]}", peso_tara_kg=Decimal("2.00"), activo=True)
+            db.add(bandeja_alterna)
+            db.commit()
+            # El administrador tiene el mismo permiso y puede corregir tipo, cantidad y calidad.
+            estado_admin, administrada = solicitar("PUT", ruta, token_admin, {**correccion, "tipo_bandeja_id": bandeja_alterna.id, "cantidad_bandejas": 40, "porcentaje_calidad": 86, "motivo": "Corrección de bandejas y calidad"})
+            db.expire_all()
+            movimiento = db.scalar(select(MovimientoBandeja).where(MovimientoBandeja.tarja_id == creada["id"]))
+            evento_movimiento = db.scalar(select(Auditoria).where(Auditoria.tabla == "movimientos_bandeja", Auditoria.registro_id == str(movimiento.id)).order_by(Auditoria.id.desc()))
+            comprobar(
+                "HU20 - administrador sincroniza y audita movimiento",
+                estado_admin == 200
+                and administrada["porcentaje_calidad"] == 86
+                and movimiento.tipo_bandeja_id == bandeja_alterna.id
+                and movimiento.cantidad == 40
+                and evento_movimiento.motivo == "Corrección de bandejas y calidad"
+                and json.loads(evento_movimiento.valores_antes)["cantidad"] == 50
+                and json.loads(evento_movimiento.valores_despues)["cantidad"] == 40,
+            )
+            # PARCIAL y PROCESADA representan kilos ya comprometidos y bloquean toda edición.
+            for estado_tarja in (EstadoTarja.PARCIAL, EstadoTarja.PROCESADA):
+                db.get(Tarja, creada["id"]).estado = estado_tarja
+                db.commit()
+                estado_http, salida = solicitar("PUT", ruta, token_recepcion, correccion)
+                comprobar(f"HU20 - {estado_tarja.value} bloqueada", estado_http == 409 and "procesos" in salida["detail"])
+            # Una tarja anulada tampoco admite correcciones.
+            db.get(Tarja, creada["id"]).estado = EstadoTarja.ANULADA
+            db.commit()
+            comprobar("HU20 - anulada bloqueada", solicitar("PUT", ruta, token_recepcion, correccion)[0] == 409)
+            # Las rutas posteriores siguen usando la transacción externa del escenario.
+            comprobar("HU20 - transacción externa conservada", externa.is_active and conexion.in_transaction())
+
+
 # Ejecuta todo y compara el estado final con el inicial.
 def main() -> None:
     # Un error inesperado suma una falla.
@@ -1277,6 +1362,8 @@ def main() -> None:
         probar_saldo_bandejas()
         # Anulación de tarjas (HU24).
         probar_anulacion()
+        # Corrección trazable de tarjas (HU20).
+        probar_edicion()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

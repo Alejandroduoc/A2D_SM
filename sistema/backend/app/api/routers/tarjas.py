@@ -19,11 +19,12 @@ from app.models.tarja import EstadoTarja, Tarja
 # Roles permitidos y usuario autenticado.
 from app.models.usuario import RolUsuario, Usuario
 # Contratos de entrada y salida de la API.
-from app.schemas.tarja import PendientesProductorOut, SaldoBandejaOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut
+from app.schemas.tarja import PendientesProductorOut, SaldoBandejaOut, TarjaCreate, TarjaDetalleOut, TarjaOut, TarjaResumenOut, TarjaUpdate
 # Delega las reglas de negocio al servicio.
 from app.services.tarja import (
     anular_tarja,  # Anulación sin borrar (HU24).
     CatalogoNoValidoError,  # Productor o catálogo inexistente o inactivo.
+    editar_tarja,  # Corrección trazable antes del procesamiento (HU20).
     KilosNetosNoValidosError,  # Kilos netos cero o negativos.
     listar_tarjas,  # Listado con filtros (HU17).
     obtener_tarja,  # Detalle de una tarja.
@@ -34,6 +35,7 @@ from app.services.tarja import (
     TarjaAnuladaError,  # Una tarja anulada no se imprime.
     TarjaNoAnulableError,  # Ya anulada o con kilos en procesos.
     TarjaNoEncontradaError,  # La tarja no existe.
+    TarjaNoEditableError,  # Tarja anulada o con kilos ya procesados.
 )  # Finaliza las importaciones del servicio.
 
 
@@ -71,6 +73,32 @@ def crear(
             status_code=status.HTTP_400_BAD_REQUEST,  # Datos válidos en forma, rechazados por el negocio.
             detail=str(error),  # Mensaje definido por el servicio.
         ) from error  # Conserva la causa original.
+
+
+# Corrige una tarja recepcionada y conserva la auditoría de antes y después (HU20).
+@router.put("/{tarja_id}", response_model=TarjaDetalleOut)
+def editar(
+    tarja_id: IdRuta,  # Identidad validada en la ruta.
+    datos: TarjaUpdate,  # Campos corregibles y motivo obligatorio.
+    db: Session = Depends(get_db),  # Sesión de la petición.
+    usuario: Usuario = Depends(get_current_user),  # Responsable autenticado de la corrección.
+) -> dict:
+    # El servicio mantiene una sola transacción entre tarja, saldo y auditoría.
+    try:
+        # Devuelve el detalle actualizado.
+        return editar_tarja(db, tarja_id, datos, usuario)
+    # La identidad no existe.
+    except TarjaNoEncontradaError as error:
+        # Responde como recurso no encontrado.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    # La tarja ya no cumple las condiciones de corrección.
+    except TarjaNoEditableError as error:
+        # Responde conflicto para que el cliente recargue su estado.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    # Los catálogos o los kilos son inválidos para la regla de negocio.
+    except (CatalogoNoValidoError, KilosNetosNoValidosError) as error:
+        # Responde con la explicación utilizable por el operador.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
 
 # Lista las tarjas según los filtros recibidos (HU17 criterio 1).

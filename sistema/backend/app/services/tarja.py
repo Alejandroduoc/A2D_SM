@@ -25,7 +25,7 @@ from app.models.tipo_bandeja import TipoBandeja
 from app.models.usuario import Usuario
 from app.models.variedad import Variedad
 # Entrada ya validada por Pydantic.
-from app.schemas.tarja import TarjaCreate
+from app.schemas.tarja import TarjaCreate, TarjaUpdate
 # Captura estados y prepara eventos dentro de la misma transacción.
 from app.services.auditoria import instantanea, registrar_auditoria
 
@@ -57,6 +57,11 @@ class TarjaAnuladaError(Exception):
 # El router traduce este error a HTTP 409.
 class TarjaNoAnulableError(Exception):
     """La tarja ya está anulada o tiene kilos en procesos (HU24 criterio 2)."""
+
+
+# El router traduce este error a HTTP 409.
+class TarjaNoEditableError(Exception):
+    """La tarja está anulada o ya tiene kilos comprometidos en procesos."""
 
 
 # Calcula los kilos netos de una tarja (HU14 criterio 1).
@@ -347,6 +352,124 @@ def obtener_tarja(db: Session, tarja_id: int) -> dict | None:
     procesados, pendientes = kilos_de_tarja(db, fila.Tarja)
     # Agrega los kilos a los demás datos.
     return {**datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
+
+
+# Corrige una tarja sin modificar su número, tara histórica ni responsable original (HU20).
+def editar_tarja(db: Session, tarja_id: int, datos: TarjaUpdate, usuario: Usuario) -> dict:
+    # Protege tarja, saldo de bandejas y auditorías hasta el único commit.
+    try:
+        # Bloquea la tarja para no mezclar una corrección con una operación concurrente.
+        tarja = db.execute(
+            select(Tarja)
+            .where(Tarja.id == tarja_id)
+            .with_hint(Tarja, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")
+            .execution_options(populate_existing=True)
+        ).scalars().first()
+        # Una identidad inexistente no puede corregirse.
+        if tarja is None:
+            raise TarjaNoEncontradaError("Tarja no encontrada")
+        # Una anulación es histórica y nunca se edita.
+        if tarja.estado == EstadoTarja.ANULADA:
+            raise TarjaNoEditableError("No se puede corregir una tarja anulada")
+        # La recepción solo es corregible antes de que sus kilos entren a procesamiento.
+        if tarja.estado != EstadoTarja.RECEPCIONADA or kilos_procesados_de_tarja(db, tarja.id) > 0:
+            raise TarjaNoEditableError("No se puede corregir una tarja con kilos en procesos")
+        # Una merma rebajada también consume sus kilos aunque conserve otro estado por error previo.
+        if tarja.merma_rebajada:
+            raise TarjaNoEditableError("No se puede corregir una tarja con merma rebajada")
+
+        # Comprueba todas las referencias de nuevo: el formulario no es una fuente de confianza.
+        _obtener_activo(db, Productor, datos.productor_id, "El productor")
+        _obtener_activo(db, SistemaProductivo, datos.sistema_productivo_id, "El sistema productivo")
+        _obtener_activo(db, Variedad, datos.variedad_id, "La variedad")
+        _obtener_activo(db, Calidad, datos.calidad_id, "La calidad")
+        _obtener_activo(db, TipoBandeja, datos.tipo_bandeja_id, "El tipo de bandeja")
+        # Usa la tara guardada en la propia tarja; un catálogo actual no reescribe la historia.
+        kilos_netos = calcular_kilos_netos(
+            datos.kilos_brutos,
+            datos.cantidad_bandejas,
+            tarja.tara_kg,
+            datos.peso_pallet_kg,
+        )
+        # Mantiene la misma regla de neto positivo de la creación.
+        if kilos_netos <= 0:
+            raise KilosNetosNoValidosError(
+                "Los kilos netos deben ser mayores que cero; revise la balanza, las bandejas y el pallet"
+            )
+
+        # Conserva el antes de modificar la tarja para la trazabilidad exigida.
+        antes_tarja = instantanea(tarja)
+        # Busca y bloquea la entrada de bandejas vigente que originó esta tarja.
+        movimiento = db.execute(
+            select(MovimientoBandeja)
+            .where(
+                MovimientoBandeja.tarja_id == tarja.id,
+                MovimientoBandeja.tipo == TipoMovimientoBandeja.ENTRADA,
+                MovimientoBandeja.anulado == False,  # noqa: E712  Solo la entrada que aporta al saldo.
+            )
+            .with_hint(MovimientoBandeja, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")
+            .execution_options(populate_existing=True)
+        ).scalars().first()
+        # Toda tarja activa creada por HU12 posee exactamente una entrada vigente.
+        if movimiento is None:
+            raise TarjaNoEditableError("La tarja no tiene una entrada de bandejas vigente para corregir")
+        # Conserva el antes del saldo cuando la corrección lo afecte.
+        antes_movimiento = instantanea(movimiento)
+
+        # Actualiza solamente los datos digitados que la historia permite corregir.
+        tarja.productor_id = datos.productor_id
+        tarja.sistema_productivo_id = datos.sistema_productivo_id
+        tarja.variedad_id = datos.variedad_id
+        tarja.calidad_id = datos.calidad_id
+        tarja.tipo_bandeja_id = datos.tipo_bandeja_id
+        tarja.cantidad_bandejas = datos.cantidad_bandejas
+        tarja.peso_pallet_kg = datos.peso_pallet_kg
+        tarja.kilos_brutos = datos.kilos_brutos
+        tarja.kilos_netos = kilos_netos
+        tarja.porcentaje_calidad = datos.porcentaje_calidad
+        tarja.fecha_recepcion = datos.fecha_recepcion
+        # Mantiene el saldo consistente con productor, tipo y cantidad de la tarja corregida.
+        movimiento.productor_id = datos.productor_id
+        movimiento.tipo_bandeja_id = datos.tipo_bandeja_id
+        movimiento.cantidad = datos.cantidad_bandejas
+        # Solo un cambio real del saldo merece un evento UPDATE de movimiento.
+        movimiento_cambio = instantanea(movimiento) != antes_movimiento
+        # Fuerza las restricciones de base antes de crear eventos de auditoría.
+        db.flush()
+
+        # Guarda siempre la corrección solicitada, incluso si los valores coinciden, junto a su motivo.
+        registrar_auditoria(
+            db,
+            usuario.id,
+            "tarjas",
+            tarja.id,
+            AccionAuditoria.UPDATE,
+            antes=antes_tarja,
+            despues=instantanea(tarja),
+            motivo=datos.motivo,
+        )
+        # Audita el movimiento únicamente si la corrección cambió el saldo asociado.
+        if movimiento_cambio:
+            registrar_auditoria(
+                db,
+                usuario.id,
+                "movimientos_bandeja",
+                movimiento.id,
+                AccionAuditoria.UPDATE,
+                antes=antes_movimiento,
+                despues=instantanea(movimiento),
+                motivo=datos.motivo,
+            )
+        # Confirma todos los cambios o ninguno.
+        db.commit()
+    # Una falla deja tarja, saldo y auditoría como estaban.
+    except Exception:
+        # Revierte la transacción completa.
+        db.rollback()
+        # El router decide la respuesta HTTP.
+        raise
+    # Devuelve el detalle ya confirmado con sus nombres y kilos recalculados.
+    return obtener_tarja(db, tarja_id)
 
 
 # Registra una impresión o reimpresión de la tarja (HU16 criterio 3).

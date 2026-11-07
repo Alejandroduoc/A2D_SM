@@ -81,6 +81,29 @@ class TarjaCreate(BaseModel):
         return valor
 
 
+# Define los datos corregibles de una tarja sin permitir alterar sus campos históricos.
+class TarjaUpdate(TarjaCreate):
+    """Corrige una tarja recepcionada; la tara y el número siguen siendo históricos."""
+
+    # Explica por qué se modifica una tarja ya impresa o registrada.
+    motivo: str = Field(min_length=1, max_length=255)
+
+    # No acepta motivos formados solo por espacios.
+    @field_validator("motivo")
+    # Vincula el validador a la clase del schema.
+    @classmethod
+    # Conserva el motivo limpio para la auditoría.
+    def validar_motivo(cls, valor: str) -> str:
+        # Quita espacios accidentales al comienzo y al final.
+        motivo = valor.strip()
+        # Un texto vacío no explica una corrección.
+        if not motivo:
+            # Pydantic devuelve 422 asociado al campo motivo.
+            raise ValueError("El motivo de la corrección es obligatorio")
+        # Entrega el motivo ya normalizado.
+        return motivo
+
+
 # Expone los datos de una tarja registrada.
 class TarjaOut(BaseModel):
     """Representa una tarja devuelta por la API, sin el usuario que la registró."""
