@@ -9,6 +9,14 @@ export async function registrarTarja(datos) {
   return respuesta.data;
 }
 
+// Corrige una tarja recepcionada con el motivo obligatorio de HU20.
+export async function editarTarja(id, datos) {
+  // El identificador permanece en la ruta y los datos corregibles en el cuerpo.
+  const respuesta = await client.put(`/tarjas/${id}`, datos);
+  // Devuelve el detalle confirmado por el backend.
+  return respuesta.data;
+}
+
 // Lista las tarjas según los filtros (HU17); los filtros sin valor no se envían.
 export async function listarTarjas(filtros) {
   // Axios omite los parámetros undefined.

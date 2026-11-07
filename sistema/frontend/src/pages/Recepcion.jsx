@@ -1,13 +1,13 @@
 // Estado, efectos y referencia del formulario de recepción.
 import { useEffect, useRef, useState } from "react";
 // Lleva a la hoja de impresión al guardar y recibe lo que se conserva de la tarja anterior.
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 // Traduce errores HTTP a mensajes legibles sin borrar lo escrito.
 import { extraerMensajeError } from "../api/client";
 // Catálogos activos usados por la recepción.
 import { listarCalidades, listarEspecies, listarSistemasProductivos, listarTiposBandeja, listarVariedades } from "../api/opciones";
 // Escritura de tarjas y acumulados del productor.
-import { pendientesProductor, registrarTarja, saldoBandejasProductor } from "../api/tarjas";
+import { editarTarja, obtenerTarja, pendientesProductor, registrarTarja, saldoBandejasProductor } from "../api/tarjas";
 // Selectores compartidos de HU11.
 import SelectorCatalogo from "../components/SelectorCatalogo";
 import SelectorProductor from "../components/SelectorProductor";
@@ -96,6 +96,10 @@ function formularioVacio(fecha) {
 export default function Recepcion() {
   // Navegación a la hoja de impresión.
   const navigate = useNavigate();
+  // Identifica la tarja cuando esta misma pantalla se usa para corregirla.
+  const { id: tarjaId } = useParams();
+  // Distingue registro nuevo de edición sin confiar solo en la URL visual.
+  const editando = Boolean(tarjaId);
   // Productor y fecha que vuelven desde la hoja, para seguir con la siguiente tarja.
   const { state: anterior } = useLocation();
   // Día de hoy en la planta, para el valor inicial y el máximo de la fecha.
@@ -132,6 +136,48 @@ export default function Recepcion() {
   // Estado de escritura y mensaje de error; el éxito se avisa en la hoja de impresión.
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  // Conserva la tara histórica y el detalle inicial durante una corrección.
+  const [tarjaOriginal, setTarjaOriginal] = useState(null);
+  // Explica la corrección y el backend también la valida como obligatoria.
+  const [motivo, setMotivo] = useState("");
+
+  // Carga el detalle al editar y llena el mismo formulario operativo de recepción.
+  useEffect(() => {
+    // Una recepción nueva no necesita detalle previo.
+    if (!editando || cargando) return undefined;
+    // Evita escribir estado si la ruta cambia antes de responder.
+    let vigente = true;
+    // Obtiene la tarja protegida por los mismos permisos del backend.
+    async function cargarTarja() {
+      try {
+        // Pide el detalle completo con los nombres que necesita el formulario.
+        const detalle = await obtenerTarja(tarjaId);
+        // Espera las especies cargadas para convertir el nombre de la variedad en su especie.
+        const especie = especies.find((opcion) => opcion.nombre === detalle.especie);
+        // Una respuesta tardía no debe sobrescribir otra pantalla.
+        if (!vigente) return;
+        // Conserva la tara propia, que puede diferir de la tara vigente del catálogo.
+        setTarjaOriginal(detalle);
+        // Arma el productor en el formato que consume SelectorProductor.
+        setProductor({ id: detalle.productor_id, codigo: detalle.productor_codigo, rut: detalle.productor_rut, razon_social: detalle.productor_razon_social });
+        // Precarga cada selector con el valor guardado en la tarja.
+        setSistemaId(String(detalle.sistema_productivo_id));
+        setEspecieId(especie ? String(especie.id) : "");
+        setVariedadId(String(detalle.variedad_id));
+        setCalidadId(String(detalle.calidad_id));
+        setBandejaId(String(detalle.tipo_bandeja_id));
+        // Mantiene los decimales como texto, igual que el registro nuevo.
+        setForm({ cantidad_bandejas: String(detalle.cantidad_bandejas), peso_pallet_kg: String(detalle.peso_pallet_kg), kilos_brutos: String(detalle.kilos_brutos), porcentaje_calidad: String(detalle.porcentaje_calidad), fecha_recepcion: detalle.fecha_recepcion });
+      } catch (errorRecibido) {
+        // Informa el bloqueo o la ausencia sin mostrar valores inventados.
+        if (vigente) setError(extraerMensajeError(errorRecibido, "No se pudo cargar la tarja para corregir"));
+      }
+    }
+    // Inicia la carga de la tarja elegida.
+    cargarTarja();
+    // Marca obsoleta la petición al desmontar.
+    return () => { vigente = false; };
+  }, [cargando, editando, especies, tarjaId]);
 
   // Al volver con el productor ya elegido, el cursor parte en el primer catálogo,
   // cuando terminan de cargar las listas: antes esa lista está deshabilitada.
@@ -283,7 +329,7 @@ export default function Recepcion() {
   // Selecciona la bandeja completa para leer su tara sin usar float.
   const bandeja = bandejas.find((opcion) => String(opcion.id) === bandejaId);
   // Pesos en centésimos enteros, igual de exactos que los Decimal del backend.
-  const taraCentimos = bandeja ? aCentimos(bandeja.peso_tara_kg) : null;
+  const taraCentimos = editando ? aCentimos(tarjaOriginal?.tara_kg) : bandeja ? aCentimos(bandeja.peso_tara_kg) : null;
   const palletCentimos = aCentimos(form.peso_pallet_kg);
   const brutosCentimos = aCentimos(form.kilos_brutos);
   // Valores numéricos de los campos enteros.
@@ -324,7 +370,8 @@ export default function Recepcion() {
     && palletValido
     && brutosValidos
     && fechaValida
-    && netoValido,
+    && netoValido
+    && (!editando || motivo.trim() !== ""),
   );
 
   // Saldo actual del productor en la bandeja elegida; sin movimientos, está al día.
@@ -378,6 +425,8 @@ export default function Recepcion() {
     if (evento.target.tagName === "BUTTON") return;
     // En un campo, Enter no debe enviar el formulario.
     evento.preventDefault();
+    // El motivo admite varias líneas y Enter debe conservar su edición natural.
+    if (evento.target.tagName === "TEXTAREA") return;
     // El buscador de productores maneja su propio Enter.
     if (evento.target.type === "search") return;
     // Recorre los campos en orden y termina en Guardar, si ya está habilitado.
@@ -403,7 +452,7 @@ export default function Recepcion() {
     setError("");
     try {
       // Número, tara, kilos netos, estado y usuario los pone el sistema.
-      const registrada = await registrarTarja({
+      const datosTarja = {
         productor_id: productor.id, // Productor elegido.
         sistema_productivo_id: Number(sistemaId), // Sistema productivo elegido.
         variedad_id: Number(variedadId), // Variedad elegida.
@@ -414,7 +463,15 @@ export default function Recepcion() {
         kilos_brutos: form.kilos_brutos.replace(",", "."), // Decimal como texto, sin float.
         porcentaje_calidad: calidad, // Calidad visual.
         fecha_recepcion: form.fecha_recepcion, // Día de llegada de la fruta.
-      });
+      };
+      // La corrección conserva el número y vuelve al listado al confirmarse.
+      if (editando) {
+        await editarTarja(tarjaId, { ...datosTarja, motivo: motivo.trim() });
+        navigate("/tarjas");
+        return;
+      }
+      // El registro nuevo abre su hoja de impresión al terminar.
+      const registrada = await registrarTarja(datosTarja);
       // Igual que el legado y socradex: al guardar se abre la tarja para imprimirla (HU16).
       navigate(`/tarjas/${registrada.id}/imprimir`, {
         state: {
@@ -425,7 +482,7 @@ export default function Recepcion() {
       });
     } catch (errorRecibido) {
       // Muestra el error sin borrar lo escrito.
-      setError(extraerMensajeError(errorRecibido, "No se pudo registrar la tarja"));
+      setError(extraerMensajeError(errorRecibido, editando ? "No se pudo corregir la tarja" : "No se pudo registrar la tarja"));
     } finally {
       // Libera el formulario en ambos casos.
       setGuardando(false);
@@ -438,8 +495,8 @@ export default function Recepcion() {
       {/* Encabezado del módulo de la Épica 3. */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">E3 · Recepción</p>
-        <h1 className="text-2xl font-bold text-frigorifico-900">Recepción</h1>
-        <p className="mt-2 text-sm text-slate-500">Registre la fruta recibida y revise los kilos netos antes de guardar.</p>
+        <h1 className="text-2xl font-bold text-frigorifico-900">{editando ? "Corregir tarja" : "Recepción"}</h1>
+        <p className="mt-2 text-sm text-slate-500">{editando ? "Corrija el dato digitado, indique el motivo y revise el cálculo con la tara histórica." : "Registre la fruta recibida y revise los kilos netos antes de guardar."}</p>
       </div>
 
       {/* Errores de carga y de la última escritura. */}
@@ -655,6 +712,26 @@ export default function Recepcion() {
             </div>
           </section>
 
+          {/* HU20 exige una justificación visible antes de confirmar la corrección. */}
+          {editando && (
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <h3 className={SUBTITULO}>Motivo de la corrección</h3>
+              <label htmlFor="recepcion-motivo" className={ETIQUETA}>Explique el error corregido</label>
+              <textarea
+                id="recepcion-motivo"
+                value={motivo}
+                onChange={(evento) => setMotivo(evento.target.value)}
+                maxLength={255}
+                rows={3}
+                className={motivo.trim() ? CAMPO : CAMPO_ERROR}
+                aria-invalid={!motivo.trim()}
+                aria-describedby="recepcion-motivo-ayuda"
+                required
+              />
+              <p id="recepcion-motivo-ayuda" className={AYUDA}>Obligatorio. Quedará registrado junto al antes y después de la tarja.</p>
+            </section>
+          )}
+
           {/* Saldo de bandejas del productor en el tipo elegido, como el semáforo del legado (HU15). */}
           {productor && bandejaId && (
             <section className="mt-6 border-t border-slate-200 pt-5" aria-live="polite">
@@ -688,6 +765,13 @@ export default function Recepcion() {
                   <dt className="text-xs font-semibold text-slate-500">Promedio por bandeja</dt>
                   <dd className="mt-1 text-2xl font-bold text-frigorifico-900">{promedioCentimos === null ? "—" : `${formatearCentimos(promedioCentimos)} kg`}</dd>
                 </div>
+                {/* En edición se declara la tara histórica aunque el catálogo haya cambiado. */}
+                {editando && (
+                  <div>
+                    <dt className="text-xs font-semibold text-slate-500">Tara histórica utilizada</dt>
+                    <dd className="mt-1 text-lg font-bold text-frigorifico-900">{tarjaOriginal ? `${String(tarjaOriginal.tara_kg).replace(".", ",")} kg` : "Cargando…"}</dd>
+                  </div>
+                )}
               </dl>
               {/* Explica por qué Guardar sigue deshabilitado. */}
               {kilosNetos !== null && !netoValido && <p className="mt-2 text-sm text-red-700">Los kilos netos deben ser mayores que cero; revise los pesos.</p>}

@@ -382,6 +382,12 @@ export default function Tarjas() {
                         >
                           {cargandoDetalle === tarja.id ? "Cargando…" : "Ver detalle"}
                         </button>
+                        {/* HU20 solo permite corregir tarjas antes del procesamiento. */}
+                        {tarja.estado === "RECEPCIONADA" && (
+                          <Link to={`/tarjas/${tarja.id}/editar`} className={`whitespace-nowrap ${BOTON_EDITAR}`}>
+                            Editar
+                          </Link>
+                        )}
                         {/* Una tarja anulada no se imprime (HU16). */}
                         {tarja.estado !== "ANULADA" && (
                           <Link to={`/tarjas/${tarja.id}/imprimir`} aria-label={`${tarja.veces_impresa > 0 ? "Reimprimir" : "Imprimir"} la tarja ${tarja.numero_tarja}`} className={`whitespace-nowrap ${BOTON_EDITAR}`}>

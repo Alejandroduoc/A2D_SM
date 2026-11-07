@@ -60,6 +60,8 @@ export default function App() {
             {/* Recepción y administrador, los mismos roles que exige /opciones en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
               <Route path="recepcion" element={<Recepcion />} />
+              {/* Reutiliza el formulario de recepción para la corrección trazable de HU20. */}
+              <Route path="tarjas/:id/editar" element={<Recepcion />} />
               <Route path="tarjas" element={<Tarjas />} />
               <Route path="bandejas" element={<Bandejas />} />
             </Route>
