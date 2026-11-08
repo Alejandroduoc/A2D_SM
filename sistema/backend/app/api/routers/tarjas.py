@@ -25,6 +25,7 @@ from app.services.tarja import (
     anular_tarja,  # Anulación sin borrar (HU24).
     CatalogoNoValidoError,  # Productor o catálogo inexistente o inactivo.
     editar_tarja,  # Corrección trazable antes del procesamiento (HU20).
+    FechaRecepcionNoValidaError,  # Recepción posterior al registro de la tarja (HU20).
     KilosNetosNoValidosError,  # Kilos netos cero o negativos.
     listar_tarjas,  # Listado con filtros (HU17).
     obtener_tarja,  # Detalle de una tarja.
@@ -32,6 +33,7 @@ from app.services.tarja import (
     registrar_impresion,  # Impresión o reimpresión (HU16).
     registrar_tarja,  # Alta en una sola transacción.
     saldo_bandejas_productor,  # Saldo de bandejas (HU15).
+    SinCambiosError,  # Corrección que no cambia ningún dato (HU20 criterio 7).
     TarjaAnuladaError,  # Una tarja anulada no se imprime.
     TarjaNoAnulableError,  # Ya anulada o con kilos en procesos.
     TarjaNoEncontradaError,  # La tarja no existe.
@@ -95,8 +97,8 @@ def editar(
     except TarjaNoEditableError as error:
         # Responde conflicto para que el cliente recargue su estado.
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
-    # Los catálogos o los kilos son inválidos para la regla de negocio.
-    except (CatalogoNoValidoError, KilosNetosNoValidosError) as error:
+    # Catálogos, kilos o fecha inválidos para el negocio, o una corrección sin cambios.
+    except (CatalogoNoValidoError, KilosNetosNoValidosError, FechaRecepcionNoValidaError, SinCambiosError) as error:
         # Responde con la explicación utilizable por el operador.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 

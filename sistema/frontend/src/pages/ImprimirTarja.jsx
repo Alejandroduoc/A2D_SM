@@ -139,6 +139,10 @@ export default function ImprimirTarja() {
         {desdeRecepcion?.recienRegistrada && (
           <p className={MENSAJE_EXITO} role="status">Tarja N° {tarja.numero_tarja} registrada: {tarja.kilos_netos} kg netos</p>
         )}
+        {/* Aviso al llegar desde una corrección (HU20 criterio 6): la hoja del pallet quedó con datos antiguos. */}
+        {desdeRecepcion?.recienCorregida && (
+          <p className={MENSAJE_EXITO} role="status">Tarja N° {tarja.numero_tarja} corregida: {tarja.kilos_netos} kg netos. Reimprima la hoja y reemplace la del pallet.</p>
+        )}
         {/* Error al registrar la impresión. */}
         {error && <p className={MENSAJE_ERROR} role="alert">{error}</p>}
         {/* Enlaces de salida y botón de imprimir. */}

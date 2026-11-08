@@ -41,6 +41,7 @@ from app.main import app
 # Modelos que se crean o se comprueban.
 from app.models.auditoria import AccionAuditoria, Auditoria
 from app.models.calidad import Calidad
+from app.models.embalaje import Embalaje
 from app.models.especie import Especie
 from app.models.movimiento_bandeja import MovimientoBandeja, TipoMovimientoBandeja
 from app.models.productor import Productor
@@ -49,10 +50,14 @@ from app.models.tarja import EstadoTarja, Tarja
 from app.models.tipo_bandeja import TipoBandeja
 from app.models.usuario import RolUsuario, Usuario, UsuarioRol
 from app.models.variedad import Variedad
-# Schema de entrada y fecha de hoy en Chile.
-from app.schemas.tarja import TarjaCreate, hoy_en_chile
+# Schema de entrada, fecha de hoy y zona horaria de Chile.
+from app.schemas.tarja import ZONA_CHILE, TarjaCreate, hoy_en_chile
+# Proceso real para el caso 13 de HU20.
+from app.schemas.proceso import ProcesoCreate
 # Misma instantánea que guarda la auditoría.
 from app.services.auditoria import instantanea
+# Procesos y merma reales: dejan la tarja PARCIAL, PROCESADA o con merma rebajada (HU20).
+from app.services.proceso import anular_proceso, reabrir_tarja, registrar_proceso, terminar_tarja
 # Funciones del service que se prueban directamente.
 from app.services.tarja import anular_tarja, calcular_kilos_netos, registrar_impresion, registrar_tarja
 
@@ -277,6 +282,16 @@ def cantidades(db: Session) -> tuple[int, int, int]:
         db.scalar(select(func.count()).select_from(MovimientoBandeja)),
         db.scalar(select(func.count()).select_from(Auditoria)),
     )
+
+
+# Último evento de auditoría de una tarja, para leer su motivo y sus valores.
+def ultimo_evento_tarja(db: Session, tarja_id: int) -> Auditoria | None:
+    # El id más alto es el evento más reciente.
+    return db.scalar(
+        select(Auditoria)  # Eventos de la bitácora.
+        .where(Auditoria.tabla == "tarjas", Auditoria.registro_id == str(tarja_id))  # Solo esta tarja.
+        .order_by(Auditoria.id.desc())  # El más nuevo primero.
+    )  # Devuelve el evento o None.
 
 
 # Convierte una instantánea con fechas, decimales y enums como lo hace auditoría.
@@ -1316,6 +1331,9 @@ def probar_edicion() -> None:
                 "HU20 - administrador sincroniza y audita movimiento",
                 estado_admin == 200
                 and administrada["porcentaje_calidad"] == 86
+                # Caso 1 de D6: el tipo nuevo trae su tara vigente; 1020 − 40 × 2,00 − 20 = 920.
+                and Decimal(administrada["tara_kg"]) == Decimal("2.00")
+                and administrada["kilos_netos"] == 920
                 and movimiento.tipo_bandeja_id == bandeja_alterna.id
                 and movimiento.cantidad == 40
                 and evento_movimiento.motivo == "Corrección de bandejas y calidad"
@@ -1334,6 +1352,287 @@ def probar_edicion() -> None:
             comprobar("HU20 - anulada bloqueada", solicitar("PUT", ruta, token_recepcion, correccion)[0] == 409)
             # Las rutas posteriores siguen usando la transacción externa del escenario.
             comprobar("HU20 - transacción externa conservada", externa.is_active and conexion.in_transaction())
+
+
+# HU20, correcciones de la revisión del 2026-11-07 (casos 3 a 17 de la tarea D6).
+def probar_edicion_correcciones() -> None:
+    # Aísla actores, catálogos, tarjas, procesos y auditorías de este escenario.
+    with aislado() as (db, conexion, externa):
+        # Prepara referencias activas e inactivas y un actor de cada perfil.
+        datos = preparar(db)
+        # Actores y token que usan los casos.
+        _, token = datos["actores"][RolUsuario.OPERADOR_RECEPCION]
+        administrador, _ = datos["actores"][RolUsuario.ADMINISTRADOR]
+        operador_proceso, _ = datos["actores"][RolUsuario.OPERADOR_PROCESO]
+        # Segundo tipo de bandeja, con otra tara.
+        bandeja_b = TipoBandeja(nombre=f"QA Bandeja B {uuid.uuid4().hex[:8]}", peso_tara_kg=Decimal("2.00"), activo=True)
+        # Embalaje de 10 kg por caja para los procesos reales del caso 13.
+        caja = Embalaje(nombre=f"QA Caja HU20 {uuid.uuid4().hex[:8]}", kg_por_caja=Decimal("10.00"), activo=True)
+        # Los agrega a la transacción del escenario.
+        db.add_all([bandeja_b, caja])
+        # Solo confirma el savepoint.
+        db.commit()
+
+        # Usa la sesión aislada también en las rutas HTTP reales.
+        with api_con_sesion(db):
+            # Tarja de partida: 1000 − 50 × 1,20 − 20 = 920 kg.
+            _, creada = solicitar("POST", BASE, token, cuerpo_valido(datos))
+            # Ruta de la tarja.
+            ruta = f"{BASE}/{creada['id']}"
+            # Lo que la tarja tiene ahora; cada corrección exitosa lo actualiza.
+            actual = cuerpo_valido(datos)
+
+            # Envía los datos actuales con los cambios del caso y un motivo.
+            def corregir(cambios: dict, motivo: str = "Corrección QA") -> tuple[int, object]:
+                # Usa el operador de recepción, que tiene el permiso.
+                return solicitar("PUT", ruta, token, {**actual, **cambios, "motivo": motivo})
+
+            # Caso 1 (variante): cambiar el tipo usa la tara vigente del tipo nuevo, y la auditoría lo registra.
+            estado, salida = corregir({"tipo_bandeja_id": bandeja_b.id})
+            # Evento de esa corrección.
+            evento = ultimo_evento_tarja(db, creada["id"])
+            comprobar(
+                "HU20 C1 - tipo nuevo con su tara vigente y tara_kg auditada",
+                estado == 200
+                and Decimal(salida["tara_kg"]) == Decimal("2.00")
+                and salida["kilos_netos"] == 880  # 1000 − 50 × 2,00 − 20.
+                and json.loads(evento.valores_antes)["tara_kg"] == "1.20"
+                and json.loads(evento.valores_despues)["tara_kg"] == "2.00",
+            )
+            # La tarja quedó con el tipo B.
+            actual["tipo_bandeja_id"] = bandeja_b.id
+
+            # Caso 3: el tipo original cambió su tara a 3,30 en el catálogo; volver a él usa la tara vigente.
+            datos["bandeja"].peso_tara_kg = Decimal("3.30")
+            # Solo confirma el savepoint.
+            db.commit()
+            # Vuelve al tipo original.
+            estado, salida = corregir({"tipo_bandeja_id": datos["bandeja"].id})
+            comprobar(
+                "HU20 C3 - volver al tipo original usa su tara vigente",
+                estado == 200 and Decimal(salida["tara_kg"]) == Decimal("3.30") and salida["kilos_netos"] == 815,  # 1000 − 165 − 20.
+            )
+            # La tarja quedó con el tipo original.
+            actual["tipo_bandeja_id"] = datos["bandeja"].id
+
+            # Caso 4: una corrección sin cambios se rechaza, también si los decimales vienen escritos distinto.
+            antes = cantidades(db)
+            # Exactamente los mismos datos.
+            estado, salida = corregir({})
+            # Mismos valores, sin los ".00".
+            estado_texto, _ = corregir({"kilos_brutos": "1000", "peso_pallet_kg": "20"})
+            comprobar(
+                "HU20 C4 - sin cambios 400, también con 1000 en vez de 1000.00, sin escrituras",
+                estado == 400 and salida["detail"] == "No hay cambios que guardar" and estado_texto == 400 and cantidades(db) == antes,
+            )
+
+            # Caso 5: la fecha de recepción es obligatoria al corregir.
+            sin_fecha = {**actual, "kilos_brutos": "1001.00", "motivo": "Sin fecha"}
+            # Quita el campo del cuerpo.
+            sin_fecha.pop("fecha_recepcion")
+            comprobar(
+                "HU20 C5 - sin fecha_recepcion 422 y con null 422",
+                solicitar("PUT", ruta, token, sin_fecha)[0] == 422
+                and corregir({"kilos_brutos": "1001.00", "fecha_recepcion": None})[0] == 422,
+            )
+
+            # Caso 6: se retrasa el registro 3 días; si no, toda fecha posterior sería futura y daría 422.
+            tarja = db.get(Tarja, creada["id"])
+            # La API usa esta misma sesión, así que verá el cambio.
+            tarja.fecha_hora = tarja.fecha_hora - timedelta(days=3)
+            # Solo confirma el savepoint.
+            db.commit()
+            # Día del registro en Chile, con la misma conversión del service.
+            dia_registro = tarja.fecha_hora.replace(tzinfo=timezone.utc).astimezone(ZONA_CHILE).date()
+            # Un día después del registro (y antes de hoy): no corresponde.
+            estado_posterior, salida_posterior = corregir({"fecha_recepcion": (dia_registro + timedelta(days=1)).isoformat()})
+            # El mismo día del registro sí.
+            estado_mismo, _ = corregir({"fecha_recepcion": dia_registro.isoformat()})
+            # La tarja quedó con esa fecha.
+            actual["fecha_recepcion"] = dia_registro.isoformat()
+            # Un día antes del registro también.
+            estado_anterior, _ = corregir({"fecha_recepcion": (dia_registro - timedelta(days=1)).isoformat()})
+            # La tarja quedó con la fecha anterior.
+            actual["fecha_recepcion"] = (dia_registro - timedelta(days=1)).isoformat()
+            comprobar(
+                "HU20 C6 - recepción posterior al registro 400; el mismo día y el anterior 200",
+                estado_posterior == 400
+                and "posterior al registro" in salida_posterior["detail"]
+                and estado_mismo == 200
+                and estado_anterior == 200,
+            )
+
+            # Caso 7: los catálogos de la tarja se desactivan después del registro.
+            catalogos = ("productor", "sistema", "variedad", "calidad", "bandeja")
+            # Desactiva cada uno.
+            for clave in catalogos:
+                datos[clave].activo = False
+            # Solo confirma el savepoint.
+            db.commit()
+            # Corrige solo los kilos.
+            estado, salida = corregir({"kilos_brutos": "1002.00"})
+            comprobar("HU20 C7 - catálogos desactivados sin cambiarlos 200", estado == 200 and salida["kilos_netos"] == 817)  # 1002 − 165 − 20.
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1002.00"
+
+            # Caso 8: cambiar a una referencia inactiva sigue rechazándose.
+            antes = cantidades(db)
+            # Variedad inactiva.
+            estado_variedad, salida_variedad = corregir({"variedad_id": datos["variedad_inactiva"].id})
+            # Tipo de bandeja inactivo.
+            estado_bandeja, _ = corregir({"tipo_bandeja_id": datos["bandeja_inactiva"].id})
+            comprobar(
+                "HU20 C8 - cambiar a una referencia inactiva 400, sin escrituras",
+                estado_variedad == 400
+                and "variedad" in salida_variedad["detail"].lower()
+                and estado_bandeja == 400
+                and cantidades(db) == antes,
+            )
+            # Reactiva los catálogos para los casos siguientes.
+            for clave in catalogos:
+                datos[clave].activo = True
+            # Solo confirma el savepoint.
+            db.commit()
+
+            # Caso 9: kilos netos cero al corregir (185 − 50 × 3,30 − 20 = 0).
+            antes = cantidades(db)
+            comprobar(
+                "HU20 C9 - kilos netos cero 400, sin escrituras",
+                corregir({"kilos_brutos": "185.00"})[0] == 400 and cantidades(db) == antes,
+            )
+
+            # Caso 10: una tarja que no existe y un id fuera de rango.
+            comprobar(
+                "HU20 C10 - tarja inexistente 404 e id 0 422",
+                solicitar("PUT", f"{BASE}/2147483647", token, {**actual, "kilos_brutos": "1003.00", "motivo": "X"})[0] == 404
+                and solicitar("PUT", f"{BASE}/0", token, {**actual, "kilos_brutos": "1003.00", "motivo": "X"})[0] == 422,
+            )
+
+            # Caso 11: largo del motivo, tildes y saltos de línea.
+            antes = cantidades(db)
+            comprobar(
+                "HU20 C11a - motivo de 256 caracteres 422, sin escrituras",
+                corregir({"kilos_brutos": "1003.00"}, "x" * 256)[0] == 422 and cantidades(db) == antes,
+            )
+            # 255 caracteres con tilde: cada uno ocupa una sola unidad UTF-16.
+            estado_tildes, _ = corregir({"kilos_brutos": "1003.00"}, "á" * 255)
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1003.00"
+            comprobar(
+                "HU20 C11b - motivo de 255 con tildes 200 y se guarda igual",
+                estado_tildes == 200 and ultimo_evento_tarja(db, creada["id"]).motivo == "á" * 255,
+            )
+            # Dos líneas con espacios en los extremos.
+            estado_lineas, _ = corregir({"kilos_brutos": "1004.00"}, "  Línea uno\nLínea dos  ")
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1004.00"
+            comprobar(
+                "HU20 C11c - saltos de línea conservados, sin espacios en los extremos",
+                estado_lineas == 200 and ultimo_evento_tarja(db, creada["id"]).motivo == "Línea uno\nLínea dos",
+            )
+
+            # Caso 15: con NVARCHAR, la flecha, el ✓ y el emoji se guardan tal cual.
+            especial = "Balanza → 1.020 kg ✓ 😀 ñandú"
+            # Corrige con ese motivo.
+            estado, _ = corregir({"kilos_brutos": "1005.00"}, especial)
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1005.00"
+            comprobar(
+                "HU20 C15 - motivo con flecha, ✓, emoji y ñ se guarda igual",
+                estado == 200 and ultimo_evento_tarja(db, creada["id"]).motivo == especial,
+            )
+
+            # Caso 17: el largo se mide en unidades UTF-16, como NVARCHAR(255).
+            antes = cantidades(db)
+            # 128 emojis son 256 unidades.
+            estado_emojis, _ = corregir({"kilos_brutos": "1006.00"}, "😀" * 128)
+            # 254 letras y un emoji también son 256.
+            estado_mixto, _ = corregir({"kilos_brutos": "1006.00"}, "a" * 254 + "😀")
+            comprobar(
+                "HU20 C17a - 128 emojis o 254 letras más un emoji 422, sin escrituras",
+                estado_emojis == 422 and estado_mixto == 422 and cantidades(db) == antes,
+            )
+            # 253 letras y un emoji son exactamente 255 unidades.
+            estado_limite, _ = corregir({"kilos_brutos": "1006.00"}, "a" * 253 + "😀")
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1006.00"
+            comprobar(
+                "HU20 C17b - 253 letras más un emoji (255 unidades) 200 y se guarda igual",
+                estado_limite == 200 and ultimo_evento_tarja(db, creada["id"]).motivo == "a" * 253 + "😀",
+            )
+
+            # Caso 14: los campos que pone el sistema no se aceptan en el cuerpo.
+            antes = cantidades(db)
+            # Un intento por campo histórico.
+            historicos = [
+                solicitar("PUT", ruta, token, {**actual, campo: valor, "kilos_brutos": "1007.00", "motivo": "Campo histórico"})[0]
+                for campo, valor in (("tara_kg", "9.99"), ("numero_tarja", 1), ("estado", "PROCESADA"), ("kilos_netos", 1))
+            ]
+            comprobar(
+                "HU20 C14 - tara, número, estado o kilos netos en el cuerpo 422, sin escrituras",
+                historicos == [422, 422, 422, 422] and cantidades(db) == antes,
+            )
+
+            # Caso 16: el detalle trae el id de la especie.
+            estado, detalle = solicitar("GET", ruta, token)
+            comprobar(
+                "HU20 C16 - el detalle trae especie_id",
+                estado == 200 and detalle["especie_id"] == datos["variedad"].especie_id,
+            )
+
+            # Caso 12: merma rebajada con el service real de HU18.
+            terminar_tarja(db, creada["id"], operador_proceso)
+            # Intenta corregirla.
+            estado_merma, _ = corregir({"kilos_brutos": "1008.00"})
+            # La reabre para los casos siguientes.
+            reabrir_tarja(db, creada["id"], operador_proceso)
+            comprobar("HU20 C12 - merma rebajada 409", estado_merma == 409)
+
+            # Caso 13: proceso real de 10 cajas de 10 kg; la tarja queda PARCIAL.
+            proceso = registrar_proceso(
+                db,  # Misma sesión del escenario.
+                ProcesoCreate(embalaje_id=caja.id, tarjas=[{"tarja_id": creada["id"], "cantidad_cajas": 10}]),  # 100 kg.
+                operador_proceso,  # Responsable del proceso.
+            )  # Finaliza el registro.
+            # Estado que dejó el proceso.
+            estado_parcial = db.get(Tarja, creada["id"]).estado
+            # Intenta corregirla.
+            codigo_parcial, _ = corregir({"kilos_brutos": "1008.00"})
+            # El administrador anula el proceso (HU25).
+            anular_proceso(db, proceso["id"], administrador)
+            # Estado después de anularlo.
+            estado_reabierta = db.get(Tarja, creada["id"]).estado
+            # Ahora sí se corrige.
+            codigo_reabierta, _ = corregir({"kilos_brutos": "1008.00"})
+            # La tarja quedó con esos kilos.
+            actual["kilos_brutos"] = "1008.00"
+            comprobar(
+                "HU20 C13a - PARCIAL por un proceso real 409; al anularlo vuelve a RECEPCIONADA y se corrige",
+                estado_parcial == EstadoTarja.PARCIAL
+                and codigo_parcial == 409
+                and estado_reabierta == EstadoTarja.RECEPCIONADA
+                and codigo_reabierta == 200,
+            )
+            # Un proceso con la casilla "tarja terminada" la deja PROCESADA.
+            proceso = registrar_proceso(
+                db,  # Misma sesión del escenario.
+                ProcesoCreate(embalaje_id=caja.id, tarjas=[{"tarja_id": creada["id"], "cantidad_cajas": 10, "tarja_terminada": True}]),  # Terminada.
+                operador_proceso,  # Responsable del proceso.
+            )  # Finaliza el registro.
+            # Estado que dejó el proceso.
+            estado_procesada = db.get(Tarja, creada["id"]).estado
+            # Intenta corregirla.
+            codigo_procesada, _ = corregir({"kilos_brutos": "1009.00"})
+            # El administrador anula el proceso.
+            anular_proceso(db, proceso["id"], administrador)
+            # Ahora sí se corrige.
+            codigo_final, _ = corregir({"kilos_brutos": "1009.00"})
+            comprobar(
+                "HU20 C13b - PROCESADA por un proceso real 409; al anularlo se corrige",
+                estado_procesada == EstadoTarja.PROCESADA and codigo_procesada == 409 and codigo_final == 200,
+            )
+            # Las rutas posteriores siguen usando la transacción externa del escenario.
+            comprobar("HU20 C - transacción externa conservada", externa.is_active and conexion.in_transaction())
 
 
 # Ejecuta todo y compara el estado final con el inicial.
@@ -1364,6 +1663,8 @@ def main() -> None:
         probar_anulacion()
         # Corrección trazable de tarjas (HU20).
         probar_edicion()
+        # Correcciones de la revisión de HU20 (tara, sin cambios, fechas, catálogos y motivo).
+        probar_edicion_correcciones()
     # Registra el error sin detener el informe.
     except Exception:
         # Cuenta el error como falla.

@@ -5,7 +5,7 @@ import enum
 from datetime import datetime, timezone
 
 # Tipos y restricciones de las columnas de la tabla de auditoría.
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, UnicodeText
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Unicode, UnicodeText
 
 # Herramientas de SQLAlchemy 2 para declarar atributos y columnas tipados.
 from sqlalchemy.orm import Mapped, mapped_column
@@ -75,7 +75,7 @@ class Auditoria(Base):
     ) 
     # Guarda la justificación cuando la operación de negocio la requiere.
     motivo: Mapped[str | None] = mapped_column(
-        String(255),  # Limita la explicación a 255 caracteres.
+        Unicode(255),  # NVARCHAR(255): el motivo de HU20 lo escribe una persona y puede traer cualquier carácter.
         nullable=True,  # La exigencia del motivo se aplica desde el negocio.
     )  
     # Registra el instante del evento con la misma convención UTC de Usuario.

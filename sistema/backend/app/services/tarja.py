@@ -24,8 +24,8 @@ from app.models.tarja import EstadoTarja, Tarja
 from app.models.tipo_bandeja import TipoBandeja
 from app.models.usuario import Usuario
 from app.models.variedad import Variedad
-# Entrada ya validada por Pydantic.
-from app.schemas.tarja import TarjaCreate, TarjaUpdate
+# Entrada ya validada por Pydantic y zona horaria de la planta.
+from app.schemas.tarja import ZONA_CHILE, TarjaCreate, TarjaUpdate
 # Captura estados y prepara eventos dentro de la misma transacción.
 from app.services.auditoria import instantanea, registrar_auditoria
 
@@ -62,6 +62,16 @@ class TarjaNoAnulableError(Exception):
 # El router traduce este error a HTTP 409.
 class TarjaNoEditableError(Exception):
     """La tarja está anulada o ya tiene kilos comprometidos en procesos."""
+
+
+# El router traduce este error a HTTP 400 (HU20 criterio 7).
+class SinCambiosError(Exception):
+    """La corrección no cambia ningún dato de la tarja."""
+
+
+# El router traduce este error a HTTP 400.
+class FechaRecepcionNoValidaError(Exception):
+    """La fecha de recepción corregida queda después del día en que se registró la tarja."""
 
 
 # Calcula los kilos netos de una tarja (HU14 criterio 1).
@@ -262,6 +272,7 @@ def consulta_con_nombres():
             Productor.rut.label("productor_rut"),  # RUT del productor.
             Productor.razon_social.label("productor_razon_social"),  # Nombre del productor.
             SistemaProductivo.nombre.label("sistema_productivo"),  # Nombre del sistema productivo.
+            Variedad.especie_id.label("especie_id"),  # Id de la especie, aunque esté inactiva (HU20).
             Especie.nombre.label("especie"),  # Nombre de la especie.
             Variedad.nombre.label("variedad"),  # Nombre de la variedad.
             Calidad.nombre.label("calidad"),  # Nombre de la calidad.
@@ -354,7 +365,8 @@ def obtener_tarja(db: Session, tarja_id: int) -> dict | None:
     return {**datos_de_fila(fila), "kilos_procesados": procesados, "kilos_pendientes": pendientes}
 
 
-# Corrige una tarja sin modificar su número, tara histórica ni responsable original (HU20).
+# Corrige una tarja sin modificar su número, su fecha de registro ni su responsable original (HU20).
+# La tara se conserva si el tipo de bandeja no cambia; si cambia, se copia la del tipo nuevo.
 def editar_tarja(db: Session, tarja_id: int, datos: TarjaUpdate, usuario: Usuario) -> dict:
     # Protege tarja, saldo de bandejas y auditorías hasta el único commit.
     try:
@@ -378,19 +390,52 @@ def editar_tarja(db: Session, tarja_id: int, datos: TarjaUpdate, usuario: Usuari
         if tarja.merma_rebajada:
             raise TarjaNoEditableError("No se puede corregir una tarja con merma rebajada")
 
-        # Comprueba todas las referencias de nuevo: el formulario no es una fuente de confianza.
-        _obtener_activo(db, Productor, datos.productor_id, "El productor")
-        _obtener_activo(db, SistemaProductivo, datos.sistema_productivo_id, "El sistema productivo")
-        _obtener_activo(db, Variedad, datos.variedad_id, "La variedad")
-        _obtener_activo(db, Calidad, datos.calidad_id, "La calidad")
-        _obtener_activo(db, TipoBandeja, datos.tipo_bandeja_id, "El tipo de bandeja")
-        # Usa la tara guardada en la propia tarja; un catálogo actual no reescribe la historia.
+        # Exige que esté activo solo lo que cambia: lo que la tarja ya tenía existe por clave foránea.
+        # Así, un catálogo desactivado después del registro no impide corregir otro dato (B3).
+        if datos.productor_id != tarja.productor_id:
+            # Un productor nuevo debe existir y estar activo.
+            _obtener_activo(db, Productor, datos.productor_id, "El productor")
+        # Mismo criterio para el sistema productivo.
+        if datos.sistema_productivo_id != tarja.sistema_productivo_id:
+            # Un sistema nuevo debe existir y estar activo.
+            _obtener_activo(db, SistemaProductivo, datos.sistema_productivo_id, "El sistema productivo")
+        # Mismo criterio para la variedad.
+        if datos.variedad_id != tarja.variedad_id:
+            # Una variedad nueva debe existir y estar activa.
+            _obtener_activo(db, Variedad, datos.variedad_id, "La variedad")
+        # Mismo criterio para la calidad.
+        if datos.calidad_id != tarja.calidad_id:
+            # Una calidad nueva debe existir y estar activa.
+            _obtener_activo(db, Calidad, datos.calidad_id, "La calidad")
+        # Criterio 4 (precisado el 2026-11-07): la tara sigue al tipo de bandeja, como en Form4.vb.
+        if datos.tipo_bandeja_id != tarja.tipo_bandeja_id:
+            # El tipo nuevo debe estar activo, porque de él sale la tara.
+            bandeja = _obtener_activo(db, TipoBandeja, datos.tipo_bandeja_id, "El tipo de bandeja")
+            # Copia la tara vigente del tipo nuevo, igual que al registrar.
+            tara = bandeja.peso_tara_kg
+        # Si el tipo no cambia, se conserva la tara de la tarja.
+        else:
+            # Un cambio posterior del catálogo no reescribe la tara con que se pesó.
+            tara = tarja.tara_kg
+
+        # fecha_hora se guarda en UTC sin zona; se le indica la zona antes de convertirla.
+        registro_utc = tarja.fecha_hora if tarja.fecha_hora.tzinfo else tarja.fecha_hora.replace(tzinfo=timezone.utc)
+        # Día del registro en la planta, no en UTC (después de las 21:00 serían días distintos).
+        dia_registro = registro_utc.astimezone(ZONA_CHILE).date()
+        # La fruta no puede haberse recibido después de registrar su tarja (B2).
+        if datos.fecha_recepcion > dia_registro:
+            # El mismo día del registro y los anteriores sí se aceptan.
+            raise FechaRecepcionNoValidaError(
+                f"La fecha de recepción no puede ser posterior al registro de la tarja ({dia_registro:%d-%m-%Y})"
+            )
+
+        # Recalcula con la tara que corresponde según el tipo de bandeja.
         kilos_netos = calcular_kilos_netos(
-            datos.kilos_brutos,
-            datos.cantidad_bandejas,
-            tarja.tara_kg,
-            datos.peso_pallet_kg,
-        )
+            datos.kilos_brutos,  # Peso de balanza corregido.
+            datos.cantidad_bandejas,  # Cantidad de bandejas corregida.
+            tara,  # Tara de la tarja o del tipo nuevo.
+            datos.peso_pallet_kg,  # Peso del pallet corregido.
+        )  # Finaliza el cálculo.
         # Mantiene la misma regla de neto positivo de la creación.
         if kilos_netos <= 0:
             raise KilosNetosNoValidosError(
@@ -423,11 +468,18 @@ def editar_tarja(db: Session, tarja_id: int, datos: TarjaUpdate, usuario: Usuari
         tarja.calidad_id = datos.calidad_id
         tarja.tipo_bandeja_id = datos.tipo_bandeja_id
         tarja.cantidad_bandejas = datos.cantidad_bandejas
+        # La tara cambia solo si cambió el tipo; la auditoría muestra el antes y el después.
+        tarja.tara_kg = tara
         tarja.peso_pallet_kg = datos.peso_pallet_kg
         tarja.kilos_brutos = datos.kilos_brutos
         tarja.kilos_netos = kilos_netos
         tarja.porcentaje_calidad = datos.porcentaje_calidad
         tarja.fecha_recepcion = datos.fecha_recepcion
+        # Criterio 7: una corrección que no cambia ningún dato no deja un evento vacío en la auditoría.
+        # Los Decimal se comparan por valor: "1000" y "1000.00" son iguales y no cuentan como cambio.
+        if instantanea(tarja) == antes_tarja:
+            # El except revierte la sesión y el router responde 400.
+            raise SinCambiosError("No hay cambios que guardar")
         # Mantiene el saldo consistente con productor, tipo y cantidad de la tarja corregida.
         movimiento.productor_id = datos.productor_id
         movimiento.tipo_bandeja_id = datos.tipo_bandeja_id
@@ -437,7 +489,7 @@ def editar_tarja(db: Session, tarja_id: int, datos: TarjaUpdate, usuario: Usuari
         # Fuerza las restricciones de base antes de crear eventos de auditoría.
         db.flush()
 
-        # Guarda siempre la corrección solicitada, incluso si los valores coinciden, junto a su motivo.
+        # Guarda la corrección con su antes, su después y su motivo (criterio 5).
         registrar_auditoria(
             db,
             usuario.id,

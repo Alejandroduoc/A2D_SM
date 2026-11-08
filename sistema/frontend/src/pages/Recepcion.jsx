@@ -14,7 +14,7 @@ import SelectorProductor from "../components/SelectorProductor";
 // Semáforo del saldo de bandejas, igual que el del legado.
 import { situacionBandejas } from "../components/saldoBandejas";
 // Clases comunes de formularios y mensajes.
-import { AYUDA, BOTON_PRINCIPAL, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SUBTITULO } from "../components/catalogo";
+import { AYUDA, BOTON_PRINCIPAL, BOTON_SECUNDARIO, CAMPO, CAMPO_ERROR, ETIQUETA, MENSAJE_ERROR, SUBTITULO } from "../components/catalogo";
 
 // Capacidades técnicas de SQL Server y de los DECIMAL definidos en TarjaCreate.
 // La planta confirmó que no existen máximos operativos para estos tres valores.
@@ -26,18 +26,44 @@ const MAX_PALLET_CENTIMOS = 99999999;
 const MAX_BALANZA_CENTIMOS = 9999999999;
 
 // Obtiene YYYY-MM-DD usando el día de la planta y no la fecha UTC del navegador.
-function hoyEnChile() {
+// Sin argumento usa el momento actual; con un instante, entrega el día de ese instante en Chile.
+function hoyEnChile(instante = new Date()) {
   // en-CA entrega el orden año, mes y día.
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Santiago", // Zona horaria de la planta.
     year: "numeric", // Año con cuatro dígitos.
     month: "2-digit", // Mes con dos dígitos.
     day: "2-digit", // Día con dos dígitos.
-  }).formatToParts(new Date());
+  }).formatToParts(instante);
   // Busca una de las partes por su tipo.
   const valor = (tipo) => partes.find((parte) => parte.type === tipo)?.value;
   // Arma el formato que usa el campo de fecha.
   return `${valor("year")}-${valor("month")}-${valor("day")}`;
+}
+
+// Día en Chile de una fecha y hora que la API entrega en UTC sin zona (por ejemplo fecha_hora).
+function diaEnChile(valorUtc) {
+  // Sin la "Z", el navegador la leería como hora local; si ya trae zona, se respeta.
+  const conZona = /(Z|[+-]\d{2}:\d{2})$/i.test(valorUtc) ? valorUtc : `${valorUtc}Z`;
+  // Convierte el instante al día de la planta.
+  return hoyEnChile(new Date(conZona));
+}
+
+// Muestra YYYY-MM-DD como dd-mm-aaaa, el formato de los mensajes.
+function formatearDia(iso) {
+  // Separa año, mes y día.
+  const [anio, mes, dia] = iso.split("-");
+  // Los ordena como se leen en Chile.
+  return `${dia}-${mes}-${anio}`;
+}
+
+// Agrega a una lista de activos el valor que la tarja ya tenía, si después se desactivó (HU20, B3).
+// Solo ese valor aparece: los demás inactivos siguen fuera de la lista.
+function conValorDeLaTarja(opciones, id, nombre, aviso) {
+  // Sin valor original, o si sigue activo, la lista no cambia.
+  if (id == null || opciones.some((opcion) => String(opcion.id) === String(id))) return opciones;
+  // Lo agrega al final con un aviso visible.
+  return [...opciones, { id, nombre: `${nombre} (${aviso})` }];
 }
 
 // Convierte un decimal escrito a centésimos exactos; null indica entrada incompleta.
@@ -152,8 +178,6 @@ export default function Recepcion() {
       try {
         // Pide el detalle completo con los nombres que necesita el formulario.
         const detalle = await obtenerTarja(tarjaId);
-        // Espera las especies cargadas para convertir el nombre de la variedad en su especie.
-        const especie = especies.find((opcion) => opcion.nombre === detalle.especie);
         // Una respuesta tardía no debe sobrescribir otra pantalla.
         if (!vigente) return;
         // Conserva la tara propia, que puede diferir de la tara vigente del catálogo.
@@ -162,7 +186,8 @@ export default function Recepcion() {
         setProductor({ id: detalle.productor_id, codigo: detalle.productor_codigo, rut: detalle.productor_rut, razon_social: detalle.productor_razon_social });
         // Precarga cada selector con el valor guardado en la tarja.
         setSistemaId(String(detalle.sistema_productivo_id));
-        setEspecieId(especie ? String(especie.id) : "");
+        // La especie se elige por id, no por nombre: así funciona aunque esté desactivada (B3).
+        setEspecieId(String(detalle.especie_id));
         setVariedadId(String(detalle.variedad_id));
         setCalidadId(String(detalle.calidad_id));
         setBandejaId(String(detalle.tipo_bandeja_id));
@@ -177,7 +202,7 @@ export default function Recepcion() {
     cargarTarja();
     // Marca obsoleta la petición al desmontar.
     return () => { vigente = false; };
-  }, [cargando, editando, especies, tarjaId]);
+  }, [cargando, editando, tarjaId]);
 
   // Al volver con el productor ya elegido, el cursor parte en el primer catálogo,
   // cuando terminan de cargar las listas: antes esa lista está deshabilitada.
@@ -328,8 +353,11 @@ export default function Recepcion() {
 
   // Selecciona la bandeja completa para leer su tara sin usar float.
   const bandeja = bandejas.find((opcion) => String(opcion.id) === bandejaId);
+  // Al corregir, indica si se conserva el tipo de bandeja que tenía la tarja.
+  const mismaBandeja = Boolean(editando && tarjaOriginal && bandejaId === String(tarjaOriginal.tipo_bandeja_id));
+  // Igual que el backend (criterio 4): mismo tipo, tara de la tarja; otro tipo, tara vigente del catálogo.
+  const taraCentimos = mismaBandeja ? aCentimos(tarjaOriginal.tara_kg) : bandeja ? aCentimos(bandeja.peso_tara_kg) : null;
   // Pesos en centésimos enteros, igual de exactos que los Decimal del backend.
-  const taraCentimos = editando ? aCentimos(tarjaOriginal?.tara_kg) : bandeja ? aCentimos(bandeja.peso_tara_kg) : null;
   const palletCentimos = aCentimos(form.peso_pallet_kg);
   const brutosCentimos = aCentimos(form.kilos_brutos);
   // Valores numéricos de los campos enteros.
@@ -343,8 +371,12 @@ export default function Recepcion() {
     && calidad <= 100;
   const palletValido = palletCentimos !== null && palletCentimos >= 0 && palletCentimos <= MAX_PALLET_CENTIMOS;
   const brutosValidos = brutosCentimos !== null && brutosCentimos > 0 && brutosCentimos <= MAX_BALANZA_CENTIMOS;
+  // Al corregir, la recepción no puede quedar después del día en que se registró la tarja (B2).
+  const diaRegistro = editando && tarjaOriginal ? diaEnChile(tarjaOriginal.fecha_hora) : null;
+  // En un registro nuevo el máximo sigue siendo hoy.
+  const fechaMaxima = diaRegistro ?? fechaHoy;
   // Las fechas YYYY-MM-DD se pueden comparar como texto.
-  const fechaValida = form.fecha_recepcion !== "" && form.fecha_recepcion <= fechaHoy;
+  const fechaValida = form.fecha_recepcion !== "" && form.fecha_recepcion <= fechaMaxima;
   // Neto = brutos − bandejas × tara − pallet, en cuanto estén los datos.
   const netoCentimos = cantidadValida && taraCentimos !== null && palletCentimos !== null && brutosCentimos !== null
     ? brutosCentimos - cantidad * taraCentimos - palletCentimos
@@ -357,6 +389,21 @@ export default function Recepcion() {
     : null;
   // HU14 criterio 2: el neto no puede ser negativo ni cero.
   const netoValido = kilosNetos !== null && kilosNetos > 0;
+  // Solo una tarja recepcionada se corrige; una parcial, procesada o anulada muestra el bloqueo (B4).
+  const corregible = !editando || tarjaOriginal?.estado === "RECEPCIONADA";
+  // Criterio 7: al corregir hay que cambiar al menos un dato. Los pesos se comparan en centésimos ("20" = "20.00").
+  const hayCambios = !editando || Boolean(tarjaOriginal && (
+    productor?.id !== tarjaOriginal.productor_id
+    || sistemaId !== String(tarjaOriginal.sistema_productivo_id)
+    || variedadId !== String(tarjaOriginal.variedad_id)
+    || calidadId !== String(tarjaOriginal.calidad_id)
+    || bandejaId !== String(tarjaOriginal.tipo_bandeja_id)
+    || cantidad !== tarjaOriginal.cantidad_bandejas
+    || calidad !== tarjaOriginal.porcentaje_calidad
+    || palletCentimos !== aCentimos(tarjaOriginal.peso_pallet_kg)
+    || brutosCentimos !== aCentimos(tarjaOriginal.kilos_brutos)
+    || form.fecha_recepcion !== tarjaOriginal.fecha_recepcion
+  ));
   // Guardar se habilita solo con todo completo y correcto.
   const formularioValido = Boolean(
     productor
@@ -371,7 +418,8 @@ export default function Recepcion() {
     && brutosValidos
     && fechaValida
     && netoValido
-    && (!editando || motivo.trim() !== ""),
+    // Al corregir, además: tarja corregible, motivo escrito y algún dato cambiado.
+    && (!editando || (corregible && motivo.trim() !== "" && hayCambios)),
   );
 
   // Saldo actual del productor en la bandeja elegida; sin movimientos, está al día.
@@ -390,11 +438,24 @@ export default function Recepcion() {
   // Semáforo del saldo, igual que el Form4 del legado.
   const situacionSaldo = situacionBandejas(saldoActual);
 
-  // Etiquetas de bandeja con la tara visible para anticipar el cálculo.
+  // Etiquetas de bandeja con la tara que se usará, para anticipar el cálculo.
   const opcionesBandeja = bandejas.map((opcion) => ({
     id: opcion.id, // Identificador que se envía a la API.
-    nombre: `${opcion.nombre} (${String(opcion.peso_tara_kg).replace(".", ",")} kg)`, // Nombre con su tara.
+    // Al corregir, el tipo original muestra la tara de la tarja; los demás, la vigente del catálogo.
+    nombre: `${opcion.nombre} (${String(editando && tarjaOriginal && opcion.id === tarjaOriginal.tipo_bandeja_id ? tarjaOriginal.tara_kg : opcion.peso_tara_kg).replace(".", ",")} kg)`,
   }));
+  // Al corregir, cada lista incluye el valor original aunque se haya desactivado (B3).
+  const opcionesSistema = editando && tarjaOriginal ? conValorDeLaTarja(sistemas, tarjaOriginal.sistema_productivo_id, tarjaOriginal.sistema_productivo, "inactivo") : sistemas;
+  const opcionesEspecie = editando && tarjaOriginal ? conValorDeLaTarja(especies, tarjaOriginal.especie_id, tarjaOriginal.especie, "inactiva") : especies;
+  // La variedad original solo pertenece a la lista de su propia especie.
+  const opcionesVariedad = editando && tarjaOriginal && especieId === String(tarjaOriginal.especie_id)
+    ? conValorDeLaTarja(variedades, tarjaOriginal.variedad_id, tarjaOriginal.variedad, "inactiva")
+    : variedades;
+  const opcionesCalidad = editando && tarjaOriginal ? conValorDeLaTarja(calidades, tarjaOriginal.calidad_id, tarjaOriginal.calidad, "inactiva") : calidades;
+  // El tipo de bandeja original, si se desactivó, aparece con la tara de la tarja.
+  const opcionesBandejaFinal = editando && tarjaOriginal
+    ? conValorDeLaTarja(opcionesBandeja, tarjaOriginal.tipo_bandeja_id, `${tarjaOriginal.tipo_bandeja} (${String(tarjaOriginal.tara_kg).replace(".", ",")} kg)`, "inactivo")
+    : opcionesBandeja;
   // Primer texto de los selectores según el estado de carga.
   const textoVacio = cargando ? "Cargando…" : "Seleccione…";
   // Primer texto del selector de variedades según la especie.
@@ -440,8 +501,8 @@ export default function Recepcion() {
     evento.preventDefault();
     // El buscador de productores maneja su propio Enter.
     if (evento.target.type === "search") return;
-    // Recorre los campos en orden y termina en Guardar, si ya está habilitado.
-    const campos = [...formularioRef.current.querySelectorAll("input, select, button[type='submit']")]
+    // Recorre los campos en orden y termina en Guardar; incluye el motivo para que el último campo lleve a él (O2).
+    const campos = [...formularioRef.current.querySelectorAll("input, select, textarea, button[type='submit']")]
       .filter((campo) => !campo.disabled && campo.type !== "search");
     // Posición del campo actual.
     const indice = campos.indexOf(evento.target);
@@ -475,10 +536,12 @@ export default function Recepcion() {
         porcentaje_calidad: calidad, // Calidad visual.
         fecha_recepcion: form.fecha_recepcion, // Día de llegada de la fruta.
       };
-      // La corrección conserva el número y vuelve al listado al confirmarse.
+      // La corrección conserva el número y abre la hoja para reimprimirla (criterio 6).
       if (editando) {
-        await editarTarja(tarjaId, { ...datosTarja, motivo: motivo.trim() });
-        navigate("/tarjas");
+        // La API devuelve la tarja corregida.
+        const corregida = await editarTarja(tarjaId, { ...datosTarja, motivo: motivo.trim() });
+        // La hoja pegada en el pallet quedó con los datos antiguos: se abre para reemplazarla.
+        navigate(`/tarjas/${corregida.id}/imprimir`, { state: { recienCorregida: true } });
         return;
       }
       // El registro nuevo abre su hoja de impresión al terminar.
@@ -506,15 +569,24 @@ export default function Recepcion() {
       {/* Encabezado del módulo de la Épica 3. */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ambar">E3 · Recepción</p>
-        <h1 className="text-2xl font-bold text-frigorifico-900">{editando ? "Corregir tarja" : "Recepción"}</h1>
-        <p className="mt-2 text-sm text-slate-500">{editando ? "Corrija el dato digitado, indique el motivo y revise el cálculo con la tara histórica." : "Registre la fruta recibida y revise los kilos netos antes de guardar."}</p>
+        {/* Al corregir, el título nombra la tarja apenas carga (B4). */}
+        <h1 className="text-2xl font-bold text-frigorifico-900">{editando ? `Corregir tarja N° ${tarjaOriginal?.numero_tarja ?? "…"}` : "Recepción"}</h1>
+        <p className="mt-2 text-sm text-slate-500">{editando ? "Corrija el dato digitado e indique el motivo. Si cambia el tipo de bandeja, se usa la tara vigente del tipo nuevo." : "Registre la fruta recibida y revise los kilos netos antes de guardar."}</p>
       </div>
 
       {/* Errores de carga y de la última escritura. */}
       {errorCarga && <p className={MENSAJE_ERROR} role="alert">{errorCarga}</p>}
       {error && <p className={MENSAJE_ERROR} role="alert">{error}</p>}
 
-      {/* Formulario grande dividido según el flujo operativo. */}
+      {/* Una tarja parcial, procesada (también con merma rebajada) o anulada no muestra el formulario (B4). */}
+      {editando && tarjaOriginal && !corregible ? (
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className={MENSAJE_ERROR} role="alert">La tarja N° {tarjaOriginal.numero_tarja} está {tarjaOriginal.estado.toLowerCase()} y no se puede corregir.</p>
+          {/* Salida sin guardar nada. */}
+          <button type="button" onClick={() => navigate("/tarjas")} className={BOTON_SECUNDARIO}>Volver a Tarjas</button>
+        </div>
+      ) : (
+      /* Formulario grande dividido según el flujo operativo. */
       <form
         ref={formularioRef}
         onSubmit={guardar}
@@ -556,7 +628,7 @@ export default function Recepcion() {
               <SelectorCatalogo
                 id="recepcion-sistema"
                 etiqueta="Sistema productivo"
-                opciones={sistemas}
+                opciones={opcionesSistema}
                 valor={sistemaId}
                 onChange={setSistemaId}
                 deshabilitado={cargando}
@@ -566,7 +638,7 @@ export default function Recepcion() {
               <SelectorCatalogo
                 id="recepcion-especie"
                 etiqueta="Especie"
-                opciones={especies}
+                opciones={opcionesEspecie}
                 valor={especieId}
                 onChange={cambiarEspecie}
                 deshabilitado={cargando}
@@ -576,7 +648,7 @@ export default function Recepcion() {
               <SelectorCatalogo
                 id="recepcion-variedad"
                 etiqueta="Variedad"
-                opciones={variedades}
+                opciones={opcionesVariedad}
                 valor={variedadId}
                 onChange={setVariedadId}
                 deshabilitado={!especieId || cargandoVariedades}
@@ -586,7 +658,7 @@ export default function Recepcion() {
               <SelectorCatalogo
                 id="recepcion-calidad"
                 etiqueta="Calidad"
-                opciones={calidades}
+                opciones={opcionesCalidad}
                 valor={calidadId}
                 onChange={setCalidadId}
                 deshabilitado={cargando}
@@ -627,12 +699,13 @@ export default function Recepcion() {
               <SelectorCatalogo
                 id="recepcion-bandeja"
                 etiqueta="Tipo de bandeja"
-                opciones={opcionesBandeja}
+                opciones={opcionesBandejaFinal}
                 valor={bandejaId}
                 onChange={setBandejaId}
                 deshabilitado={cargando}
                 textoVacio={textoVacio}
-                ayuda="Entre paréntesis se muestra la tara que se copiará."
+                // Al corregir, la tara depende de si el tipo cambia (criterio 4).
+                ayuda={editando ? "Entre paréntesis, la tara que se usará: la de la tarja si no cambia el tipo; la vigente si elige otro." : "Entre paréntesis se muestra la tara que se copiará."}
               />
               {/* Cantidad de bandejas. */}
               <div>
@@ -700,14 +773,14 @@ export default function Recepcion() {
                   <p id="recepcion-brutos-error" className="mt-1 text-xs text-red-700" role="alert">Ingrese un peso mayor que cero con hasta dos decimales.</p>
                 )}
               </div>
-              {/* Fecha de recepción: por defecto hoy, editable y nunca futura (decisión C). */}
+              {/* Fecha de recepción: por defecto hoy, editable y nunca futura (decisión C); al corregir, no posterior al registro. */}
               <div>
                 <label htmlFor="recepcion-fecha" className={ETIQUETA}>Fecha de recepción</label>
                 <input
                   id="recepcion-fecha"
                   name="fecha_recepcion"
                   type="date"
-                  max={fechaHoy}
+                  max={fechaMaxima}
                   value={form.fecha_recepcion}
                   onChange={cambiarCampo}
                   className={!fechaValida ? CAMPO_ERROR : CAMPO}
@@ -717,7 +790,9 @@ export default function Recepcion() {
                 />
                 {/* Aviso en línea. */}
                 {!fechaValida && (
-                  <p id="recepcion-fecha-error" className="mt-1 text-xs text-red-700" role="alert">La fecha no puede ser posterior a hoy.</p>
+                  <p id="recepcion-fecha-error" className="mt-1 text-xs text-red-700" role="alert">
+                    {diaRegistro ? `La fecha no puede ser posterior al registro de la tarja (${formatearDia(diaRegistro)}).` : "La fecha no puede ser posterior a hoy."}
+                  </p>
                 )}
               </div>
             </div>
@@ -776,11 +851,12 @@ export default function Recepcion() {
                   <dt className="text-xs font-semibold text-slate-500">Promedio por bandeja</dt>
                   <dd className="mt-1 text-2xl font-bold text-frigorifico-900">{promedioCentimos === null ? "—" : `${formatearCentimos(promedioCentimos)} kg`}</dd>
                 </div>
-                {/* En edición se declara la tara histórica aunque el catálogo haya cambiado. */}
+                {/* En edición se declara qué tara se usa: la de la tarja o la vigente del tipo elegido (criterio 4). */}
                 {editando && (
                   <div>
-                    <dt className="text-xs font-semibold text-slate-500">Tara histórica utilizada</dt>
-                    <dd className="mt-1 text-lg font-bold text-frigorifico-900">{tarjaOriginal ? `${String(tarjaOriginal.tara_kg).replace(".", ",")} kg` : "Cargando…"}</dd>
+                    <dt className="text-xs font-semibold text-slate-500">{mismaBandeja || !bandeja ? "Tara de la tarja" : "Tara vigente del tipo elegido"}</dt>
+                    {/* "Cargando…" mientras llega la tarja; "—" si se dejó el tipo sin elegir. */}
+                    <dd className="mt-1 text-lg font-bold text-frigorifico-900">{!tarjaOriginal ? "Cargando…" : taraCentimos === null ? "—" : `${formatearCentimos(taraCentimos)} kg`}</dd>
                   </div>
                 )}
               </dl>
@@ -791,11 +867,22 @@ export default function Recepcion() {
 
           {/* Guardar es la única acción que envía el formulario. */}
           <div className="mt-6 border-t border-slate-200 pt-5">
-            <button type="submit" disabled={!formularioValido || guardando} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
-            <p className={AYUDA}>Enter avanza al siguiente campo hasta Guardar; solo este botón registra la tarja y abre su hoja de impresión.</p>
+            <div className="flex flex-wrap gap-3">
+              <button type="submit" disabled={!formularioValido || guardando} className={BOTON_PRINCIPAL}>{guardando ? "Guardando…" : "Guardar"}</button>
+              {/* Al corregir, Cancelar vuelve a Tarjas sin guardar nada (B4). */}
+              {editando && <button type="button" onClick={() => navigate("/tarjas")} className={BOTON_SECUNDARIO}>Cancelar</button>}
+            </div>
+            {/* Explica por qué Guardar sigue deshabilitado si no se cambió nada (criterio 7). */}
+            {editando && tarjaOriginal && !hayCambios && <p className={AYUDA}>Cambie al menos un dato para guardar la corrección.</p>}
+            <p className={AYUDA}>
+              {editando
+                ? "Enter avanza al siguiente campo hasta el motivo. Guardar registra la corrección y abre la hoja para reimprimirla."
+                : "Enter avanza al siguiente campo hasta Guardar; solo este botón registra la tarja y abre su hoja de impresión."}
+            </p>
           </div>
         </fieldset>
       </form>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
-// Importa los componentes de enrutamiento.
-import { Navigate, Route, Routes } from "react-router-dom";
+// Importa los componentes de enrutamiento y el id de la ruta de corrección.
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 // Provee sesión a toda la aplicación.
 import { AuthProvider } from "./api/AuthContext";
 // Protege las rutas privadas.
@@ -35,6 +35,14 @@ import Trazabilidad from "./pages/Trazabilidad";
 // Consulta de la bitácora de auditoría (HU22).
 import Auditoria from "./pages/Auditoria";
 
+// Monta un formulario nuevo por cada tarja que se corrige (HU20, hallazgo M2).
+function CorregirTarja() {
+  // Id de la tarja en la URL.
+  const { id } = useParams();
+  // La key cambia con la tarja: de Recepción a Corregir, o de una tarja a otra, React no reutiliza los datos.
+  return <Recepcion key={`editar-${id}`} />;
+}
+
 // Declara las rutas públicas y protegidas.
 export default function App() {
   return (
@@ -59,9 +67,10 @@ export default function App() {
             <Route path="cambiar-contrasena" element={<CambiarContrasena />} />
             {/* Recepción y administrador, los mismos roles que exige /opciones en la API. */}
             <Route element={<ProtectedRoute rolesPermitidos={["operador_recepcion", "administrador"]} />}>
-              <Route path="recepcion" element={<Recepcion />} />
-              {/* Reutiliza el formulario de recepción para la corrección trazable de HU20. */}
-              <Route path="tarjas/:id/editar" element={<Recepcion />} />
+              {/* Key fija: al volver desde "Corregir tarja", el registro nuevo parte con el formulario vacío. */}
+              <Route path="recepcion" element={<Recepcion key="nueva" />} />
+              {/* Reutiliza el formulario de recepción para la corrección trazable de HU20, con su propia key. */}
+              <Route path="tarjas/:id/editar" element={<CorregirTarja />} />
               <Route path="tarjas" element={<Tarjas />} />
               <Route path="bandejas" element={<Bandejas />} />
             </Route>

@@ -83,12 +83,19 @@ class TarjaCreate(BaseModel):
 
 # Define los datos corregibles de una tarja sin permitir alterar sus campos históricos.
 class TarjaUpdate(TarjaCreate):
-    """Corrige una tarja recepcionada; la tara y el número siguen siendo históricos."""
+    """Corrige una tarja recepcionada; el número sigue siendo histórico.
 
+    La tara se conserva si el tipo de bandeja no cambia; si cambia, el service
+    copia la tara vigente del tipo nuevo (decisión del 2026-11-07).
+    """
+
+    # Al corregir, la fecha es obligatoria: sin ella, el validador heredado pondría hoy (B1).
+    # Sin valor por defecto, un cuerpo sin la fecha o con null responde 422; la regla de no futura se hereda.
+    fecha_recepcion: date
     # Explica por qué se modifica una tarja ya impresa o registrada.
     motivo: str = Field(min_length=1, max_length=255)
 
-    # No acepta motivos formados solo por espacios.
+    # No acepta motivos formados solo por espacios ni más largos que la columna.
     @field_validator("motivo")
     # Vincula el validador a la clase del schema.
     @classmethod
@@ -100,6 +107,11 @@ class TarjaUpdate(TarjaCreate):
         if not motivo:
             # Pydantic devuelve 422 asociado al campo motivo.
             raise ValueError("El motivo de la corrección es obligatorio")
+        # NVARCHAR(255) cuenta unidades UTF-16: un emoji ocupa dos y Python lo cuenta como uno.
+        # Sin esta regla, 128 emojis pasan max_length y SQL Server los rechaza con un error 500.
+        if len(motivo.encode("utf-16-le")) // 2 > 255:
+            # Pydantic devuelve 422 asociado al campo motivo.
+            raise ValueError("El motivo supera los 255 caracteres permitidos")
         # Entrega el motivo ya normalizado.
         return motivo
 
@@ -201,6 +213,8 @@ class TarjaDetalleOut(TarjaOut):
     productor_razon_social: str
     # Nombre del sistema productivo.
     sistema_productivo: str
+    # Id de la especie, obtenido de la variedad: la corrección la elige por id aunque esté inactiva.
+    especie_id: int
     # Especie, obtenida de la variedad.
     especie: str
     # Nombre de la variedad.

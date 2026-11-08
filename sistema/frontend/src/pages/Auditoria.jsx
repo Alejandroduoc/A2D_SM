@@ -265,7 +265,8 @@ export default function Auditoria() {
                     <td className={CELDA}>{TEXTO_TABLA[evento.tabla] ?? evento.tabla} / {evento.registro_id}</td>
                     <td className={CELDA}>{ACCIONES[evento.accion] ?? evento.accion}</td>
                     <td className={CELDA}><DetalleEvento evento={evento} /></td>
-                    <td className={CELDA}>{evento.motivo ?? "—"}</td>
+                    {/* whitespace-pre-line muestra los saltos de línea del motivo de HU20 (O2). */}
+                    <td className={`${CELDA} whitespace-pre-line`}>{evento.motivo ?? "—"}</td>
                   </tr>
                 ))
               )}

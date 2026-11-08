@@ -29,7 +29,8 @@ RUN npm run build
 
 # ---- Etapa 2: servir ----
 # nginx liviano: la imagen final no lleva Node, código fuente ni node_modules.
-FROM nginx:1.27-alpine
+# 1.30 es la rama estable vigente (1.27 ya no recibe correcciones); la etiqueta toma sus parches (B6, 2026-11-08).
+FROM nginx:1.30-alpine
 
 # Configuración propia: rutas de React, proxy a la API y cabeceras de seguridad.
 COPY nginx.conf /etc/nginx/conf.d/default.conf

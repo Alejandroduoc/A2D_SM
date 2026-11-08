@@ -311,6 +311,15 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml config   # ver el resultado sin levantar nada
 ```
 
+Para volver a desarrollo después de probar producción:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+docker compose up -d --build
+```
+
+El `--build` es obligatorio: producción reemplaza la imagen del frontend por la de nginx, y sin reconstruir el contenedor de desarrollo no arranca (`exec: "node": executable file not found`). Ninguno de los dos comandos borra la base.
+
 **Aún no está listo para desplegar.** Faltan:
 
 - HTTPS: un certificado para nginx (hoy el puerto 80 publica sin cifrar);
@@ -342,6 +351,8 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 | `Can't locate revision ...` | La base tiene una versión que no existe en `migrations/versions/` (por ejemplo tras borrar migraciones o cambiar de rama) | Recrear la base (sección 4.3) o pedir la migración faltante al equipo |
 | `There is already an object named 'usuarios'` al aplicar | Las tablas ya existían (creadas fuera de Alembic) | Borrar las tablas o recrear la base (sección 4.3) y volver a aplicar |
 | El editor marca imports en rojo (sqlalchemy, fastapi...) | Tu PC no tiene esos paquetes instalados (solo están en el contenedor) | No afecta la ejecución; es solo el resaltado del editor |
+| Después de un `git pull` que cambió `package-lock.json`, el frontend sigue con las versiones anteriores (`docker compose exec frontend node -p "require('vite/package.json').version"` muestra la vieja) | El volumen `frontend_node_modules` conserva lo instalado antes: Docker solo copia la imagen a un volumen vacío | `docker compose down`, `docker volume rm a2d_sm_frontend_node_modules` y `docker compose up -d --build`. **No usar `down -v`**: borra también la base |
+| Después de probar producción, `a2d_frontend` no arranca (`exec: "node": executable file not found`) | Producción reemplazó la imagen del frontend por la de nginx | `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` y `docker compose up -d --build` (sección 8) |
 
 ## 10. Qué hay construido hasta ahora
 
