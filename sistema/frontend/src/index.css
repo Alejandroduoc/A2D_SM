@@ -84,4 +84,11 @@ h4 {
   .site-footer {
     display: none;
   }
+
+  /* Sin margen de página, el navegador no tiene dónde imprimir su encabezado y su pie
+     (fecha, título, dirección y número de página): la hoja sale limpia, como el reporte del legado.
+     El margen lo pone cada hoja con print:p-[12mm] (2026-11-08). */
+  @page {
+    margin: 0;
+  }
 }

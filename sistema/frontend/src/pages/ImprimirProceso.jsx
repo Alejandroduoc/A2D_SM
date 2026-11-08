@@ -52,6 +52,16 @@ export default function ImprimirProceso() {
     return () => { vigente = false; };
   }, [id]);
 
+  // Mientras el comprobante está abierto, el título es solo "Socradex": es el nombre que se propone al guardar el PDF.
+  useEffect(() => {
+    // Recuerda el título de la aplicación para devolverlo al salir.
+    const anterior = document.title;
+    // Nombre de la empresa, sin "A2D SM | Trazabilidad" (decisión de Alejandro del 2026-11-08).
+    document.title = "Socradex";
+    // Al salir de la hoja vuelve el título de siempre.
+    return () => { document.title = anterior; };
+  }, []);
+
   // Sin proceso: muestra la carga, o el error con una salida.
   if (!proceso) {
     return (
@@ -75,7 +85,8 @@ export default function ImprimirProceso() {
 
   // Renderiza las acciones, que no se imprimen, y la hoja.
   return (
-    <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 print:max-w-none print:p-0">
+    // print:p-[12mm]: la página no tiene margen (index.css), así que el margen del papel lo pone la hoja.
+    <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 print:max-w-none print:p-[12mm]">
       {/* Acciones de pantalla: print:hidden las deja fuera del papel. */}
       <div className="space-y-4 print:hidden">
         {/* Aviso al llegar desde Procesamiento. */}
