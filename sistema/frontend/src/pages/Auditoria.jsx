@@ -23,8 +23,10 @@ import {
 
 // Traduce acciones persistidas a textos de la pantalla.
 const ACCIONES = { INSERT: "Crear", UPDATE: "Modificar", DELETE: "Eliminar" };
-// Texto del enlace que despliega los datos del registro, según la acción.
+// Texto del enlace que abre los datos del registro, según la acción.
 const TEXTO_DATOS = { INSERT: "Ver datos creados", UPDATE: "Ver todos los datos", DELETE: "Ver datos eliminados" };
+// Título de la ventana con esos datos, según la acción.
+const TITULO_DATOS = { INSERT: "Datos creados", UPDATE: "Todos los datos", DELETE: "Datos eliminados" };
 // Nombres legibles de las tablas; una tabla nueva se muestra con su nombre técnico.
 const TEXTO_TABLA = {
   calidades: "Calidades",
@@ -53,11 +55,11 @@ function fechaHoraChile(valor) {
   return new Date(`${valor}Z`).toLocaleString("es-CL", { timeZone: "America/Santiago" });
 }
 
-// Muestra qué cambió y, plegados, todos los datos del registro (criterio 2).
-function DetalleEvento({ evento }) {
+// Muestra qué cambió y el enlace que abre todos los datos del registro (criterio 2).
+function DetalleEvento({ evento, onVerDatos }) {
   // Una modificación puede no cambiar datos: el cambio de contraseña se explica en el motivo.
   const sinCambios = evento.accion === "UPDATE" && evento.cambios.length === 0;
-  // Renderiza los cambios y los datos.
+  // Renderiza los cambios y el enlace.
   return (
     <>
       {/* Solo lo que cambió, con su valor anterior y su valor nuevo. */}
@@ -65,21 +67,134 @@ function DetalleEvento({ evento }) {
         <span key={cambio.campo} className="block break-words">{cambio.campo}: {cambio.antes ?? "—"} → {cambio.despues ?? "—"}</span>
       ))}
       {sinCambios && <span className="block text-slate-400">Sin cambios en los datos</span>}
-      {/* Los demás datos quedan plegados para que la tabla se pueda leer. */}
+      {/* Todos los datos se ven en una ventana: desplegados dentro de la fila, la tabla quedaba muy alta. */}
       {evento.datos.length > 0 && (
-        <details className="mt-1">
-          <summary className={`cursor-pointer ${BOTON_EDITAR}`}>{TEXTO_DATOS[evento.accion] ?? "Ver datos"}</summary>
-          <dl className="mt-1 text-xs text-slate-500">
-            {evento.datos.map((dato) => (
-              <div key={dato.campo} className="flex flex-wrap gap-x-1">
-                <dt className="font-semibold">{dato.campo}:</dt>
-                <dd className="break-words">{dato.valor ?? "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
+        <button type="button" onClick={() => onVerDatos(evento)} className={`mt-1 ${BOTON_EDITAR}`}>
+          {TEXTO_DATOS[evento.accion] ?? "Ver datos"}
+        </button>
       )}
     </>
+  );
+}
+
+// ¿El clic cayó fuera de la ventana, sobre el fondo oscuro? Se mide la posición, no el elemento:
+// el <dialog> también es el destino de los clics en su propio relleno.
+function fueraDeLaVentana(puntero, ventana) {
+  // Rectángulo visible de la ventana.
+  const caja = ventana.getBoundingClientRect();
+  // Fuera si el puntero quedó a un lado de cualquiera de sus bordes.
+  return puntero.clientX < caja.left || puntero.clientX > caja.right || puntero.clientY < caja.top || puntero.clientY > caja.bottom;
+}
+
+// Ventana con todos los datos de un evento de la bitácora (<dialog> nativo, modal).
+function VentanaDatos({ evento, onCerrar }) {
+  // Referencia al <dialog> para abrirlo con showModal().
+  const ventanaRef = useRef(null);
+  // Referencia a Cerrar, que recibe el foco al abrir.
+  const cerrarRef = useRef(null);
+
+  // Abre la ventana como modal cada vez que llega un evento.
+  useEffect(() => {
+    // Elemento de la ventana.
+    const ventana = ventanaRef.current;
+    // Sin evento o ya abierta, no hay nada que hacer.
+    if (!evento || !ventana || ventana.open) return;
+    // showModal() deja inerte la página, cierra con Esc y devuelve el foco al botón al cerrar.
+    ventana.showModal();
+    // React no deja el atributo autofocus en el HTML: el foco va a Cerrar de forma explícita.
+    cerrarRef.current?.focus();
+  }, [evento]);
+
+  // Cerrar con un clic fuera: closedby="any" lo hace solo; este respaldo cubre los navegadores sin closedby.
+  useEffect(() => {
+    // Elemento de la ventana.
+    const ventana = ventanaRef.current;
+    // Con soporte nativo no hace falta nada más.
+    if (!ventana || "closedBy" in HTMLDialogElement.prototype) return undefined;
+    // Recuerda si el clic empezó fuera, para no cerrar al terminar de seleccionar texto sobre el fondo.
+    let empezoFuera = false;
+    // Al presionar, anota dónde empezó.
+    const alPresionar = (puntero) => { empezoFuera = fueraDeLaVentana(puntero, ventana); };
+    // Al soltar, cierra solo si empezó y terminó fuera.
+    const alSoltar = (puntero) => { if (empezoFuera && fueraDeLaVentana(puntero, ventana)) ventana.close(); };
+    // Escucha los dos momentos del clic.
+    ventana.addEventListener("pointerdown", alPresionar);
+    ventana.addEventListener("pointerup", alSoltar);
+    // Quita los oyentes al desmontar.
+    return () => {
+      ventana.removeEventListener("pointerdown", alPresionar);
+      ventana.removeEventListener("pointerup", alSoltar);
+    };
+  }, []);
+
+  // El <dialog> queda siempre montado; su contenido depende del evento elegido.
+  return (
+    <dialog
+      ref={ventanaRef}
+      // Esc, botón Cerrar o clic fuera de la ventana la cierran.
+      closedby="any"
+      // Al cerrarse por cualquier vía, la pantalla olvida el evento.
+      onClose={onCerrar}
+      aria-labelledby="ventana-datos-titulo"
+      // overscroll-contain y el fondo con overflow oculto evitan que la página de atrás se desplace.
+      className="max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl overscroll-contain rounded-xl border border-slate-200 bg-white p-0 text-sm text-slate-600 shadow-xl backdrop:overflow-hidden backdrop:overscroll-contain backdrop:bg-frigorifico-900/50"
+    >
+      {evento && (
+        <>
+          {/* Encabezado fijo: el título y Cerrar siguen a la vista al desplazar datos largos. */}
+          <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
+            <div>
+              <h2 id="ventana-datos-titulo" className={SUBTITULO}>{TITULO_DATOS[evento.accion] ?? "Datos del registro"}</h2>
+              {/* Qué registro es, quién lo hizo y cuándo. */}
+              <p className="mt-1 text-xs text-slate-500">
+                {TEXTO_TABLA[evento.tabla] ?? evento.tabla} / {evento.registro_id} · {ACCIONES[evento.accion] ?? evento.accion} · {evento.usuario} · {fechaHoraChile(evento.fecha_hora)}
+              </p>
+            </div>
+            {/* form method="dialog" cierra la ventana sin código. */}
+            <form method="dialog">
+              <button ref={cerrarRef} type="submit" className={BOTON_SECUNDARIO}>Cerrar</button>
+            </form>
+          </div>
+          {/* Cuerpo con los cambios, el motivo y todos los datos. */}
+          <div className="space-y-5 px-5 py-4">
+            {/* Lo que cambió, con su valor anterior y su valor nuevo. */}
+            {evento.cambios.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Qué cambió</h3>
+                <dl className="divide-y divide-slate-100 rounded border border-slate-200">
+                  {evento.cambios.map((cambio) => (
+                    <div key={cambio.campo} className="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-3">
+                      <dt className="font-semibold text-slate-700">{cambio.campo}</dt>
+                      {/* En pantallas angostas, el antes y el después quedan bajo el nombre. */}
+                      <dd className="break-words sm:col-span-2">{cambio.antes ?? "—"} → <span className="font-semibold text-frigorifico-900">{cambio.despues ?? "—"}</span></dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+            {/* El motivo, con sus saltos de línea. */}
+            {evento.motivo && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Motivo</h3>
+                <p className="whitespace-pre-line break-words rounded border border-slate-200 px-3 py-2">{evento.motivo}</p>
+              </section>
+            )}
+            {/* Todos los datos del registro, en dos columnas: campo y valor. */}
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Todos los datos</h3>
+              <dl className="divide-y divide-slate-100 rounded border border-slate-200">
+                {evento.datos.map((dato) => (
+                  <div key={dato.campo} className="grid grid-cols-1 gap-1 px-3 py-2 sm:grid-cols-3">
+                    <dt className="font-semibold text-slate-700">{dato.campo}</dt>
+                    <dd className="break-words sm:col-span-2">{dato.valor ?? "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </div>
+        </>
+      )}
+    </dialog>
   );
 }
 
@@ -99,6 +214,8 @@ export default function Auditoria() {
   const [error, setError] = useState("");
   // Número de la última consulta: una respuesta antigua se descarta.
   const ultimaConsulta = useRef(0);
+  // Evento cuyos datos se muestran en la ventana; null con la ventana cerrada.
+  const [eventoAbierto, setEventoAbierto] = useState(null);
 
   // Pide una página con los filtros indicados.
   const consultar = useCallback(async (criterios, offset) => {
@@ -264,7 +381,7 @@ export default function Auditoria() {
                     <td className={CELDA}>{evento.usuario}</td>
                     <td className={CELDA}>{TEXTO_TABLA[evento.tabla] ?? evento.tabla} / {evento.registro_id}</td>
                     <td className={CELDA}>{ACCIONES[evento.accion] ?? evento.accion}</td>
-                    <td className={CELDA}><DetalleEvento evento={evento} /></td>
+                    <td className={CELDA}><DetalleEvento evento={evento} onVerDatos={setEventoAbierto} /></td>
                     {/* whitespace-pre-line muestra los saltos de línea del motivo de HU20 (O2). */}
                     <td className={`${CELDA} whitespace-pre-line`}>{evento.motivo ?? "—"}</td>
                   </tr>
@@ -279,6 +396,9 @@ export default function Auditoria() {
           <button type="button" disabled={cargando || !resultado.hay_mas} className={BOTON_SECUNDARIO} onClick={() => consultar(filtrosAplicados, resultado.offset + resultado.limite)}>Siguiente</button>
         </div>
       </section>
+
+      {/* Ventana con todos los datos del evento elegido. */}
+      <VentanaDatos evento={eventoAbierto} onCerrar={() => setEventoAbierto(null)} />
     </div>
   );
 }
