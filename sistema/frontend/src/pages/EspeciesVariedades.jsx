@@ -366,7 +366,8 @@ export default function EspeciesVariedades() {
                                 {/* Elegir la especie es la acción principal de la fila: botón con contorno; las otras son enlaces. */}
                                 <button type="button" onClick={() => seleccionarEspecie(especie.id)} aria-pressed={seleccionada} className={seleccionada ? BOTON_PRINCIPAL : BOTON_SECUNDARIO}>{seleccionada ? "Seleccionada" : "Ver variedades"}</button>
                                 <button type="button" onClick={() => editarEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`Editar ${especie.nombre}`} className={BOTON_EDITAR}>Editar</button>
-                                <button type="button" onClick={() => cambiarEstadoEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`${especie.activo ? "Desactivar" : "Activar"} ${especie.nombre}`} className={botonEstado(especie.activo)}>{cambiandoEspecieId === especie.id ? "Actualizando…" : especie.activo ? "Desactivar" : "Activar"}</button>
+                                {/* Ancho fijo (w-24 cabe "Actualizando…"): al alternar el texto, Editar y Ver variedades no se mueven (2026-11-08). */}
+                                <button type="button" onClick={() => cambiarEstadoEspecie(especie)} disabled={cambiandoEspecieId === especie.id || guardandoEspecie} aria-label={`${especie.activo ? "Desactivar" : "Activar"} ${especie.nombre}`} className={`${botonEstado(especie.activo)} w-24 shrink-0 text-right`}>{cambiandoEspecieId === especie.id ? "Actualizando…" : especie.activo ? "Desactivar" : "Activar"}</button>
                               </div>
                             </td>
                           </tr>
@@ -439,7 +440,8 @@ export default function EspeciesVariedades() {
                                 <td className={CELDA}><EtiquetaEstado activo={variedad.activo} femenino /></td>
                                 <td className={`${CELDA} text-right`}><div className="flex flex-wrap justify-end gap-3">
                                   <button type="button" onClick={() => editarVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad} aria-label={`Editar ${variedad.nombre}`} className={BOTON_EDITAR}>Editar</button>
-                                  <button type="button" onClick={() => cambiarEstadoVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad || (!variedad.activo && !especieSeleccionada.activo)} title={!variedad.activo && !especieSeleccionada.activo ? "Activa primero la especie" : undefined} aria-label={`${variedad.activo ? "Desactivar" : "Activar"} ${variedad.nombre}`} className={botonEstado(variedad.activo)}>{cambiandoVariedadId === variedad.id ? "Actualizando…" : variedad.activo ? "Desactivar" : "Activar"}</button>
+                                  {/* Mismo ancho fijo que en especies: Editar no se mueve al activar o desactivar (2026-11-08). */}
+                                  <button type="button" onClick={() => cambiarEstadoVariedad(variedad)} disabled={cambiandoVariedadId === variedad.id || guardandoVariedad || (!variedad.activo && !especieSeleccionada.activo)} title={!variedad.activo && !especieSeleccionada.activo ? "Activa primero la especie" : undefined} aria-label={`${variedad.activo ? "Desactivar" : "Activar"} ${variedad.nombre}`} className={`${botonEstado(variedad.activo)} w-24 shrink-0 text-right`}>{cambiandoVariedadId === variedad.id ? "Actualizando…" : variedad.activo ? "Desactivar" : "Activar"}</button>
                                 </div></td>
                               </tr>
                             ))}
