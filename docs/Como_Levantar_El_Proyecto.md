@@ -354,30 +354,51 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 | Después de un `git pull` que cambió `package-lock.json`, el frontend sigue con las versiones anteriores (`docker compose exec frontend node -p "require('vite/package.json').version"` muestra la vieja) | El volumen `frontend_node_modules` conserva lo instalado antes: Docker solo copia la imagen a un volumen vacío | `docker compose down`, `docker volume rm a2d_sm_frontend_node_modules` y `docker compose up -d --build`. **No usar `down -v`**: borra también la base |
 | Después de probar producción, `a2d_frontend` no arranca (`exec: "node": executable file not found`) | Producción reemplazó la imagen del frontend por la de nginx | `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` y `docker compose up -d --build` (sección 8) |
 
-## 10. Qué hay construido hasta ahora
+## 10. Qué hay construido (PMV completo: E1 a E4)
 
-- API base con `GET /health`.
-- Configuración por variables de entorno (`app/core/config.py`).
-- Conexión a SQL Server con SQLAlchemy (`app/core/database.py`).
-- Utilidades de seguridad: hash de contraseñas y JWT (`app/core/security.py`) y validación de RUT (`app/core/validators.py`).
-- Modelo de usuarios y roles (`app/models/usuario.py`): `RolUsuario` (4 roles), `Usuario` y `UsuarioRol`. Comentado línea por línea. El rol `OPERADOR_BODEGA` queda fuera del alcance actual.
-- Migraciones con Alembic (`alembic.ini`, `migrations/`): la migración inicial `4e5b5d399259` crea las tablas `usuarios` y `usuario_roles` (más `alembic_version`). Se aplica con `docker compose exec backend alembic upgrade head`.
-- Schemas de autenticación (`app/schemas/auth.py`): `LoginRequest`, `TokenResponse`, `UsuarioCreate`, `UsuarioUpdate` y `UsuarioOut` (este último nunca expone la contraseña). Comentado línea por línea.
+### 10.1. Funcionalidad por épica
 
-- Dependencias de autenticación y roles (`app/api/deps.py`): `get_current_user`, `require_rol` y `require_roles`. Comentado línea por línea. Se verifican con las 14 pruebas de `tests/probar_deps.py`:
+| Épica | Historias | Pantallas (ruta) | Roles |
+| --- | --- | --- | --- |
+| **E1 · Autenticación y RBAC** | HU01 a HU06: inicio de sesión, perfil y menú según el rol, usuarios (crear, editar, activar, desactivar y listar) y acceso por rol | Login, Inicio (`/`), Usuarios (`/usuarios`), Cambiar contraseña (`/cambiar-contrasena`) | Todos; Usuarios solo el administrador |
+| **E2 · Maestros core** | HU07 productores, HU08 especies y variedades, HU09 calidades y sistemas productivos, HU10 tipos de bandeja y embalajes, HU11 listas para los formularios, HU21 auditoría automática | Productores (`/productores`), Mantenedores (`/mantenedores`, en pestañas) | Administrador |
+| **E3 · Recepción de tarjas** | HU12 registrar tarja, HU13 numeración automática, HU14 kilos netos, HU15 saldo de bandejas, HU16 imprimir tarja, HU17 consultar tarjas, HU24 anular tarja | Recepción (`/recepcion`), Tarjas (`/tarjas`), Bandejas (`/bandejas`), hoja de la tarja (`/tarjas/:id/imprimir`) | Operador de recepción y administrador; anular, solo el administrador |
+| **E4 · Procesamiento y auditoría** | HU18 procesar tarjas, HU19 rendimiento y merma, HU20 corregir una tarja, HU22 bitácora, HU23 trazabilidad, HU25 anular proceso | Procesamiento (`/procesamiento`), comprobante (`/procesamiento/:id/imprimir`), Rendimiento (`/rendimiento`), Corregir tarja (`/tarjas/:id/editar`), Trazabilidad (`/trazabilidad`), Auditoría (`/auditoria`) | Proceso: operador de proceso y administrador. Corregir: operador de recepción y administrador. Trazabilidad y Auditoría: gerencia y administrador. Anular un proceso: solo el administrador |
 
-  ```powershell
-  docker compose exec backend python -m tests.probar_deps
-  ```
+Reglas que el sistema garantiza en todas las épicas:
 
-   Debe terminar con `RESULTADO: todas las pruebas pasaron`. El script usa una transacción con `rollback`, así que no deja usuarios en la base.
+- La autorización se consulta siempre en la base de datos; los roles del token son solo informativos.
+- Las contraseñas se guardan con bcrypt, y el inicio de sesión se bloquea tras 5 fallos seguidos (`429`).
+- Nada se borra: las tarjas y los procesos se anulan, y los catálogos y los usuarios se desactivan.
+- Cada cambio queda en la auditoría con su usuario, su fecha y los valores de antes y después; la corrección de una tarja, además, con su motivo.
+- Las hojas de tarja y de proceso se imprimen sin el encabezado ni el pie del navegador.
 
-Épica 1 (autenticación, usuarios y roles) verificada en desarrollo:
+### 10.2. Migraciones
 
-- `app/scripts/crear_admin.py`: crear el primer administrador mediante `docker compose exec backend python -m app.scripts.crear_admin`.
-- `app/api/routers/auth.py`: login, usuario actual y gestión de usuarios.
-- `app/main.py`: router de autenticación activo bajo `/api/v1`.
-- Endpoints disponibles: `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `GET /api/v1/auth/usuarios`, `POST /api/v1/auth/usuarios` y `PUT /api/v1/auth/usuarios/{usuario_id}`.
-- Resultados de las pruebas de E1 (15 de aceptación HTTP, 14 automáticas de `deps.py` y 17 complementarias de QA): `docs/Pruebas/Pruebas.docx`.
+`docker compose exec backend alembic current` debe mostrar `c83e321c741d (head)`. Cadena completa, en `sistema/backend/migrations/versions/`:
 
-La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).
+`4e5b5d399259` (inicial) → `5e84fd3d65d7` (rol gerencia) → `374ea7356923` (auditoría) → `dda055fe706d` (productores) → `389173192388` (especies y variedades) → `4b255aeb7ac0` (calidades y sistemas productivos) → `30d78ce03230` (tipos de bandeja y embalajes) → `e650ab5e4bce` (código del productor) → `87d3341cb7a7` (tarjas y movimientos de bandeja) → `6787239d36b0` (procesos) → `988c85041cdb` (folio de 11 caracteres) → `c4f1a7d29e30` (cajas con decimales y merma en la tarja) → `c83e321c741d` (motivo de auditoría en `NVARCHAR`).
+
+### 10.3. Pruebas automáticas
+
+Desde `sistema/`, con el stack levantado. **Se ejecutan una por una, nunca en paralelo:** comparten la base y pueden bloquearse entre sí. Cada una trabaja dentro de una transacción que se revierte, así que no deja datos.
+
+```powershell
+docker compose exec backend python -m tests.probar_deps
+docker compose exec backend python -m tests.probar_auditoria
+docker compose exec backend python -m tests.probar_productores
+docker compose exec backend python -m tests.probar_catalogos
+docker compose exec backend python -m tests.probar_calidades_sistemas
+docker compose exec backend python -m tests.probar_seguridad
+docker compose exec backend python -m tests.probar_opciones
+docker compose exec backend python -m tests.probar_bandejas_embalajes
+docker compose exec backend python -m tests.probar_tarjas
+docker compose exec backend python -m tests.probar_procesos
+docker compose exec backend python -m tests.probar_trazabilidad
+docker compose exec backend python -m tests.probar_bitacora
+docker compose exec frontend node --test tests/
+```
+
+Cada suite del backend termina con `RESULTADO: todas las pruebas pasaron`. Resultado del 08/11/2026 (12 suites, 2.521 comprobaciones, 0 fallas): `probar_deps` 14, `probar_auditoria` 14, `probar_productores` 277, `probar_catalogos` 1.116, `probar_calidades_sistemas` 88, `probar_seguridad` 135, `probar_opciones` 123, `probar_bandejas_embalajes` 68, `probar_tarjas` 210, `probar_procesos` 307, `probar_trazabilidad` 53 y `probar_bitacora` 116. Frontend: 11 pruebas, 0 fallas.
+
+Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `docs/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).

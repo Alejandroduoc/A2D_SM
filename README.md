@@ -49,6 +49,11 @@ asegurando la disponibilidad y confiabilidad de la información.
 - Gestión de catálogos.
 - Auditoría de cambios.
 
+El producto mínimo viable está completo: épicas E1 (autenticación y roles), E2
+(maestros), E3 (recepción de tarjas) y E4 (procesamiento, trazabilidad y
+auditoría). Pantallas, roles, migraciones y pruebas de cada épica:
+[docs/Como_Levantar_El_Proyecto.md, sección 10](docs/Como_Levantar_El_Proyecto.md#10-qué-hay-construido-pmv-completo-e1-a-e4).
+
 ## Tecnologías utilizadas
 
 | Categoría | Tecnología |
@@ -57,12 +62,12 @@ asegurando la disponibilidad y confiabilidad de la información.
 | Frameworks | FastAPI, SQLAlchemy 2.0 + Alembic, React (Vite) + Tailwind |
 | Base de datos | Microsoft SQL Server 2022 |
 | Autenticación | JWT (token de acceso de 30 minutos y *refresh token* de 7 días) |
-| Infraestructura | Docker + Docker Compose |
+| Infraestructura | Docker + Docker Compose (Node 26 para el frontend; nginx en producción) |
 
 
 ## Instrucciones para ejecutar el proyecto localmente
 
-Todo el entorno corre en Docker: no hace falta instalar Python ni SQL Server.
+Todo el entorno corre en Docker: no hace falta instalar Python, Node ni SQL Server.
 Guía completa (variables de entorno, creación de la base, Alembic y errores
 frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
 
@@ -78,7 +83,7 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
 2. Crear los archivos `.env` a partir de los `.env.example` (en `sistema/` y en
    `sistema/backend/`) y completar las contraseñas.
 
-3. Desde la carpeta `sistema/`, levantar los contenedores (SQL Server + backend FastAPI):
+3. Desde la carpeta `sistema/`, levantar los contenedores (SQL Server, backend FastAPI y frontend React):
 
    ```powershell
    cd sistema
