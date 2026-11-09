@@ -1,7 +1,7 @@
 # Resultados de pruebas — Seguridad, E2, E3 y E4
 
-Resumen al 08/11/2026 de las pruebas del producto mínimo viable después de la
-Épica 1 (las actas de E1 están en esta misma carpeta). Todas las pruebas se
+Resumen al 09/11/2026 (creado el 08/11/2026) de las pruebas del producto
+mínimo viable después de la Épica 1 (las actas de E1 están en esta misma carpeta). Todas las pruebas se
 ejecutaron en Docker, con el entorno descrito en `docs/Como_Levantar_El_Proyecto.md`.
 El detalle de cada caso (pasos, valores esperados y obtenidos) está en el
 registro interno del equipo.
@@ -9,10 +9,10 @@ registro interno del equipo.
 **Convenciones:** ✅ pasó; ⏳ pendiente. "Verificación independiente" significa
 que la repitió el responsable de QA (Angelo Galindo) en su propio equipo.
 
-## 1. Pruebas automáticas (regresión completa, 08/11/2026)
+## 1. Pruebas automáticas (regresión completa, 09/11/2026)
 
 12 suites del backend, ejecutadas una por una: **2.521 comprobaciones, 0 fallas**.
-Frontend: 11 pruebas, 0 fallas. Migraciones en `c83e321c741d (head)` y
+Frontend: 17 pruebas, 0 fallas (6 nuevas del menú agrupado). Migraciones en `c83e321c741d (head)` y
 `alembic check` sin operaciones pendientes. Comandos y cifras por suite en
 `docs/Como_Levantar_El_Proyecto.md`, sección 10.3.
 
@@ -70,20 +70,22 @@ sección 6).
 
 - Pruebas automáticas de la corrección (`probar_tarjas`): incluyen el cambio de tipo de bandeja con su tara, la corrección sin cambios, las fechas, los catálogos desactivados, el largo del motivo y procesos reales que bloquean y luego liberan la tarja. Todas ✅.
 - Recorrido automatizado en navegador (Chromium, a 1280 y 390 px): 18 de 18 casos ✅.
-- ⏳ Verificación independiente en Edge (casos H20-1 a H20-20) e impresión física en papel de una tarja nueva y de una corregida.
+- Verificación independiente (08/11/2026): pruebas de entorno y regresión (5) y casos H20-1 a H20-19 de la pantalla ✅. Con el menú agrupado del 09/11, H20-15 (volver al registro desde "Corregir tarja") y H20-19 (390 px) se repitieron en navegador ✅.
+- ⏳ H20-20: impresión física en papel de una tarja nueva y de una corregida.
 
-**Cambios de interfaz del 08/11/2026, probados en navegador:**
+**Cambios de interfaz del 08 y 09/11/2026, probados en navegador:**
 
 - Los datos de cada evento de la bitácora se ven en una ventana emergente: 7 de 7 ✅.
 - En Mantenedores, los botones ya no se mueven al activar o desactivar: 6 de 6 ✅.
 - Hojas impresas con el título "Socradex" y sin el encabezado ni el pie del navegador: título y márgenes ✅; ⏳ confirmación en el diálogo de impresión de Edge.
+- Menú agrupado (09/11): "Recepción" (Registrar tarja y Consultar tarjas) y "Control" (Trazabilidad y Auditoría) se despliegan desde la barra. Pruebas automáticas del filtrado por rol: 6 ✅. Recorrido con los cuatro roles y un usuario con dos roles, a 1280 y 390 px (opciones por rol, apertura con clic, Enter y Espacio, cierre con Esc, con un clic fuera y al navegar, foco con Tab, grupo activo, panel dentro de la pantalla y sin scroll horizontal): 52 de 52 ✅. ⏳ Revisión del responsable de QA.
 
 ## 6. Verificación independiente de E3 y E4 (03/11 al 05/11/2026)
 
 49 casos ✅, en el equipo de QA: pruebas automáticas, procesamiento (HU18,
 HU19, HU23 y HU25), bitácora (HU22), impresión guardada como PDF y bloque 2 de
-E3. ⏳ Un ajuste visual pendiente en Mantenedores ("Ver variedades", R2), en
-curso.
+E3. El ajuste visual de Mantenedores ("Ver variedades", R2) se cerró el
+08/11/2026 con el ancho fijo de los botones Activar y Desactivar (sección 5).
 
 ## 7. Observaciones aceptadas
 
