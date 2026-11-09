@@ -47,6 +47,14 @@ body::before {
   min-height: calc(100vh - 50px);
 }
 
+/* El Popover nativo se ancla bajo su botón y se invierte en línea si falta espacio en móvil. */
+.menu-grupo-panel {
+  position-area: block-end span-inline-end;
+  inset: auto;
+  margin: 0;
+  position-try-fallbacks: flip-inline;
+}
+
 /* Títulos con serifa. */
 h1,
 h2,
