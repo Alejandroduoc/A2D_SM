@@ -37,22 +37,35 @@ asegurando la disponibilidad y confiabilidad de la información.
 
 | Rol | Necesidad principal |
 | --- | --- |
-| Operador de recepción | Registrar el ingreso de fruta y sus tarjas |
-| Operador de proceso | Consultar y actualizar el estado del procesamiento |
-| Administrador | Gestionar catálogos, usuarios y parámetros del sistema |
-| Gerencia  | Consultar trazabilidad e historial de cambios |
+| Operador de recepción | Registrar, imprimir, consultar y corregir las tarjas de recepción, y ver el saldo de bandejas de cada productor |
+| Operador de proceso | Registrar los procesos de las tarjas (folio, embalaje y cajas), rebajar la merma y consultar el rendimiento |
+| Administrador | Gestionar usuarios, productores y catálogos, y anular tarjas y procesos, además de todo lo anterior |
+| Gerencia | Consultar la trazabilidad de una tarja y la bitácora de cambios |
 
 ### Alcance funcional
 
-- Recepción de fruta.
-- Procesamiento de tarjas.
-- Gestión de catálogos.
-- Auditoría de cambios.
+El producto mínimo viable (PMV) está **completo al 09/11/2026**, con sus cuatro
+épicas:
 
-El producto mínimo viable está completo: épicas E1 (autenticación y roles), E2
-(maestros), E3 (recepción de tarjas) y E4 (procesamiento, trazabilidad y
-auditoría). Pantallas, roles, migraciones y pruebas de cada épica:
+| Épica | Qué incluye |
+| --- | --- |
+| E1 · Autenticación y roles | Inicio de sesión con renovación automática, cambio de contraseña, usuarios y menú según el rol (con los grupos desplegables "Recepción" y "Control") |
+| E2 · Maestros | Productores, especies y variedades, calidades, sistemas productivos, tipos de bandeja, embalajes y auditoría automática de cada cambio |
+| E3 · Recepción de tarjas | Registro de la tarja con numeración automática y kilos netos, impresión, consulta, saldo de bandejas y anulación |
+| E4 · Procesamiento y auditoría | Procesos con consumo parcial de tarjas, merma, rendimiento, corrección de tarjas con motivo, trazabilidad, bitácora y anulación de procesos |
+
+Pantallas, roles, migraciones y pruebas de cada épica:
 [docs/Como_Levantar_El_Proyecto.md, sección 10](docs/Como_Levantar_El_Proyecto.md#10-qué-hay-construido-pmv-completo-e1-a-e4).
+
+**Fuera del alcance del PMV** (trabajo posterior):
+
+- **La guía de recepción**, que agrupa las tarjas de un productor con los datos
+  del transporte. En el sistema legado, la guía es también donde se registran
+  las **bandejas que se devuelven al productor**. Por eso, en el PMV el saldo de
+  bandejas solo suma las entradas de cada tarja. El modelo de datos ya admite
+  movimientos de salida, para cuando se agregue la guía.
+- Bodega, despacho y reportes de gestión.
+- La migración de los datos del sistema legado.
 
 ## Tecnologías utilizadas
 
@@ -62,7 +75,7 @@ auditoría). Pantallas, roles, migraciones y pruebas de cada épica:
 | Frameworks | FastAPI, SQLAlchemy 2.0 + Alembic, React (Vite) + Tailwind |
 | Base de datos | Microsoft SQL Server 2022 |
 | Autenticación | JWT (token de acceso de 30 minutos y *refresh token* de 7 días) |
-| Infraestructura | Docker + Docker Compose (Node 26 para el frontend; nginx en producción) |
+| Infraestructura | Docker + Docker Compose (Node 26 para el frontend; nginx 1.30 en producción) |
 
 
 ## Instrucciones para ejecutar el proyecto localmente
@@ -115,6 +128,22 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
    administrador. La API responde en http://localhost:8000/health y su
    documentación está en http://localhost:8000/docs.
 
+### Pruebas
+
+Desde `sistema/`, con los contenedores levantados y **una prueba a la vez**
+(comparten la base). Cada prueba del backend trabaja dentro de una transacción
+que se revierte, así que no deja datos:
+
+```powershell
+docker compose exec backend python -m tests.probar_tarjas
+docker compose exec frontend node --test tests/
+```
+
+Resultado al 09/11/2026: 12 pruebas del backend con 2.521 comprobaciones y 17
+pruebas del frontend, sin fallas. La lista completa de comandos está en
+[docs/Como_Levantar_El_Proyecto.md, sección 10.3](docs/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas),
+y los resultados por épica en [docs/Pruebas/](docs/Pruebas/).
+
 ## Integrantes del equipo
 
 | Integrante | Rol |
@@ -149,25 +178,42 @@ conexión directa cliente-BD verificadas en el código fuente real —
 
 ### Arquitectura en capas
 
-Toda petición sigue el mismo camino, sin excepciones:
+Toda petición sigue el mismo camino:
 
 ```
 Frontend (React)  →  Router (FastAPI)  →  Service (lógica de negocio)  →  Model (SQLAlchemy)  →  Base de datos
 ```
+
+La única excepción documentada es el inicio de sesión y la renovación de
+tokens (router `auth`), que consultan los modelos directamente porque son
+operaciones simples de lectura sobre los usuarios. La autorización se consulta siempre
+en la base de datos: los roles del token son solo informativos.
+
+### Desarrollo y producción
+
+En desarrollo, el navegador usa el frontend de Vite (puerto 5173) y la API
+(puerto 8000). En producción (`docker-compose.prod.yml`), nginx 1.30 entrega el
+frontend compilado y reenvía `/api` al backend por la red interna. Solo se
+publica el puerto 80: la API y SQL Server quedan dentro de Docker. Antes de
+desplegar falta configurar HTTPS, una `SECRET_KEY` propia del servidor y un
+usuario de SQL Server distinto de `sa`
+([docs/Como_Levantar_El_Proyecto.md, sección 8](docs/Como_Levantar_El_Proyecto.md#8-producción)).
 
 ## Estructura del repositorio
 
 ```text
 A2D_SM/
 ├── README.md
-├── docs/                         # Documentación técnica
+├── docs/
+│   ├── Como_Levantar_El_Proyecto.md  # Guía completa del entorno, producción y lo construido
+│   └── Pruebas/                  # Actas de E1 y resultados de seguridad, E2, E3 y E4
 ├── sistema/
 │   ├── .gitignore                # Archivos que no se suben a git (.env, cachés, etc.)
 │   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
 │   ├── docker-compose.yml        # Entorno de desarrollo
-│   ├── docker-compose.prod.yml   # Ajustes para producción
+│   ├── docker-compose.prod.yml   # Ajustes para producción (nginx en el puerto 80)
 │   ├── backend/                  # API FastAPI (app/, migrations/, tests/)
-│   └── frontend/                 # Interfaz React/Vite + Tailwind
+│   └── frontend/                 # Interfaz React/Vite + Tailwind (src/, tests/, nginx.conf)
 ├── Fase 1/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
 │   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
