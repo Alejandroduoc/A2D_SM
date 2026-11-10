@@ -401,4 +401,4 @@ docker compose exec frontend node --test tests/
 
 Cada suite del backend termina con `RESULTADO: todas las pruebas pasaron`. Resultado del 09/11/2026 (12 suites, 2.521 comprobaciones, 0 fallas): `probar_deps` 14, `probar_auditoria` 14, `probar_productores` 277, `probar_catalogos` 1.116, `probar_calidades_sistemas` 88, `probar_seguridad` 135, `probar_opciones` 123, `probar_bandejas_embalajes` 68, `probar_tarjas` 210, `probar_procesos` 307, `probar_trazabilidad` 53 y `probar_bitacora` 116. Frontend: 17 pruebas, 0 fallas.
 
-Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `docs/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).
+Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `docs/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto/` (Product Backlog y Sprint Backlog).
