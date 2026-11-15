@@ -64,21 +64,21 @@ sección 6).
 | HU22 Bitácora de auditoría (API y pantalla) | 13 | ✅ |
 | HU23 Trazabilidad de una tarja | 9 | ✅ |
 | HU25 Anular un proceso | 12 | ✅ |
-| HU20 Corregir una tarja | Ver abajo | ✅ / ⏳ |
+| HU20 Corregir una tarja | Ver abajo | ✅ |
 
 **HU20 (corregida el 08/11/2026):**
 
 - Pruebas automáticas de la corrección (`probar_tarjas`): incluyen el cambio de tipo de bandeja con su tara, la corrección sin cambios, las fechas, los catálogos desactivados, el largo del motivo y procesos reales que bloquean y luego liberan la tarja. Todas ✅.
 - Recorrido automatizado en navegador (Chromium, a 1280 y 390 px): 18 de 18 casos ✅.
 - Verificación independiente (08/11/2026): pruebas de entorno y regresión (5) y casos H20-1 a H20-19 de la pantalla ✅. Con el menú agrupado del 09/11, H20-15 (volver al registro desde "Corregir tarja") y H20-19 (390 px) se repitieron en navegador ✅.
-- ⏳ H20-20: impresión física en papel de una tarja nueva y de una corregida.
+- ✅ H20-20: impresión física en papel de una tarja nueva y de una corregida. La hizo Angelo (responsable de QA); registrado el 15/11/2026.
 
 **Cambios de interfaz del 08 y 09/11/2026, probados en navegador:**
 
 - Los datos de cada evento de la bitácora se ven en una ventana emergente: 7 de 7 ✅.
 - En Mantenedores, los botones ya no se mueven al activar o desactivar: 6 de 6 ✅.
-- Hojas impresas con el título "Socradex" y sin el encabezado ni el pie del navegador: título y márgenes ✅; ⏳ confirmación en el diálogo de impresión de Edge.
-- Menú agrupado (09/11): "Recepción" (Registrar tarja y Consultar tarjas) y "Control" (Trazabilidad y Auditoría) se despliegan desde la barra. Pruebas automáticas del filtrado por rol: 6 ✅. Recorrido con los cuatro roles y un usuario con dos roles, a 1280 y 390 px (opciones por rol, apertura con clic, Enter y Espacio, cierre con Esc, con un clic fuera y al navegar, foco con Tab, grupo activo, panel dentro de la pantalla y sin scroll horizontal): 52 de 52 ✅. ⏳ Revisión del responsable de QA.
+- Hojas impresas con el título "Socradex" y sin el encabezado ni el pie del navegador: título y márgenes ✅; confirmación en el diálogo de impresión de Edge ✅ (Angelo, registrado el 15/11/2026).
+- Menú agrupado (09/11): "Recepción" (Registrar tarja y Consultar tarjas) y "Control" (Trazabilidad y Auditoría) se despliegan desde la barra. Pruebas automáticas del filtrado por rol: 6 ✅. Recorrido con los cuatro roles y un usuario con dos roles, a 1280 y 390 px (opciones por rol, apertura con clic, Enter y Espacio, cierre con Esc, con un clic fuera y al navegar, foco con Tab, grupo activo, panel dentro de la pantalla y sin scroll horizontal): 52 de 52 ✅. Revisión del responsable de QA en Edge ✅ (Angelo, registrado el 15/11/2026).
 
 ## 6. Verificación independiente de E3 y E4 (03/11 al 05/11/2026)
 
