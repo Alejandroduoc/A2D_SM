@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     project_name: str="A2D_SM" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca PROJECT_NAME en el entorno; si no la encuentra, usa ese string.
     api_v1_prefix: str="/api/v1" # Un atributo con type hint (str) y un valor por defecto. Pydantic busca API_V1_PREFIX en el entorno; si no la encuentra, usa ese string.
     #cors
-    cors_origins: list[str]=["http://localhost:5173"] # direcciones permitidas
+    cors_origins: list[str]=["http://localhost:5173", "http://127.0.0.1:5173"] # direcciones permitidas (localhost y 127.0.0.1 son orígenes distintos para el navegador)
     # Publica /docs, /redoc y /openapi.json. En producción se apaga con MOSTRAR_DOCS=false
     # para no entregar el mapa completo de la API a cualquiera.
     mostrar_docs: bool = True
