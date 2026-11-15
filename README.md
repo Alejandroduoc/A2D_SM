@@ -139,7 +139,7 @@ docker compose exec backend python -m tests.probar_tarjas
 docker compose exec frontend node --test tests/
 ```
 
-Resultado al 09/11/2026: 12 pruebas del backend con 2.521 comprobaciones y 17
+Resultado al 15/11/2026: 12 pruebas del backend con 2.521 comprobaciones y 17
 pruebas del frontend, sin fallas. La lista completa de comandos está en
 [docs/Como_Levantar_El_Proyecto.md, sección 10.3](docs/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas),
 y los resultados por épica en [docs/Pruebas/](docs/Pruebas/).
@@ -206,7 +206,7 @@ A2D_SM/
 ├── README.md
 ├── docs/
 │   ├── Como_Levantar_El_Proyecto.md  # Guía completa del entorno, producción y lo construido
-│   └── Pruebas/                  # Actas de E1 y resultados de seguridad, E2, E3 y E4
+│   └── Pruebas/                  # Actas de E1, resultados de seguridad, E2, E3 y E4 (Pruebas.docx)
 ├── sistema/
 │   ├── .gitignore                # Archivos que no se suben a git (.env, cachés, etc.)
 │   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
@@ -218,9 +218,10 @@ A2D_SM/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
 │   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
 └── Fase 2/
-    ├── Actas/                    # Actas de control de avance (evidencia de retrospectiva)
-    ├── Evidencias Grupales/      # Guía 2.4 (desarrollo) e informe final 2.6
-    ├── Evidencias Individuales/  # Diarios de reflexión 2.1 de cada integrante
+    ├── Actas/                    # Actas de control de avance del 17/10 y 31/10 (evidencia de retrospectiva)
+    ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6, presentación
+    │                             # y video demo del sistema (A2D_SM 17-10-26.mp4)
+    ├── Evidencias Individuales/  # Diarios de reflexión 2.1 y autoevaluaciones 2.2
     └── Evidencias Proyecto/      # Product Vision, Product Backlog, Sprint Backlog,
                                   # Definition of Done y Documento de Diseño
 ```

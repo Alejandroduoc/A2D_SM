@@ -334,7 +334,7 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 
 | Síntoma | Causa | Solución |
 | --- | --- | --- |
-| `error during connect ... dockerDesktopLinuxEngine` | Docker Desktop apagado | Abrirlo y esperar "Engine running" |
+| `error during connect ... dockerDesktopLinuxEngine` (Windows) o `failed to connect to the docker API ... docker.sock` (Mac) | Docker Desktop apagado | Abrirlo y esperar "Engine running" |
 | `Field required` en los logs del backend | Falta `sistema/backend/.env` o `SECRET_KEY`, o falta `MSSQL_SA_PASSWORD` en `sistema/.env` | Crearlos desde los `.env.example` |
 | `Login failed for user 'sa'` + `Cannot open database "a2d_sm"` | La base aún no existe | Ejecutar el `CREATE DATABASE` de la sección 4.2 |
 | `Login failed for user 'sa'` con la base creada | El volumen se creó con otra contraseña | Sección 4.3 (`docker compose down -v`; borra los datos) |
@@ -353,6 +353,8 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 | El editor marca imports en rojo (sqlalchemy, fastapi...) | Tu PC no tiene esos paquetes instalados (solo están en el contenedor) | No afecta la ejecución; es solo el resaltado del editor |
 | Después de un `git pull` que cambió `package-lock.json`, el frontend sigue con las versiones anteriores (`docker compose exec frontend node -p "require('vite/package.json').version"` muestra la vieja) | El volumen `frontend_node_modules` conserva lo instalado antes: Docker solo copia la imagen a un volumen vacío | `docker compose down`, `docker volume rm a2d_sm_frontend_node_modules` y `docker compose up -d --build`. **No usar `down -v`**: borra también la base |
 | Después de probar producción, `a2d_frontend` no arranca (`exec: "node": executable file not found`) | Producción reemplazó la imagen del frontend por la de nginx | `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` y `docker compose up -d --build` (sección 8) |
+| `git status` dice que tu rama y `origin/main` divergieron (`have diverged`) | Alguien reescribió la historia de `main` en GitHub con un push forzado | **No hacer `git pull` ni `git push --force`.** Si no tienes commits propios sin subir: `git fetch` y `git reset --hard origin/main`. Si los tienes, avisar al equipo antes de tocar nada |
+| `docker compose exec backend python -m app.scripts.crear_admin` no deja escribir la contraseña | El script necesita una terminal interactiva (no funciona con `-T` ni desde un script) | Ejecutarlo directamente en PowerShell o en la Terminal |
 
 ## 10. Qué hay construido (PMV completo: E1 a E4)
 
@@ -399,6 +401,6 @@ docker compose exec backend python -m tests.probar_bitacora
 docker compose exec frontend node --test tests/
 ```
 
-Cada suite del backend termina con `RESULTADO: todas las pruebas pasaron`. Resultado del 09/11/2026 (12 suites, 2.521 comprobaciones, 0 fallas): `probar_deps` 14, `probar_auditoria` 14, `probar_productores` 277, `probar_catalogos` 1.116, `probar_calidades_sistemas` 88, `probar_seguridad` 135, `probar_opciones` 123, `probar_bandejas_embalajes` 68, `probar_tarjas` 210, `probar_procesos` 307, `probar_trazabilidad` 53 y `probar_bitacora` 116. Frontend: 17 pruebas, 0 fallas.
+Cada suite del backend termina con `RESULTADO: todas las pruebas pasaron`. Resultado del 15/11/2026 (12 suites, 2.521 comprobaciones, 0 fallas): `probar_deps` 14, `probar_auditoria` 14, `probar_productores` 277, `probar_catalogos` 1.116, `probar_calidades_sistemas` 88, `probar_seguridad` 135, `probar_opciones` 123, `probar_bandejas_embalajes` 68, `probar_tarjas` 210, `probar_procesos` 307, `probar_trazabilidad` 53 y `probar_bitacora` 116. Frontend: 17 pruebas, 0 fallas.
 
 Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `docs/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto/` (Product Backlog y Sprint Backlog).
