@@ -200,7 +200,8 @@ function PanelCatalogo({ clave, titulo, singular, femenino, listar, crear, actua
                     <td className={`${CELDA} text-right`}><div className="flex flex-wrap justify-end gap-3">
                       {/* aria-label nombra el registro: el lector de pantalla no dice solo "Editar". */}
                       <button type="button" onClick={() => editar(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`Editar ${fila.nombre}`} className={BOTON_EDITAR}>Editar</button>
-                      <button type="button" onClick={() => cambiarEstado(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`} className={botonEstado(fila.activo)}>{cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}</button>
+                      {/* Ancho fijo (w-24, como en especies): Editar queda en la misma columna con Activar o Desactivar (2026-11-15). */}
+                      <button type="button" onClick={() => cambiarEstado(fila)} disabled={guardando || cambiandoId === fila.id} aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`} className={`${botonEstado(fila.activo)} w-24 shrink-0 text-right`}>{cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}</button>
                     </div></td>
                   </tr>)}
           </tbody>

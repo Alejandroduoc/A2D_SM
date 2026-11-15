@@ -386,7 +386,8 @@ export default function Productores() {
                           {/* Impide cambiar de registro o de estado mientras el panel está abierto. */}
                           <div className="flex flex-wrap justify-end gap-3">
                             <button type="button" onClick={() => abrirFormulario(productor)} disabled={ocupado || editando !== null} aria-label={`Editar ${productor.razon_social}`} className={BOTON_EDITAR}>Editar</button>
-                            <button type="button" onClick={() => cambiarEstado(productor)} disabled={ocupado || editando !== null} aria-label={`${productor.activo ? "Desactivar" : "Activar"} ${productor.razon_social}`} className={botonEstado(productor.activo)}>
+                            {/* Ancho fijo (w-24, como en Mantenedores): Editar queda en la misma columna con Activar o Desactivar (2026-11-15). */}
+                            <button type="button" onClick={() => cambiarEstado(productor)} disabled={ocupado || editando !== null} aria-label={`${productor.activo ? "Desactivar" : "Activar"} ${productor.razon_social}`} className={`${botonEstado(productor.activo)} w-24 shrink-0 text-right`}>
                               {cambiandoEstadoId === productor.id ? "Actualizando…" : productor.activo ? "Desactivar" : "Activar"}
                             </button>
                           </div>

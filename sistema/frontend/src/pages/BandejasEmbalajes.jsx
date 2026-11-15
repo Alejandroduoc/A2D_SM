@@ -444,7 +444,8 @@ function PanelPeso({
                         onClick={() => cambiarEstado(fila)}
                         disabled={guardando || cambiandoId === fila.id}
                         aria-label={`${fila.activo ? "Desactivar" : "Activar"} ${fila.nombre}`}
-                        className={botonEstado(fila.activo)}
+                        // Ancho fijo (w-24, como en especies): Editar queda en la misma columna con Activar o Desactivar (2026-11-15).
+                        className={`${botonEstado(fila.activo)} w-24 shrink-0 text-right`}
                       >
                         {cambiandoId === fila.id ? "Actualizando…" : fila.activo ? "Desactivar" : "Activar"}
                       </button>

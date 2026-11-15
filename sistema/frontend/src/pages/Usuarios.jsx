@@ -281,10 +281,14 @@ export default function Usuarios() {
                         <div className="flex flex-wrap justify-end gap-3">
                           <button type="button" onClick={() => abrir(cuenta)} disabled={ocupado || form !== null} aria-label={`Editar ${cuenta.nombre_usuario}`} className={BOTON_EDITAR}>Editar</button>
                           {/* Nadie puede desactivar su propia cuenta. */}
-                          {cuenta.id !== yo.id && (
-                            <button type="button" onClick={() => cambiarEstado(cuenta)} disabled={ocupado || form !== null} aria-label={`${cuenta.activo ? "Desactivar" : "Activar"} ${cuenta.nombre_usuario}`} className={botonEstado(cuenta.activo)}>
+                          {/* Ancho fijo (w-24, como en Mantenedores): Editar queda en la misma columna con Activar o Desactivar (2026-11-15). */}
+                          {cuenta.id !== yo.id ? (
+                            <button type="button" onClick={() => cambiarEstado(cuenta)} disabled={ocupado || form !== null} aria-label={`${cuenta.activo ? "Desactivar" : "Activar"} ${cuenta.nombre_usuario}`} className={`${botonEstado(cuenta.activo)} w-24 shrink-0 text-right`}>
                               {cambiandoId === cuenta.id ? "Actualizando…" : cuenta.activo ? "Desactivar" : "Activar"}
                             </button>
+                          ) : (
+                            // En la propia cuenta, un espacio vacío del mismo ancho mantiene Editar alineado.
+                            <span className="w-24 shrink-0" aria-hidden="true" />
                           )}
                         </div>
                       </td>
