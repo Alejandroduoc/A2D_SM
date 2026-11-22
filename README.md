@@ -12,13 +12,13 @@ auditable. Proyecto de Título APT122 — Duoc UC, Ingeniería Informática.
 ## Tabla de contenidos
 
 - [Descripción](#descripción)
-- [Licencia](#licencia)
 - [Tecnologías utilizadas](#tecnologías-utilizadas)
 - [Instrucciones para ejecutar el proyecto localmente](#instrucciones-para-ejecutar-el-proyecto-localmente)
 - [Integrantes del equipo](#integrantes-del-equipo)
 - [Metodología de trabajo](#metodología-de-trabajo)
 - [Arquitectura de la solución](#arquitectura-de-la-solución)
 - [Estructura del repositorio](#estructura-del-repositorio)
+- [Licencia](#licencia)
 
 ## Descripción
 
@@ -26,16 +26,6 @@ auditable. Proyecto de Título APT122 — Duoc UC, Ingeniería Informática.
 fruta. Su objetivo es modernizar y complementar el sistema legado actual,
 permitiendo gestionar el flujo de recepción y procesamiento de tarjas de fruta
 de manera más segura, mantenible y auditable.
-
-## Licencia
-
-El código fuente propio de [`src/`](src/) y las configuraciones técnicas de
-[`maquinasVirtuales/`](maquinasVirtuales/) se distribuyen bajo la
-[GNU General Public License, versión 3 exclusivamente (GPL-3.0-only)](LICENSE).
-La documentación académica, plantillas, archivos multimedia y material de
-terceros no reciben una licencia adicional salvo que su archivo lo indique.
-
-Copyright © 2026 Alejandro Rodríguez, Diego Carrillo y Angelo Galindo.
 
 ### Problema que resuelve
 
@@ -215,6 +205,7 @@ usuario de SQL Server distinto de `sa`
 ```text
 A2D_SM/
 ├── README.md
+├── LICENSE                       # GNU General Public License v3 (ver «Licencia»)
 ├── .gitignore                    # Archivos que no se suben a git (.env, cachés, temporales de Word)
 ├── Fase 1/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
@@ -238,3 +229,13 @@ A2D_SM/
     ├── .env.example              # Contraseña de SQL Server (copiar como .env)
     └── Como_Levantar_El_Proyecto.md  # Guía completa del entorno, producción y lo construido
 ```
+
+## Licencia
+
+El código fuente propio de [`src/`](src/) y las configuraciones técnicas de
+[`maquinasVirtuales/`](maquinasVirtuales/) se distribuyen bajo la
+[GNU General Public License, versión 3 exclusivamente (GPL-3.0-only)](LICENSE).
+La documentación académica, plantillas, archivos multimedia y material de
+terceros no reciben una licencia adicional salvo que su archivo lo indique.
+
+Copyright © 2026 Alejandro Rodríguez, Diego Carrillo y Angelo Galindo.
