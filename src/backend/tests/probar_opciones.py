@@ -1,6 +1,6 @@
 """HU11 — Pruebas reproducibles de las opciones de formularios para recepción (casos O1–O20).
 
-Ejecutar desde sistema/: docker compose exec backend python -m tests.probar_opciones
+Ejecutar desde maquinasVirtuales/: docker compose exec backend python -m tests.probar_opciones
 Todo corre dentro de una transacción externa que siempre se revierte: los datos
 de prueba se insertan como savepoints y no se borra ninguna fila para limpiar.
 Importar este módulo no ejecuta pruebas.

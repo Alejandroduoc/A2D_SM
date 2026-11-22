@@ -1,6 +1,6 @@
 # docker-compose.prod.yml: cambios para PRODUCCIÓN sobre el docker-compose.yml de desarrollo.
 # No se usa solo: se combina con el archivo base, y este archivo tiene prioridad
-# (ejecutar desde la carpeta sistema/):
+# (ejecutar desde la carpeta maquinasVirtuales/):
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
@@ -9,7 +9,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml config
 #
 # Antes de desplegar, revisar la lista de pendientes de producción en
-# docs/Como_Levantar_El_Proyecto.md, sección 8 (proxy HTTPS, usuario propio de SQL Server,
+# maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 8 (proxy HTTPS, usuario propio de SQL Server,
 # respaldos, claves del servidor y publicación del frontend).
 #
 # Esquema: el navegador solo habla con nginx (frontend, puerto 80). nginx entrega la
@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     # Imagen de producción: compila con Vite y sirve los archivos con nginx.
     build:
-      context: ./frontend
+      context: ../src/frontend
       dockerfile: Dockerfile.prod
       args:
         # Ruta relativa: el navegador llama a la API en el mismo servidor (/api/v1).

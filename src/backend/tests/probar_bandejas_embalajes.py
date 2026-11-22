@@ -1,6 +1,6 @@
 """HU10 — Pruebas reproducibles de tipos de bandeja y embalajes.
 
-Ejecutar desde sistema/ con:
+Ejecutar desde maquinasVirtuales/ con:
 docker compose exec backend python -m tests.probar_bandejas_embalajes
 
 Las escrituras usan una transacción externa. Los commit de los servicios quedan

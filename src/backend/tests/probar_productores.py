@@ -1,6 +1,6 @@
 """HU07 — Pruebas reproducibles del servicio, HTTP, permisos y auditoría.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_productores
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_productores
 Los commits del servicio quedan dentro de una transacción externa que se revierte.
 No se ejecutan consultas ni pruebas al importar este módulo.
 """

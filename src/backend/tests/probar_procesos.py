@@ -1,6 +1,6 @@
 """HU18: prueba reproducible del registro de procesos de tarjas.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_procesos
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_procesos
 Todas las filas temporales quedan dentro de una transacción externa revertida.
 """
 

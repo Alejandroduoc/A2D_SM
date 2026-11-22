@@ -1,6 +1,6 @@
 """HU12-HU14: prueba reproducible del registro de tarjas de recepción.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_tarjas
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_tarjas
 Todas las filas temporales quedan dentro de una transacción externa revertida.
 """
 

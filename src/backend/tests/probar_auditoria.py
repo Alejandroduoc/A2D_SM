@@ -1,6 +1,6 @@
 """HU21 — Pruebas del servicio de auditoría con datos temporales.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_auditoria
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_auditoria
 Cada escenario real utiliza su propia sesión y revierte todos sus cambios.
 """
 

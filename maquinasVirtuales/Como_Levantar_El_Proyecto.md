@@ -18,19 +18,19 @@ Tu PC (Docker Desktop)
 └── contenedor "a2d_frontend"  React/Vite, puerto 5173       ← interfaz web
 ```
 
-Son tres contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`sistema/backend/`) y del frontend (`sistema/frontend/`) se comparten con sus contenedores, así que lo que edites se aplica al instante. Todo se define en `sistema/docker-compose.yml`; las imágenes están en `sistema/backend/Dockerfile` y `sistema/frontend/Dockerfile`.
+Son tres contenedores separados. Los datos de la base se guardan en un volumen de Docker; el código del backend (`src/backend/`) y del frontend (`src/frontend/`) se comparten con sus contenedores, así que lo que edites se aplica al instante. Todo se define en `maquinasVirtuales/docker-compose.yml`; las imágenes están en `src/backend/Dockerfile` y `src/frontend/Dockerfile`.
 
 ## 3. Configuración (solo la primera vez)
 
 Hay **dos** archivos `.env`. Ninguno se sube a git; cada integrante crea los suyos copiando los `.env.example`.
 
-**3.1. `sistema/.env`:**
+**3.1. `maquinasVirtuales/.env`:**
 
 ```env
 MSSQL_SA_PASSWORD=<tu-contraseña>
 ```
 
-**3.2. `sistema/backend/.env`:**
+**3.2. `src/backend/.env`:**
 
 ```env
 SECRET_KEY=<una-clave-larga-y-aleatoria>
@@ -40,9 +40,9 @@ Reglas importantes:
 
 - La contraseña de SQL Server exige mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; si no, el contenedor se cae al iniciar.
 - Evita `@ : / ? #` en la contraseña: rompen la URL de conexión.
-- **No hay que escribir `DATABASE_URL`:** el `docker-compose.yml` la arma solo (servidor `db`, driver 18) usando `MSSQL_SA_PASSWORD`. Así la contraseña se escribe una sola vez. Si quedó una línea `DATABASE_URL` en tu `sistema/backend/.env`, bórrala: no hace daño (el compose tiene prioridad) pero confunde.
+- **No hay que escribir `DATABASE_URL`:** el `docker-compose.yml` la arma solo (servidor `db`, driver 18) usando `MSSQL_SA_PASSWORD`. Así la contraseña se escribe una sola vez. Si quedó una línea `DATABASE_URL` en tu `src/backend/.env`, bórrala: no hace daño (el compose tiene prioridad) pero confunde.
 
-> **¿Cómo llega la URL al backend?** `MSSQL_SA_PASSWORD` (`sistema/.env`) → `docker-compose.yml` arma `DATABASE_URL` (`...@db:1433/a2d_sm...`) y la entrega al contenedor como variable de entorno → `app/core/config.py` la lee en `settings.database_url` → `app/core/database.py` crea la conexión. `db` es el nombre del servicio de SQL Server dentro de la red de Docker (no `localhost`). Para ver qué recibió, sin mostrar la contraseña: `docker compose exec backend python -c "from app.core.config import settings; print(settings.database_url.split('@')[1])"`.
+> **¿Cómo llega la URL al backend?** `MSSQL_SA_PASSWORD` (`maquinasVirtuales/.env`) → `docker-compose.yml` arma `DATABASE_URL` (`...@db:1433/a2d_sm...`) y la entrega al contenedor como variable de entorno → `app/core/config.py` la lee en `settings.database_url` → `app/core/database.py` crea la conexión. `db` es el nombre del servicio de SQL Server dentro de la red de Docker (no `localhost`). Para ver qué recibió, sin mostrar la contraseña: `docker compose exec backend python -c "from app.core.config import settings; print(settings.database_url.split('@')[1])"`.
 - Si falta `SECRET_KEY` o `MSSQL_SA_PASSWORD`, la API **no arranca** (error `Field required`). Es intencional: no hay valores por defecto.
 
 ## 4. Levantar el proyecto
@@ -59,10 +59,10 @@ Distinguir tres cosas, porque se hacen en momentos distintos:
 
 ### 4.1. Levantar los contenedores
 
-Desde la carpeta `sistema/` (ahí están el `docker-compose.yml` y el `.env`):
+Desde la carpeta `maquinasVirtuales/` (ahí están el `docker-compose.yml` y el `.env`):
 
 ```powershell
-cd sistema
+cd maquinasVirtuales
 docker compose up -d --build
 docker compose ps
 ```
@@ -72,7 +72,7 @@ docker compose ps
 - **No sigas al paso 4.2 hasta que la base diga `healthy`**: si el motor aún está arrancando, el comando falla.
 - El frontend queda disponible en `http://localhost:5173`; la API queda disponible en `http://localhost:8000`.
 - Los puertos 1433, 8000 y 5173 se publican solo en tu PC (`127.0.0.1`): otros equipos de la misma red no pueden conectarse a ellos.
-- Si al actualizar el repositorio cambió `sistema/backend/requirements.txt` o un `Dockerfile`, reconstruye con `docker compose up -d --build`.
+- Si al actualizar el repositorio cambió `src/backend/requirements.txt` o un `Dockerfile`, reconstruye con `docker compose up -d --build`.
 - El primer arranque instala las dependencias de React dentro de `a2d_frontend`; no es necesario instalar Node en el PC.
 
 ### 4.2. Crear la base `a2d_sm` (solo la primera vez)
@@ -81,7 +81,7 @@ docker compose ps
 docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -Q "CREATE DATABASE a2d_sm"
 ```
 
-- Usa la contraseña que pusiste en `sistema/.env` (`MSSQL_SA_PASSWORD`).
+- Usa la contraseña que pusiste en `maquinasVirtuales/.env` (`MSSQL_SA_PASSWORD`).
 - Si funciona, **no imprime nada** (es normal).
 - Para comprobar que existe:
 
@@ -97,7 +97,7 @@ docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P
 
 La contraseña de `sa` se fija **solo la primera vez** que arranca un volumen vacío. Editar el `.env` después no la cambia: el contenedor sigue con la anterior y la API da `Login failed for user 'sa'`. Mientras la base no tenga datos que quieras conservar:
 
-1. Actualiza `MSSQL_SA_PASSWORD` en `sistema/.env`.
+1. Actualiza `MSSQL_SA_PASSWORD` en `maquinasVirtuales/.env`.
 2. Recrea el volumen (**esto borra todos los datos**):
 
    ```powershell
@@ -120,9 +120,9 @@ La contraseña de `sa` se fija **solo la primera vez** que arranca un volumen va
 
 ## 6. Tablas de la base de datos (Alembic) y comandos dentro del backend
 
-Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la carpeta `sistema/`). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `sistema/backend/`**, porque esa carpeta está compartida con el contenedor.
+Como Python vive dentro del contenedor, los comandos se ejecutan ahí con `docker compose exec backend ...` (desde la carpeta `maquinasVirtuales/`). Los archivos que generen (por ejemplo las migraciones) **quedan guardados en tu carpeta `src/backend/`**, porque esa carpeta está compartida con el contenedor.
 
-**Alembic** es la herramienta que crea y modifica las tablas de SQL Server a partir de los modelos de Python (`app/models/`). Cada cambio queda guardado como un archivo de *migración* en `sistema/backend/migrations/versions/`, que se sube a git para que todo el equipo tenga las mismas tablas. **No se usa `Base.metadata.create_all()`** para crear tablas.
+**Alembic** es la herramienta que crea y modifica las tablas de SQL Server a partir de los modelos de Python (`app/models/`). Cada cambio queda guardado como un archivo de *migración* en `src/backend/migrations/versions/`, que se sube a git para que todo el equipo tenga las mismas tablas. **No se usa `Base.metadata.create_all()`** para crear tablas.
 
 Hay que distinguir dos situaciones:
 
@@ -140,9 +140,9 @@ Hay que distinguir dos situaciones:
 **Paso 1 — Crear los `__init__.py`.** Archivos **vacíos**, para que Python trate las carpetas como paquetes:
 
 ```text
-sistema/backend/app/__init__.py
-sistema/backend/app/core/__init__.py
-sistema/backend/app/models/__init__.py
+src/backend/app/__init__.py
+src/backend/app/core/__init__.py
+src/backend/app/models/__init__.py
 ```
 
 **Paso 2 — Inicializar Alembic:**
@@ -151,9 +151,9 @@ sistema/backend/app/models/__init__.py
 docker compose exec backend alembic init migrations
 ```
 
-*Comprueba* que aparecieron `sistema/backend/alembic.ini` y la carpeta `sistema/backend/migrations/` (con `env.py`, `script.py.mako` y `versions/`).
+*Comprueba* que aparecieron `src/backend/alembic.ini` y la carpeta `src/backend/migrations/` (con `env.py`, `script.py.mako` y `versions/`).
 
-**Paso 3 — Vaciar la URL de `alembic.ini`.** Abre `sistema/backend/alembic.ini`, busca esta línea:
+**Paso 3 — Vaciar la URL de `alembic.ini`.** Abre `src/backend/alembic.ini`, busca esta línea:
 
 ```ini
 sqlalchemy.url = driver://user:pass@localhost/dbname
@@ -167,7 +167,7 @@ sqlalchemy.url =
 
 *Por qué:* la URL real se toma de la configuración de la app (`settings`), que ya la recibe desde el `docker-compose.yml`. Así no hay contraseñas en un archivo que se sube a git.
 
-**Paso 4 — Configurar `sistema/backend/migrations/env.py`.** Haz tres cambios:
+**Paso 4 — Configurar `src/backend/migrations/env.py`.** Haz tres cambios:
 
 1. Debajo de los imports que ya trae el archivo, agrega:
 
@@ -207,7 +207,7 @@ docker compose exec backend alembic current
 docker compose exec backend alembic revision --autogenerate -m "esquema inicial"
 ```
 
-Se crea un archivo nuevo en `sistema/backend/migrations/versions/` (con un nombre tipo `abc123_esquema_inicial.py`).
+Se crea un archivo nuevo en `src/backend/migrations/versions/` (con un nombre tipo `abc123_esquema_inicial.py`).
 
 **Paso 6 — Revisarla antes de aplicarla.** Ábrela. En la función `upgrade()` debe haber:
 
@@ -223,7 +223,7 @@ Si `upgrade()` solo contiene `pass`, la migración está vacía: falta el import
 docker compose exec backend alembic upgrade head
 ```
 
-**Paso 8 — Comprobar que las tablas existen** (usa la contraseña de `sistema/.env`):
+**Paso 8 — Comprobar que las tablas existen** (usa la contraseña de `maquinasVirtuales/.env`):
 
 ```powershell
 docker exec a2d_sqlserver /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "<tu-contraseña>" -d a2d_sm -Q "SELECT name FROM sys.tables"
@@ -276,7 +276,7 @@ docker compose exec backend bash                                 # terminal dent
 
 ## 7. Uso diario
 
-Una vez creada la base (sección 4.2), el día a día es solo abrir Docker Desktop y, desde la carpeta `sistema/`:
+Una vez creada la base (sección 4.2), el día a día es solo abrir Docker Desktop y, desde la carpeta `maquinasVirtuales/`:
 
 ```powershell
 docker compose up -d
@@ -284,7 +284,7 @@ docker compose up -d
 
 **No hay que volver a crear la base de datos.** Si al actualizar el proyecto llegaron migraciones nuevas, aplícalas con `docker compose exec backend alembic upgrade head` (sección 6.3). El código se recarga solo al guardar. Solo hay que reconstruir la imagen (`docker compose up -d --build backend`) si cambias `requirements.txt` o el `Dockerfile`.
 
-| Acción | Comando (desde `sistema/`) |
+| Acción | Comando (desde `maquinasVirtuales/`) |
 | --- | --- |
 | Ver estado de los contenedores | `docker compose ps` |
 | Ver logs del backend en vivo (Ctrl+C para salir) | `docker compose logs -f backend` |
@@ -298,11 +298,11 @@ docker compose up -d
 
 ## 8. Producción
 
-Todo lo anterior es el entorno de **desarrollo**. Para producción existe `sistema/docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario:
+Todo lo anterior es el entorno de **desarrollo**. Para producción existe `maquinasVirtuales/docker-compose.prod.yml`, que se combina con el compose base y solo cambia lo necesario:
 
 - quita las carpetas compartidas (corre el código de las imágenes) y `--reload`;
 - deja de publicar SQL Server y la API: solo se publica el frontend en el puerto 80;
-- el frontend se compila con `sistema/frontend/Dockerfile.prod` y lo sirve nginx (`sistema/frontend/nginx.conf`), que además reenvía `/api/` al backend por la red interna y agrega cabeceras de seguridad;
+- el frontend se compila con `src/frontend/Dockerfile.prod` y lo sirve nginx (`src/frontend/nginx.conf`), que además reenvía `/api/` al backend por la red interna y agrega cabeceras de seguridad;
 - apaga `/docs`, `/redoc` y `/openapi.json` (`MOSTRAR_DOCS=false`);
 - reinicia los contenedores si se caen.
 
@@ -335,12 +335,12 @@ CORS ya solo acepta el origen del frontend (`cors_origins` en `app/core/config.p
 | Síntoma | Causa | Solución |
 | --- | --- | --- |
 | `error during connect ... dockerDesktopLinuxEngine` (Windows) o `failed to connect to the docker API ... docker.sock` (Mac) | Docker Desktop apagado | Abrirlo y esperar "Engine running" |
-| `Field required` en los logs del backend | Falta `sistema/backend/.env` o `SECRET_KEY`, o falta `MSSQL_SA_PASSWORD` en `sistema/.env` | Crearlos desde los `.env.example` |
+| `Field required` en los logs del backend | Falta `src/backend/.env` o `SECRET_KEY`, o falta `MSSQL_SA_PASSWORD` en `maquinasVirtuales/.env` | Crearlos desde los `.env.example` |
 | `Login failed for user 'sa'` + `Cannot open database "a2d_sm"` | La base aún no existe | Ejecutar el `CREATE DATABASE` de la sección 4.2 |
 | `Login failed for user 'sa'` con la base creada | El volumen se creó con otra contraseña | Sección 4.3 (`docker compose down -v`; borra los datos) |
 | `a2d_backend` se reinicia o falla al conectar | La base no existe o la contraseña no es la del volumen | `docker compose logs backend`; revisar secciones 4.2 y 4.3 |
 | `Conflict. The container name "/a2d_sqlserver" is already in use` | Hay un contenedor viejo con ese nombre | `docker rm -f a2d_sqlserver` y `docker compose up -d` |
-| `No such container: a2d_sqlserver` (o `a2d_backend`) | Los contenedores no están creados | `docker compose up -d` desde `sistema/` |
+| `No such container: a2d_sqlserver` (o `a2d_backend`) | Los contenedores no están creados | `docker compose up -d` desde `maquinasVirtuales/` |
 | `port is already allocated` (1433) | Otro SQL Server usa el puerto | Detener el otro servicio o cambiar el puerto en `docker-compose.yml` |
 | `port is already allocated` (8000) | Otro programa usa el puerto 8000 | Cerrarlo o cambiar el puerto en `docker-compose.yml` |
 | Cambié `requirements.txt` y no se ve el paquete nuevo | La imagen no se reconstruyó | `docker compose up -d --build backend` |
@@ -377,13 +377,13 @@ Reglas que el sistema garantiza en todas las épicas:
 
 ### 10.2. Migraciones
 
-`docker compose exec backend alembic current` debe mostrar `c83e321c741d (head)`. Cadena completa, en `sistema/backend/migrations/versions/`:
+`docker compose exec backend alembic current` debe mostrar `c83e321c741d (head)`. Cadena completa, en `src/backend/migrations/versions/`:
 
 `4e5b5d399259` (inicial) → `5e84fd3d65d7` (rol gerencia) → `374ea7356923` (auditoría) → `dda055fe706d` (productores) → `389173192388` (especies y variedades) → `4b255aeb7ac0` (calidades y sistemas productivos) → `30d78ce03230` (tipos de bandeja y embalajes) → `e650ab5e4bce` (código del productor) → `87d3341cb7a7` (tarjas y movimientos de bandeja) → `6787239d36b0` (procesos) → `988c85041cdb` (folio de 11 caracteres) → `c4f1a7d29e30` (cajas con decimales y merma en la tarja) → `c83e321c741d` (motivo de auditoría en `NVARCHAR`).
 
 ### 10.3. Pruebas automáticas
 
-Desde `sistema/`, con el stack levantado. **Se ejecutan una por una, nunca en paralelo:** comparten la base y pueden bloquearse entre sí. Cada una trabaja dentro de una transacción que se revierte, así que no deja datos.
+Desde `maquinasVirtuales/`, con el stack levantado. **Se ejecutan una por una, nunca en paralelo:** comparten la base y pueden bloquearse entre sí. Cada una trabaja dentro de una transacción que se revierte, así que no deja datos.
 
 ```powershell
 docker compose exec backend python -m tests.probar_deps
@@ -403,4 +403,4 @@ docker compose exec frontend node --test tests/
 
 Cada suite del backend termina con `RESULTADO: todas las pruebas pasaron`. Resultado del 15/11/2026 (12 suites, 2.521 comprobaciones, 0 fallas): `probar_deps` 14, `probar_auditoria` 14, `probar_productores` 277, `probar_catalogos` 1.116, `probar_calidades_sistemas` 88, `probar_seguridad` 135, `probar_opciones` 123, `probar_bandejas_embalajes` 68, `probar_tarjas` 210, `probar_procesos` 307, `probar_trazabilidad` 53 y `probar_bitacora` 116. Frontend: 17 pruebas, 0 fallas.
 
-Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `docs/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto/` (Product Backlog y Sprint Backlog).
+Las actas de E1 y el resumen de pruebas de seguridad, E2, E3 y E4 (`Resultados_Pruebas_E2_E4_2026-11-08.md`) están en `Fase 2/Evidencias Proyecto (version Agil)/Pruebas/`. La planificación por semana (Carta Gantt) está en `Fase 2/Evidencias Proyecto (version Agil)/` (Product Backlog y Sprint Backlog).

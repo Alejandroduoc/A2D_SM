@@ -1,6 +1,6 @@
 """HU08 — Pruebas reproducibles de especies y variedades.
 
-Desde sistema/: docker compose exec -T backend python -m tests.probar_catalogos
+Desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_catalogos
 Modalidad API: ASGI con get_db QA; la autenticación y autorización son reales.
 Crea y retira exclusivamente una base QA propia; desarrollo solo se lee.
 El argumento --fallo-controlado comprueba el código de salida y la limpieza.

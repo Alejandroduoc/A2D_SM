@@ -1,6 +1,6 @@
 """HU09 — Pruebas reproducibles de calidades y sistemas productivos.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_calidades_sistemas
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_calidades_sistemas
 Cada escenario corre dentro de una transacción externa que siempre se revierte:
 los commits de los servicios quedan como savepoints y no se borra ninguna fila
 (tampoco de auditoría) para limpiar. Importar este módulo no ejecuta pruebas.

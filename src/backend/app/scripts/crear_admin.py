@@ -4,7 +4,7 @@ Crea el primer usuario ADMINISTRADOR del sistema.
 Sin este script no hay forma de iniciar sesión: la API solo deja crear usuarios
 a un administrador, y en una base recién creada no existe ninguno.
 
-Se ejecuta desde la carpeta sistema/ (necesita una terminal interactiva):
+Se ejecuta desde la carpeta maquinasVirtuales/ (necesita una terminal interactiva):
 
     docker compose exec backend python -m app.scripts.crear_admin
 """

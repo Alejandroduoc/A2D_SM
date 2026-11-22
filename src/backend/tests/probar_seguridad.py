@@ -1,6 +1,6 @@
 """Pruebas reproducibles de las mejoras de seguridad del 2026-10-25.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_seguridad
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_seguridad
 Cubre: límite de intentos de login, tiempo igual para usuarios inexistentes,
 largo de contraseñas, /auth/refresh, /auth/me/password, auditoría de usuarios,
 validación de productores, /docs desactivable y CORS sin credenciales.

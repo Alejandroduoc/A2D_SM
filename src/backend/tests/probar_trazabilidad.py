@@ -1,6 +1,6 @@
 """HU23: prueba reproducible de la trazabilidad de una tarja.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_trazabilidad
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_trazabilidad
 Todas las filas temporales quedan dentro de una transacción externa revertida.
 """
 

@@ -55,7 +55,7 @@ El producto mínimo viable (PMV) está **completo al 09/11/2026**, con sus cuatr
 | E4 · Procesamiento y auditoría | Procesos con consumo parcial de tarjas, merma, rendimiento, corrección de tarjas con motivo, trazabilidad, bitácora y anulación de procesos |
 
 Pantallas, roles, migraciones y pruebas de cada épica:
-[docs/Como_Levantar_El_Proyecto.md, sección 10](docs/Como_Levantar_El_Proyecto.md#10-qué-hay-construido-pmv-completo-e1-a-e4).
+[maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 10](maquinasVirtuales/Como_Levantar_El_Proyecto.md#10-qué-hay-construido-pmv-completo-e1-a-e4).
 
 **Fuera del alcance del PMV** (trabajo posterior):
 
@@ -82,7 +82,7 @@ Pantallas, roles, migraciones y pruebas de cada épica:
 
 Todo el entorno corre en Docker: no hace falta instalar Python, Node ni SQL Server.
 Guía completa (variables de entorno, creación de la base, Alembic y errores
-frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.md).
+frecuentes): [maquinasVirtuales/Como_Levantar_El_Proyecto.md](maquinasVirtuales/Como_Levantar_El_Proyecto.md).
 
 **Requisitos:** Docker Desktop y Git.
 
@@ -93,13 +93,13 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
    cd A2D_SM
    ```
 
-2. Crear los archivos `.env` a partir de los `.env.example` (en `sistema/` y en
-   `sistema/backend/`) y completar las contraseñas.
+2. Crear los archivos `.env` a partir de los `.env.example` (en `maquinasVirtuales/` y en
+   `src/backend/`) y completar las contraseñas.
 
-3. Desde la carpeta `sistema/`, levantar los contenedores (SQL Server, backend FastAPI y frontend React):
+3. Desde la carpeta `maquinasVirtuales/`, levantar los contenedores (SQL Server, backend FastAPI y frontend React):
 
    ```powershell
-   cd sistema
+   cd maquinasVirtuales
    docker compose up -d --build
    ```
 
@@ -130,7 +130,7 @@ frecuentes): [docs/Como_Levantar_El_Proyecto.md](docs/Como_Levantar_El_Proyecto.
 
 ### Pruebas
 
-Desde `sistema/`, con los contenedores levantados y **una prueba a la vez**
+Desde `maquinasVirtuales/`, con los contenedores levantados y **una prueba a la vez**
 (comparten la base). Cada prueba del backend trabaja dentro de una transacción
 que se revierte, así que no deja datos:
 
@@ -141,8 +141,8 @@ docker compose exec frontend node --test tests/
 
 Resultado al 15/11/2026: 12 pruebas del backend con 2.521 comprobaciones y 17
 pruebas del frontend, sin fallas. La lista completa de comandos está en
-[docs/Como_Levantar_El_Proyecto.md, sección 10.3](docs/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas),
-y los resultados por épica en [docs/Pruebas/](docs/Pruebas/).
+[maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 10.3](maquinasVirtuales/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas),
+y los resultados por épica en [Fase 2/Evidencias Proyecto (version Agil)/Pruebas/](<Fase 2/Evidencias Proyecto (version Agil)/Pruebas/>).
 
 ## Integrantes del equipo
 
@@ -197,31 +197,33 @@ frontend compilado y reenvía `/api` al backend por la red interna. Solo se
 publica el puerto 80: la API y SQL Server quedan dentro de Docker. Antes de
 desplegar falta configurar HTTPS, una `SECRET_KEY` propia del servidor y un
 usuario de SQL Server distinto de `sa`
-([docs/Como_Levantar_El_Proyecto.md, sección 8](docs/Como_Levantar_El_Proyecto.md#8-producción)).
+([maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 8](maquinasVirtuales/Como_Levantar_El_Proyecto.md#8-producción)).
 
 ## Estructura del repositorio
 
 ```text
 A2D_SM/
 ├── README.md
-├── docs/
-│   ├── Como_Levantar_El_Proyecto.md  # Guía completa del entorno, producción y lo construido
-│   └── Pruebas/                  # Actas de E1, resultados de seguridad, E2, E3 y E4 (Pruebas.docx)
-├── sistema/
-│   ├── .gitignore                # Archivos que no se suben a git (.env, cachés, etc.)
-│   ├── .env.example              # Contraseña de SQL Server (copiar como .env)
-│   ├── docker-compose.yml        # Entorno de desarrollo
-│   ├── docker-compose.prod.yml   # Ajustes para producción (nginx en el puerto 80)
-│   ├── backend/                  # API FastAPI (app/, migrations/, tests/)
-│   └── frontend/                 # Interfaz React/Vite + Tailwind (src/, tests/, nginx.conf)
+├── .gitignore                    # Archivos que no se suben a git (.env, cachés, temporales de Word)
 ├── Fase 1/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
 │   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
-└── Fase 2/
-    ├── Actas/                    # Actas de control de avance del 17/10 y 31/10 (evidencia de retrospectiva)
-    ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6, presentación
-    │                             # y video demo del sistema (A2D_SM 17-10-26.mp4)
-    ├── Evidencias Individuales/  # Diarios de reflexión 2.1 y autoevaluaciones 2.2
-    └── Evidencias Proyecto/      # Product Vision, Product Backlog, Sprint Backlog,
-                                  # Definition of Done y Documento de Diseño
+├── Fase 2/
+│   ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6, presentación,
+│   │                             # videos demo del sistema y actas de control de avance
+│   ├── Evidencias Individuales/  # Diarios de reflexión 2.1 y autoevaluaciones 2.2
+│   └── Evidencias Proyecto (version Agil)/  # Product Vision, Product Backlog, Sprint Backlog,
+│       │                         # Definition of Done y Documento de Diseño
+│       └── Pruebas/              # Actas de E1, resultados de seguridad, E2, E3 y E4 (Pruebas.docx)
+├── Fase 3/
+│   ├── Evidencias Grupales/      # Presentación final del proyecto
+│   └── Evidencias Individuales/  # Diarios de reflexión 3.1
+├── src/                          # Código fuente
+│   ├── backend/                  # API FastAPI (app/, migrations/, tests/, Dockerfile)
+│   └── frontend/                 # Interfaz React/Vite + Tailwind (src/, tests/, Dockerfile, nginx.conf)
+└── maquinasVirtuales/            # Configuración de Docker
+    ├── docker-compose.yml        # Entorno de desarrollo
+    ├── docker-compose.prod.yml   # Ajustes para producción (nginx en el puerto 80)
+    ├── .env.example              # Contraseña de SQL Server (copiar como .env)
+    └── Como_Levantar_El_Proyecto.md  # Guía completa del entorno, producción y lo construido
 ```

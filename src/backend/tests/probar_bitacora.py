@@ -1,6 +1,6 @@
 """HU22: prueba reproducible de la consulta de la bitácora.
 
-Ejecutar desde sistema/: docker compose exec -T backend python -m tests.probar_bitacora
+Ejecutar desde maquinasVirtuales/: docker compose exec -T backend python -m tests.probar_bitacora
 Todas las filas temporales quedan dentro de una transacción externa revertida.
 Los eventos llevan fechas de 2031 para no cruzarse con los datos reales de cada base.
 """

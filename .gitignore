@@ -1,3 +1,23 @@
+# Sistema operativo
 .DS_Store
 # Archivos temporales que crea Word/Excel mientras un documento está abierto
 ~$*
+
+# Secretos: .env de maquinasVirtuales/ y de src/backend/ (se suben solo los .env.example)
+.env
+
+# Backend (Python)
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.db
+
+# Frontend (Node)
+node_modules/
+dist/
+.vite/
+
+# Editores
+.vscode/
+.idea/
