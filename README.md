@@ -209,14 +209,14 @@ A2D_SM/
 │   ├── Evidencias Grupales/      # Entregables desarrollados por el equipo
 │   └── Evidencias Individuales/  # Autoevaluaciones y diarios de cada integrante
 ├── Fase 2/
-│   ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6, presentación,
+│   ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6,
 │   │                             # videos demo del sistema y actas de control de avance
 │   ├── Evidencias Individuales/  # Diarios de reflexión 2.1 y autoevaluaciones 2.2
 │   └── Evidencias Proyecto (version Agil)/  # Product Vision, Product Backlog, Sprint Backlog,
 │       │                         # Definition of Done y Documento de Diseño
 │       └── Pruebas/              # Actas de E1, resultados de seguridad, E2, E3 y E4 (Pruebas.docx)
 ├── Fase 3/
-│   ├── Evidencias Grupales/      # Presentación final del proyecto
+│   ├── Evidencias Grupales/      # Presentación de la entrega final (16/11/2026)
 │   └── Evidencias Individuales/  # Diarios de reflexión 3.1
 ├── src/                          # Código fuente
 │   ├── backend/                  # API FastAPI (app/, migrations/, tests/, Dockerfile)
