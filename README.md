@@ -142,8 +142,8 @@ docker compose exec frontend node --test tests/
 
 Resultado al 15/11/2026: 12 pruebas del backend con 2.521 comprobaciones y 17
 pruebas del frontend, sin fallas. La lista completa de comandos está en
-[maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 10.3](maquinasVirtuales/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas),
-y los resultados por épica en [Fase 2/Evidencias Proyecto (version Agil)/Pruebas/](<Fase 2/Evidencias Proyecto (version Agil)/Pruebas/>).
+[maquinasVirtuales/Como_Levantar_El_Proyecto.md, sección 10.3](maquinasVirtuales/Como_Levantar_El_Proyecto.md#103-pruebas-automáticas).
+Las actas de pruebas por épica se guardan en el registro interno del equipo.
 
 ## Integrantes del equipo
 
@@ -214,9 +214,8 @@ A2D_SM/
 │   ├── Evidencias Grupales/      # Guía 2.4 (desarrollo), informe final 2.6,
 │   │                             # videos demo del sistema y actas de control de avance
 │   ├── Evidencias Individuales/  # Diarios de reflexión 2.1 y autoevaluaciones 2.2
-│   └── Evidencias Proyecto (version Agil)/  # Product Vision, Product Backlog, Sprint Backlog,
-│       │                         # Definition of Done y Documento de Diseño
-│       └── Pruebas/              # Actas de E1, resultados de seguridad, E2, E3 y E4 (Pruebas.docx)
+│   └── Evidencias Proyecto/      # Product Vision, Product Backlog, Sprint Backlog,
+│                                 # Definition of Done y Documento de Diseño
 ├── Fase 3/
 │   ├── Evidencias Grupales/      # Presentación de la entrega final (16/11/2026)
 │   └── Evidencias Individuales/  # Diarios de reflexión 3.1
